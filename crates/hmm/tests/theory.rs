@@ -1,3 +1,7 @@
+use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::sync::mpsc;
+use std::time::Duration;
+
 use varvite_core::numerics::logsumexp;
 use varvite_core::{Error, Mat, Stream};
 use varvite_hmm::{
@@ -151,8 +155,14 @@ fn brute(h: &Hmm, seq: &Sequence, clamp: Option<&Clamp>) -> Brute {
     }
 }
 
+/// Infinite when any entry differs by NaN: nalgebra's `amax` skips NaN.
 fn max_abs_diff(a: &Mat, b: &Mat) -> f64 {
-    (a - b).amax()
+    let d = a - b;
+    if d.iter().any(|v| v.is_nan()) {
+        f64::INFINITY
+    } else {
+        d.amax()
+    }
 }
 
 fn check_against_brute(h: &Hmm, seq: &Sequence, clamp: Option<&Clamp>) {
@@ -1010,4 +1020,344 @@ fn em_log_likelihood_never_decreases_without_priors() {
         .map(|s| h.log_likelihood(s, None, Implementation::Log).unwrap())
         .sum();
     assert!(ll >= *rep.history.last().unwrap() - 1e-9 * ll.abs());
+}
+
+fn cat(p: Vec<f64>) -> Emission {
+    Emission::Categorical(Categorical {
+        probabilities: p,
+        pseudocount: 0.0,
+        frozen: false,
+    })
+}
+
+fn brute_best_lexicographic(h: &Hmm, seq: &Sequence) -> (Vec<u32>, f64) {
+    let (k, tn) = (h.k(), seq.t);
+    let mut best = (f64::NEG_INFINITY, vec![]);
+    for idx in 0..k.pow(tn as u32) {
+        let mut p = vec![0usize; tn];
+        let mut r = idx;
+        for t in (0..tn).rev() {
+            p[t] = r % k;
+            r /= k;
+        }
+        let mut v = h.start[p[0]].ln() + h.emissions[p[0]].log_density(&seq.x[0..seq.d]);
+        for t in 1..tn {
+            v += h.transition[(p[t - 1], p[t])].ln()
+                + h.emissions[p[t]].log_density(&seq.x[t * seq.d..(t + 1) * seq.d]);
+        }
+        if v > best.0 {
+            best = (v, p.iter().map(|&s| s as u32).collect());
+        }
+    }
+    (best.1, best.0)
+}
+
+#[test]
+fn viterbi_tie_equals_lowest_lexicographic_brute_force_path() {
+    let e = cat(vec![0.5, 0.5]);
+    let h = Hmm::new(
+        vec![0.5, 0.5],
+        Mat::from_row_slice(2, 2, &[0.1, 0.9, 0.9, 0.1]),
+        vec![e.clone(), e],
+    )
+    .unwrap();
+    let seq = Sequence {
+        t: 2,
+        d: 1,
+        x: vec![0.0, 0.0],
+    };
+    let (bp, bv) = brute_best_lexicographic(&h, &seq);
+    let (vp, vv) = h.viterbi(&seq, None).unwrap();
+    assert!((bv - vv).abs() < 1e-12);
+    assert_eq!(bp, vec![0, 1]);
+    assert_eq!(
+        vp, bp,
+        "hmm.md section 10: Viterbi must equal the lowest lexicographic path"
+    );
+}
+
+#[test]
+fn model_with_inconsistent_public_fields_errors_instead_of_panicking() {
+    let g = |m: f64| {
+        Emission::Gaussian(Gaussian {
+            mean: vec![m],
+            covariance: Mat::identity(1, 1),
+            covariance_type: CovarianceType::Full,
+            frozen: false,
+        })
+    };
+    let h = Hmm::new(
+        vec![0.5, 0.5],
+        Mat::from_element(2, 2, 0.5),
+        vec![g(0.0), g(1.0)],
+    )
+    .unwrap();
+    let mut v: serde_json::Value = serde_json::to_value(&h).unwrap();
+    v["start"] = serde_json::json!([0.3, 0.3, 0.4]);
+    let bad: Hmm = serde_json::from_value(v).unwrap();
+    let seq = Sequence {
+        t: 3,
+        d: 1,
+        x: vec![0.0, 1.0, 0.5],
+    };
+    let r = std::panic::catch_unwind(|| bad.log_likelihood(&seq, None, Implementation::Log));
+    assert!(
+        matches!(r, Ok(Err(_))),
+        "a deserialised 3-start / 2x2-transition / 2-emission model must raise InvalidInput"
+    );
+}
+
+#[test]
+fn poisson_non_integer_count_has_zero_probability() {
+    let p = Emission::Poisson(Poisson {
+        rate: vec![3.0],
+        frozen: false,
+    });
+    let v = p.log_density(&[2.5]);
+    assert_eq!(
+        v,
+        f64::NEG_INFINITY,
+        "scipy.stats.poisson.logpmf(2.5, 3) is -inf; got {v}"
+    );
+    let total: f64 = (0..200)
+        .map(|k| p.log_density(&[k as f64]).exp())
+        .sum::<f64>();
+    assert!((total - 1.0).abs() < 1e-12);
+}
+
+#[test]
+fn frozen_emissions_are_not_replaced_by_fit() {
+    let g = |m: f64| {
+        Emission::Gaussian(Gaussian {
+            mean: vec![m],
+            covariance: Mat::identity(1, 1),
+            covariance_type: CovarianceType::Diag,
+            frozen: true,
+        })
+    };
+    let mut h = Hmm::new(
+        vec![0.5, 0.5],
+        Mat::from_row_slice(2, 2, &[0.9, 0.1, 0.1, 0.9]),
+        vec![g(-3.0), g(3.0)],
+    )
+    .unwrap();
+    let frozen = h.emissions.clone();
+    let data: Vec<Sequence> = h.sample(&[200, 200], 1).into_iter().map(|p| p.1).collect();
+    h.fit(
+        &Family::Gaussian {
+            covariance_type: CovarianceType::Diag,
+        },
+        &data,
+        None,
+        &FitOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(
+        h.emissions, frozen,
+        "frozen emissions were overwritten by k-means initialisation"
+    );
+}
+
+fn normal_1d(mean: f64) -> Emission {
+    Emission::Gaussian(Gaussian {
+        mean: vec![mean],
+        covariance: Mat::identity(1, 1),
+        covariance_type: CovarianceType::Diag,
+        frozen: false,
+    })
+}
+
+fn left_to_right(means: [f64; 3]) -> Hmm {
+    let a = Mat::from_row_slice(3, 3, &[0.5, 0.5, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 1.0]);
+    Hmm::new(
+        vec![1.0, 0.0, 0.0],
+        a,
+        means.iter().map(|&m| normal_1d(m)).collect(),
+    )
+    .unwrap()
+}
+
+fn seq_1d(x: &[f64]) -> Sequence {
+    Sequence {
+        t: x.len(),
+        d: 1,
+        x: x.to_vec(),
+    }
+}
+
+#[test]
+fn scaled_forward_keeps_a_path_whose_filter_weight_underflows() {
+    let h = left_to_right([0.0, 10.0, 1000.0]);
+    let s = seq_1d(&[0.0, -80.0, 1000.0]);
+    let truth = brute(&h, &s, None).ll;
+    assert!(truth.is_finite());
+    let log = h.log_likelihood(&s, None, Implementation::Log).unwrap();
+    assert!((log - truth).abs() < 1e-9 * truth.abs());
+    let scaled = h.log_likelihood(&s, None, Implementation::Scaled);
+    assert!(
+        matches!(scaled, Ok(v) if (v - truth).abs() < 1e-9 * truth.abs()),
+        "brute force ln L = {truth}, scaled gives {scaled:?}"
+    );
+    let post = h.posterior(&s, None, Implementation::Scaled).unwrap();
+    assert!((post.log_likelihood - truth).abs() < 1e-9 * truth.abs());
+}
+
+#[test]
+fn scaled_posterior_matches_log_when_the_filter_is_subnormal() {
+    let h = left_to_right([0.0, 10.0, 1000.0]);
+    let s = seq_1d(&[0.0, -67.5, 1000.0]);
+    let log = h.posterior(&s, None, Implementation::Log).unwrap();
+    let scaled = h.posterior(&s, None, Implementation::Scaled).unwrap();
+    assert!((log.gamma[(1, 1)] - 1.0).abs() < 1e-12);
+    assert!(
+        max_abs_diff(&log.gamma, &scaled.gamma) < 1e-12,
+        "log gamma {} vs scaled gamma {}",
+        log.gamma,
+        scaled.gamma
+    );
+    assert!(max_abs_diff(&log.xi_sum, &scaled.xi_sum) < 1e-12);
+}
+
+#[test]
+fn scaled_fit_on_underflowing_data_stays_finite() {
+    let mut h = left_to_right([0.0, 10.0, 1000.0]);
+    let data = vec![seq_1d(&[0.0, -67.5, 1000.0])];
+    let opts = FitOptions {
+        max_iter: 5,
+        params: Params::parse("st").unwrap(),
+        init_params: Params::parse("").unwrap(),
+        implementation: Implementation::Scaled,
+        ..FitOptions::default()
+    };
+    let family = Family::Gaussian {
+        covariance_type: CovarianceType::Diag,
+    };
+    let res = h.fit(&family, &data, None, &opts);
+    if let Ok(report) = &res {
+        assert!(
+            h.transition.iter().all(|v| v.is_finite())
+                && report.history.iter().all(|v| v.is_finite()),
+            "fit returned Ok with transition {} and history {:?}",
+            h.transition,
+            report.history
+        );
+    }
+}
+
+#[test]
+fn sequence_length_overflow_is_invalid_input_not_a_panic() {
+    let e = Emission::Gaussian(Gaussian {
+        mean: vec![0.0, 0.0],
+        covariance: Mat::identity(2, 2),
+        covariance_type: CovarianceType::Full,
+        frozen: false,
+    });
+    let h = Hmm::new(vec![1.0], Mat::identity(1, 1), vec![e]).unwrap();
+    let s = Sequence {
+        t: usize::MAX / 2 + 1,
+        d: 2,
+        x: Vec::new(),
+    };
+    let r = catch_unwind(AssertUnwindSafe(|| {
+        h.log_likelihood(&s, None, Implementation::Log)
+    }));
+    assert!(
+        matches!(r, Ok(Err(Error::InvalidInput(_)))),
+        "t x d overflow must raise InvalidInput; got a panic: {}",
+        r.is_err()
+    );
+}
+
+#[test]
+fn sample_posterior_rejects_an_absurd_draw_count_before_allocating() {
+    let h = left_to_right([0.0, 10.0, 20.0]);
+    let s = seq_1d(&[0.0, 10.0]);
+    for n in [usize::MAX / 8, usize::MAX / 64] {
+        let r = catch_unwind(AssertUnwindSafe(|| h.sample_posterior(&s, None, n, 0, 0)));
+        assert!(
+            matches!(r, Ok(Err(Error::InvalidInput(_)))),
+            "absurd n = {n} must raise InvalidInput; panicked: {}",
+            r.is_err()
+        );
+    }
+}
+
+#[test]
+fn poisson_sampling_with_a_large_rate_finishes() {
+    let h = Hmm::new(
+        vec![1.0],
+        Mat::identity(1, 1),
+        vec![Emission::Poisson(Poisson {
+            rate: vec![1e12],
+            frozen: false,
+        })],
+    )
+    .unwrap();
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(h.sample(&[1], 0));
+    });
+    assert!(
+        rx.recv_timeout(Duration::from_secs(20)).is_ok(),
+        "sampling one Poisson(1e12) count did not finish in 20 s"
+    );
+}
+
+#[test]
+fn poisson_rejection_sampler_matches_the_pmf() {
+    let (lam, n) = (25.0f64, 200_000usize);
+    let p = Emission::Poisson(Poisson {
+        rate: vec![lam],
+        frozen: false,
+    });
+    let mut s = Stream::new(31, &[]);
+    let (lo, hi) = (10usize, 42usize);
+    let mut counts = vec![0.0f64; hi - lo + 3];
+    for _ in 0..n {
+        let k = p.sample(&mut s)[0];
+        assert!(k >= 0.0 && k.fract() == 0.0);
+        let bin = (k as usize).clamp(lo - 1, hi + 1) - (lo - 1);
+        counts[bin] += 1.0;
+    }
+    let pmf = |k: usize| p.log_density(&[k as f64]).exp();
+    let below: f64 = (0..lo).map(pmf).sum();
+    let mut expected: Vec<f64> = vec![below];
+    expected.extend((lo..=hi).map(pmf));
+    expected.push(1.0 - expected.iter().sum::<f64>());
+    let chi2: f64 = counts
+        .iter()
+        .zip(&expected)
+        .map(|(o, e)| (o - n as f64 * e).powi(2) / (n as f64 * e))
+        .sum();
+    let df = (counts.len() - 1) as f64;
+    let pv = varvite_core::special::chi2_sf(chi2, df);
+    assert!(pv > 1e-4, "chi-square {chi2} on {df} df, p = {pv}");
+
+    let (lam, n) = (1e12f64, 20_000usize);
+    let p = Emission::Poisson(Poisson {
+        rate: vec![lam],
+        frozen: false,
+    });
+    let xs: Vec<f64> = (0..n).map(|_| p.sample(&mut s)[0]).collect();
+    let mean = xs.iter().sum::<f64>() / n as f64;
+    let var = xs.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1) as f64;
+    assert!(
+        (mean - lam).abs() < 5.0 * (lam / n as f64).sqrt(),
+        "mean {mean}"
+    );
+    assert!(
+        (var / lam - 1.0).abs() < 5.0 * (2.0 / (n - 1) as f64).sqrt(),
+        "variance {var}"
+    );
+}
+
+#[test]
+fn theory_max_abs_diff_helper_sees_nan() {
+    let truth = Mat::from_row_slice(2, 2, &[0.5, 0.5, 0.25, 0.75]);
+    let broken = Mat::from_row_slice(2, 2, &[0.5, f64::NAN, 0.25, 0.75]);
+    let diff = max_abs_diff(&truth, &broken);
+    assert!(
+        diff.is_nan() || diff >= 1e-12,
+        "max_abs_diff returns {diff} for a matrix holding NaN"
+    );
 }

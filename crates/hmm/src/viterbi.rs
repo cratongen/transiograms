@@ -4,7 +4,7 @@ use crate::forward_backward::impossible;
 use crate::model::{Decoder, Hmm, Implementation};
 use crate::sequence::{Clamp, Sequence};
 
-/// Max-product path; predecessors scan upward with strict `>` so the lowest index wins ties.
+/// Max-product path; on ties the lowest lexicographic optimal path wins.
 /// `Err(t)` names the first step where every state scores `-inf`.
 pub(crate) fn viterbi_path(
     log_start: &[f64],
@@ -14,40 +14,54 @@ pub(crate) fn viterbi_path(
     let (tn, k) = scores.shape();
     let mut delta: Vec<f64> = (0..k).map(|j| log_start[j] + scores[(0, j)]).collect();
     let mut next = vec![0.0; k];
-    let mut psi = vec![0u32; tn * k];
     let dead = |v: &[f64]| v.iter().all(|x| *x == f64::NEG_INFINITY);
     if dead(&delta) {
         return Err(0);
     }
     for t in 1..tn {
         for j in 0..k {
-            let (mut best, mut arg) = (f64::NEG_INFINITY, 0);
-            for i in 0..k {
-                let v = delta[i] + log_a[(i, j)];
-                if v > best {
-                    best = v;
-                    arg = i;
-                }
-            }
+            let best = (0..k)
+                .map(|i| delta[i] + log_a[(i, j)])
+                .fold(f64::NEG_INFINITY, f64::max);
             next[j] = best + scores[(t, j)];
-            psi[t * k + j] = arg as u32;
         }
         std::mem::swap(&mut delta, &mut next);
         if dead(&delta) {
             return Err(t);
         }
     }
-    let (mut best, mut arg) = (f64::NEG_INFINITY, 0);
-    for (j, &v) in delta.iter().enumerate() {
-        if v > best {
-            best = v;
-            arg = j;
+    let best = delta.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    // v[t][i]: best log score of x_t..x_T over paths starting in state i at t. Choosing each
+    // state front to back as the lowest index that attains the optimum yields the lowest
+    // lexicographic optimal path (hmm.md section 10).
+    let mut v = Mat::zeros(tn, k);
+    for i in 0..k {
+        v[(tn - 1, i)] = scores[(tn - 1, i)];
+    }
+    for t in (0..tn - 1).rev() {
+        for i in 0..k {
+            let tail = (0..k)
+                .map(|j| log_a[(i, j)] + v[(t + 1, j)])
+                .fold(f64::NEG_INFINITY, f64::max);
+            v[(t, i)] = scores[(t, i)] + tail;
         }
     }
+    let first_max = |f: &dyn Fn(usize) -> f64| {
+        let (mut b, mut arg) = (f64::NEG_INFINITY, 0);
+        for j in 0..k {
+            let x = f(j);
+            if x > b {
+                b = x;
+                arg = j;
+            }
+        }
+        arg
+    };
     let mut path = vec![0u32; tn];
-    path[tn - 1] = arg as u32;
-    for t in (1..tn).rev() {
-        path[t - 1] = psi[t * k + path[t] as usize];
+    path[0] = first_max(&|j| log_start[j] + v[(0, j)]) as u32;
+    for t in 1..tn {
+        let i = path[t - 1] as usize;
+        path[t] = first_max(&|j| log_a[(i, j)] + v[(t, j)]) as u32;
     }
     Ok((path, best))
 }

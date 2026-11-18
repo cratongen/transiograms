@@ -9,12 +9,14 @@ pub mod model;
 pub mod sequence;
 pub mod viterbi;
 
+pub use em::update_emission;
 pub use emission::{
     Categorical, CovarianceType, Emission, Family, Gaussian, GaussianMixture, Poisson,
 };
 pub use forward_backward::Posterior;
 pub use init::kmeans;
 pub use model::{
-    Decoder, FitOptions, FitReport, Hmm, Implementation, Ordering, Params, Priors, n_observed,
+    Decoder, FitOptions, FitReport, Hmm, Implementation, Ordering, Params, Priors,
+    emission_log_prior, n_observed,
 };
-pub use sequence::{Clamp, Sequence};
+pub use sequence::{Clamp, Sequence, pooled_moments};

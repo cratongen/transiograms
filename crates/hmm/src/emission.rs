@@ -339,7 +339,7 @@ impl<'a> Density<'a> {
                     if v.is_nan() {
                         continue;
                     }
-                    if v < 0.0 {
+                    if v < 0.0 || v.fract() != 0.0 {
                         return f64::NEG_INFINITY;
                     }
                     let lam = rate.max(1e-300);
@@ -376,6 +376,9 @@ fn sample_poisson(lam: f64, rng: &mut Stream) -> f64 {
     if lam <= 0.0 {
         return 0.0;
     }
+    if lam >= 10.0 {
+        return sample_poisson_ptrs(lam, rng);
+    }
     let u = rng.uniform();
     let ln_lam = lam.ln();
     let mut k = 0.0;
@@ -389,6 +392,32 @@ fn sample_poisson(lam: f64, rng: &mut Stream) -> f64 {
         cdf += pmf;
     }
     k
+}
+
+/// Hormann (1993) PTRS transformed rejection, exact for `lam >= 10` with O(1) expected draws.
+fn sample_poisson_ptrs(lam: f64, rng: &mut Stream) -> f64 {
+    let (slam, ln_lam) = (lam.sqrt(), lam.ln());
+    let b = 0.931 + 2.53 * slam;
+    let a = -0.059 + 0.02483 * b;
+    let inv_alpha = 1.1239 + 1.1328 / (b - 3.4);
+    let vr = 0.9277 - 3.6224 / (b - 2.0);
+    loop {
+        let u = rng.uniform() - 0.5;
+        let v = rng.uniform_open();
+        let us = 0.5 - u.abs();
+        let k = ((2.0 * a / us + b) * u + lam + 0.43).floor();
+        if us >= 0.07 && v <= vr {
+            return k;
+        }
+        if k < 0.0 || (us < 0.013 && v > us) {
+            continue;
+        }
+        if v.ln() + inv_alpha.ln() - (a / (us * us) + b).ln()
+            <= k * ln_lam - lam - ln_gamma(k + 1.0)
+        {
+            return k;
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

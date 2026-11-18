@@ -1,6 +1,6 @@
 use varvite_core::numerics::logsumexp;
 use varvite_core::rng::tag;
-use varvite_core::{Error, Mat, Result, Stream};
+use varvite_core::{Error, Mat, Result, Stream, invalid, memory};
 
 use crate::emission::Density;
 use crate::model::{Hmm, Implementation};
@@ -151,8 +151,11 @@ impl Hmm {
         Ok(Pass { ll, gamma, xi_sum })
     }
 
-    /// Scaled forward pass on `b~ = exp(lb - m_t)`: normalised alphas, `c_t` and `m_t`.
-    fn forward_scaled(&self, lb: &Mat, n: usize) -> Result<(Mat, Mat, Vec<f64>, f64)> {
+    /// Scaled forward pass on `b~ = exp(lb - m_t)`: normalised alphas, `b~`, `c_t` and `ln L`.
+    /// `None` when a filter entry that is positive in exact arithmetic falls below the smallest
+    /// normal f64: linear space has then lost a path that later evidence may need.
+    #[allow(clippy::type_complexity)]
+    fn forward_scaled(&self, lb: &Mat, n: usize) -> Result<Option<(Mat, Mat, Vec<f64>, f64)>> {
         let (tn, k) = lb.shape();
         let mut bt = Mat::zeros(tn, k);
         let mut alpha = Mat::zeros(tn, k);
@@ -165,14 +168,20 @@ impl Hmm {
             }
             for j in 0..k {
                 bt[(t, j)] = (lb[(t, j)] - m).exp();
-                let prior = if t == 0 {
-                    self.start[j]
+                let (prior, reachable) = if t == 0 {
+                    (self.start[j], self.start[j] > 0.0)
                 } else {
-                    (0..k)
-                        .map(|i| alpha[(t - 1, i)] * self.transition[(i, j)])
-                        .sum()
+                    let a = |i: usize| (alpha[(t - 1, i)], self.transition[(i, j)]);
+                    (
+                        (0..k).map(|i| a(i).0 * a(i).1).sum(),
+                        (0..k).any(|i| a(i).0 > 0.0 && a(i).1 > 0.0),
+                    )
                 };
                 alpha[(t, j)] = prior * bt[(t, j)];
+                if reachable && lb[(t, j)] > f64::NEG_INFINITY && alpha[(t, j)] < f64::MIN_POSITIVE
+                {
+                    return Ok(None);
+                }
             }
             c[t] = alpha.row(t).sum();
             if c[t] <= 0.0 {
@@ -183,12 +192,16 @@ impl Hmm {
             }
             ll += c[t].ln() + m;
         }
-        Ok((alpha, bt, c, ll))
+        Ok(Some((alpha, bt, c, ll)))
     }
 
+    /// Falls back to the log pass when linear space cannot hold the exact answer: a lost
+    /// filter entry, or a backward value that overflows.
     fn fb_scaled(&self, lb: &Mat, n: usize) -> Result<Pass> {
+        let Some((alpha, bt, c, ll)) = self.forward_scaled(lb, n)? else {
+            return self.fb_log(lb, n);
+        };
         let (tn, k) = lb.shape();
-        let (alpha, bt, c, ll) = self.forward_scaled(lb, n)?;
         let a = &self.transition;
         let mut gamma = Mat::zeros(tn, k);
         let mut xi_sum = Mat::zeros(k, k);
@@ -202,14 +215,25 @@ impl Hmm {
             for j in 0..k {
                 e[j] = bt[(t + 1, j)] * beta_next[j] / c[t + 1];
             }
+            // Structural zeros are skipped, not multiplied: `0 * inf` would be NaN.
             for i in 0..k {
-                beta[i] = (0..k).map(|j| a[(i, j)] * e[j]).sum();
-                gamma[(t, i)] = alpha[(t, i)] * beta[i];
-                for j in 0..k {
-                    xi_sum[(i, j)] += alpha[(t, i)] * a[(i, j)] * e[j];
+                beta[i] = (0..k)
+                    .filter(|&j| a[(i, j)] > 0.0)
+                    .map(|j| a[(i, j)] * e[j])
+                    .sum();
+                if alpha[(t, i)] > 0.0 {
+                    gamma[(t, i)] = alpha[(t, i)] * beta[i];
+                    for j in 0..k {
+                        if a[(i, j)] > 0.0 {
+                            xi_sum[(i, j)] += alpha[(t, i)] * a[(i, j)] * e[j];
+                        }
+                    }
                 }
             }
             std::mem::swap(&mut beta, &mut beta_next);
+        }
+        if !(gamma.iter().chain(xi_sum.iter())).all(|v| v.is_finite()) {
+            return self.fb_log(lb, n);
         }
         Ok(Pass { ll, gamma, xi_sum })
     }
@@ -252,7 +276,10 @@ impl Hmm {
         let lb = self.emission_logs(seq, clamp);
         match imp {
             Implementation::Log => Ok(self.forward_log(&lb, 0)?.2),
-            Implementation::Scaled => Ok(self.forward_scaled(&lb, 0)?.3),
+            Implementation::Scaled => match self.forward_scaled(&lb, 0)? {
+                Some(pass) => Ok(pass.3),
+                None => Ok(self.forward_log(&lb, 0)?.2),
+            },
         }
     }
 
@@ -284,6 +311,20 @@ impl Hmm {
         index: u64,
     ) -> Result<Vec<Vec<u32>>> {
         self.check(seq, clamp, 0)?;
+        let bytes = seq
+            .t
+            .checked_mul(size_of::<u32>())
+            .and_then(|b| b.checked_add(size_of::<Vec<u32>>()))
+            .and_then(|b| b.checked_mul(n));
+        match bytes {
+            Some(b) => memory::check(b as u64, None, &format!("{n} posterior paths"))?,
+            None => {
+                return invalid(format!(
+                    "{n} posterior paths of {} steps overflow usize",
+                    seq.t
+                ));
+            }
+        }
         let lb = self.emission_logs(seq, clamp);
         let (la, _, _) = self.forward_log(&lb, 0)?;
         let lat = self.log_transition();

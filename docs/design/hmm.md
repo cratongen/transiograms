@@ -141,9 +141,10 @@ outside `params` count 0.
 ## 9. Sampling
 
 `sample(lengths, seed)`: sequence i uses stream `[SAMPLE, i]`: `s_1 ~ pi`, `s_{t+1} ~ A[s_t]`,
-`x_t ~ b_{s_t}`. Gaussian draws `mu + L z`, z standard normal; Poisson by inverse CDF from 0
-with log-space pmf terms `exp(k ln lam - lam - ln_gamma(k + 1))`; mixture picks the component
-first.
+`x_t ~ b_{s_t}`. Gaussian draws `mu + L z`, z standard normal; Poisson with `lam < 10` by
+inverse CDF from 0 with log-space pmf terms `exp(k ln lam - lam - ln_gamma(k + 1))`, and with
+`lam >= 10` by Hormann's (1993) PTRS transformed rejection (O(1) expected uniforms per draw, so a
+large rate does not cost O(lam)); mixture picks the component first.
 
 ## 10. Brute-force oracle (tests)
 
@@ -154,4 +155,14 @@ deleting it and using `A^2` across it.
 
 ## Implementer decisions
 
-(empty)
+- Scaled forward-backward falls back to the log pass for a sequence when a filter entry that is
+  positive in exact arithmetic drops below the smallest normal f64 (shifting by `m_t` cannot keep
+  a path whose relative weight is below about `e^-708`, and later evidence may need that path),
+  or when the backward pass yields a non-finite gamma or xi. Structural zeros in A are skipped in
+  the backward sums so `0 * inf` never appears. Scaled and log therefore agree on every input.
+- A non-finite EM objective raises `Convergence` naming the iteration.
+- Sizes are checked before allocating: `t x d` and `t x K` use checked multiplication, a pass
+  checks `6 t K` f64 against the memory budget, and `sample_posterior` checks
+  `n (t * 4 + 24)` bytes; overflow or excess raises `InvalidInput`.
+- `sample(lengths, seed)` returns `Vec` per the spec signature, so it cannot reject absurd
+  lengths; callers must bound them.

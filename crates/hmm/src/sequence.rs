@@ -54,11 +54,16 @@ pub(crate) fn check_sequence(
             seq.d
         ));
     }
-    if seq.x.len() != seq.t * seq.d {
+    let Some(td) = seq.t.checked_mul(seq.d) else {
         return invalid(format!(
-            "sequence {n} holds {} values, not t x d = {}",
-            seq.x.len(),
-            seq.t * seq.d
+            "sequence {n}: t x d = {} x {} overflows usize",
+            seq.t, seq.d
+        ));
+    };
+    if seq.x.len() != td {
+        return invalid(format!(
+            "sequence {n} holds {} values, not t x d = {td}",
+            seq.x.len()
         ));
     }
     for (i, &v) in seq.x.iter().enumerate() {
@@ -76,7 +81,7 @@ pub(crate) fn check_sequence(
         }
     }
     if let Some(c) = clamp
-        && (c.k != k || c.allowed.len() != seq.t * k)
+        && (c.k != k || seq.t.checked_mul(k) != Some(c.allowed.len()))
     {
         return invalid(format!(
             "clamp of sequence {n} must be {} x {k}, got k = {} with {} entries",

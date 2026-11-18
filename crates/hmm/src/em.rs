@@ -12,7 +12,7 @@ use crate::emission::{
 };
 use crate::forward_backward::Pass;
 use crate::init::{check_data, initial_emissions, label_counts};
-use crate::model::{FitOptions, FitReport, Hmm, Ordering, n_observed};
+use crate::model::{FitOptions, FitReport, Hmm, Ordering, n_observed, validate_emissions};
 use crate::sequence::{Clamp, Sequence, pooled_moments};
 
 impl Hmm {
@@ -82,19 +82,27 @@ impl Hmm {
     ) -> Result<Hmm> {
         let k = self.k();
         let ip = opts.init_params;
-        let emissions = if ip.emission {
-            initial_emissions(k, family, data, clamps, opts.priors.covariance, v, stream)?
+        let frozen = |j: usize| self.emissions.get(j).is_some_and(Emission::frozen);
+        let emissions = if ip.emission && !(0..k).all(frozen) {
+            let fresh =
+                initial_emissions(k, family, data, clamps, opts.priors.covariance, v, stream)?;
+            fresh
+                .into_iter()
+                .enumerate()
+                .map(|(j, e)| {
+                    if frozen(j) {
+                        self.emissions[j].clone()
+                    } else {
+                        e
+                    }
+                })
+                .collect()
         } else {
             self.emissions.clone()
         };
+        validate_emissions(&emissions, k)?;
         let (mut start, mut transition) = (self.start.clone(), self.transition.clone());
         if ip.start || ip.transition {
-            if emissions.len() != k {
-                return invalid(format!(
-                    "give {k} emission distributions, not {}",
-                    emissions.len()
-                ));
-            }
             let (s, t) = label_counts(&emissions, data, clamps, k);
             if ip.start {
                 start = s;
@@ -105,7 +113,7 @@ impl Hmm {
         }
         let model = Hmm::new(start, transition, emissions)?;
         for (n, seq) in data.iter().enumerate() {
-            model.check(seq, clamps.map(|c| &c[n]), n)?;
+            model.check_sequence(seq, clamps.map(|c| &c[n]), n)?;
         }
         Ok(model)
     }
@@ -131,6 +139,11 @@ impl Hmm {
                 })
                 .collect::<Result<_>>()?;
             let obj = stats.iter().map(|s| s.ll).sum::<f64>() + self.log_prior(&opts.priors, v);
+            if !obj.is_finite() {
+                return convergence(format!(
+                    "objective is {obj} at iteration {m_steps}; the model went non-finite"
+                ));
+            }
             let prev = history.last().copied();
             history.push(obj);
             if let Some(prev) = prev {

@@ -1,7 +1,10 @@
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use varvite_core::rng::tag;
-use varvite_core::{Mat, Result, Stream, invalid};
+use varvite_core::{Mat, Result, Stream, invalid, memory};
+
+/// Upper bound on the `t x K` f64 matrices one forward-backward or Viterbi pass holds at once.
+const PASS_MATRICES: usize = 6;
 
 use crate::emission::{CovarianceType, Emission, Gaussian, check_simplex, chol_logdet};
 use crate::sequence::{Clamp, Sequence, check_sequence};
@@ -177,34 +180,35 @@ impl Hmm {
             let row: Vec<f64> = self.transition.row(i).iter().copied().collect();
             check_simplex(&row, &format!("transition row {i}"))?;
         }
-        if self.emissions.len() != k {
-            return invalid(format!(
-                "give {k} emission distributions, not {}",
-                self.emissions.len()
-            ));
-        }
-        let first = &self.emissions[0];
-        for e in &self.emissions {
-            e.validate()?;
-            if std::mem::discriminant(e) != std::mem::discriminant(first)
-                || e.dim() != first.dim()
-                || e.symbols() != first.symbols()
-            {
-                return invalid(
-                    "every state needs the same emission family, dimension and symbol count",
-                );
-            }
-        }
-        Ok(())
+        validate_emissions(&self.emissions, k)
     }
 
     pub fn k(&self) -> usize {
         self.start.len()
     }
 
+    /// Validates the model too: public fields and deserialised JSON bypass `Hmm::new`.
     pub(crate) fn check(&self, seq: &Sequence, clamp: Option<&Clamp>, n: usize) -> Result<()> {
+        self.validate()?;
+        self.check_sequence(seq, clamp, n)
+    }
+
+    pub(crate) fn check_sequence(
+        &self,
+        seq: &Sequence,
+        clamp: Option<&Clamp>,
+        n: usize,
+    ) -> Result<()> {
         let e = &self.emissions[0];
-        check_sequence(seq, clamp, n, e.dim(), self.k(), e.symbols())
+        check_sequence(seq, clamp, n, e.dim(), self.k(), e.symbols())?;
+        let bytes = seq
+            .t
+            .checked_mul(self.k())
+            .and_then(|tk| tk.checked_mul(PASS_MATRICES * size_of::<f64>()));
+        match bytes {
+            Some(b) => memory::check(b as u64, None, &format!("sequence {n} pass")),
+            None => invalid(format!("sequence {n}: t x K overflows usize")),
+        }
     }
 
     /// Stream `(seed, [SAMPLE, i])` for sequence `i`.
@@ -273,6 +277,28 @@ impl Hmm {
         }
         lp
     }
+}
+
+pub(crate) fn validate_emissions(emissions: &[Emission], k: usize) -> Result<()> {
+    if emissions.len() != k {
+        return invalid(format!(
+            "give {k} emission distributions, not {}",
+            emissions.len()
+        ));
+    }
+    let first = &emissions[0];
+    for e in emissions {
+        e.validate()?;
+        if std::mem::discriminant(e) != std::mem::discriminant(first)
+            || e.dim() != first.dim()
+            || e.symbols() != first.symbols()
+        {
+            return invalid(
+                "every state needs the same emission family, dimension and symbol count",
+            );
+        }
+    }
+    Ok(())
 }
 
 /// The emission part of `Hmm::log_prior` for one state, with covariance prior weight `eps`;
