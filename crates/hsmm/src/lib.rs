@@ -1,5 +1,3 @@
-#![allow(unused_variables)]
-
 //! Hidden semi-Markov models with explicit durations and right censoring, and state-count
 //! selection by AIC, BIC, ICL and cross-validated likelihood.
 
@@ -16,3 +14,6 @@ pub use model::Hsmm;
 pub use selection::{
     Model, ModelKind, SelectionSpec, SelectionTable, aic, bic, icl, select_states,
 };
+
+#[cfg(test)]
+mod tests;
