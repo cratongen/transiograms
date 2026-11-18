@@ -13,12 +13,14 @@ use crate::search::Neighbourhood;
 ///
 /// Because `T(h) 1 = 1` and `p^T T(h) = p^T`, the full system always has an (n - 1)-dimensional
 /// null space `(1 b_1, ..., 1 b_n)`, `sum b = 0`, and as many redundant equations. Probabilities
-/// do not depend on the null-space component, so row `q = argmax p` of every `W_alpha`,
-/// alpha >= 2, is fixed at 0 and the matching equations are dropped. The reduced system is
-/// nonsingular for distinct data and keeps `sum_k Pr_k = 1` to round-off.
+/// do not depend on the null-space component, so row `q = argmax p` of every `W_alpha` except
+/// `W_free` is fixed at 0 and the matching equations are dropped. The reduced system is
+/// nonsingular for distinct data and keeps `sum_k Pr_k = 1` to round-off. With `free` the datum
+/// closest to the target, a datum the Markov property screens out gets exactly `W_alpha = 0`.
 pub(crate) fn weights<A, B>(
     p: &[f64],
     n: usize,
+    free: usize,
     between: impl Fn(usize, usize) -> A,
     to_target: impl Fn(usize) -> B,
     svd_cutoff: f64,
@@ -29,7 +31,9 @@ where
 {
     let k = p.len();
     let q = (0..k).fold(0, |m, j| if p[j] > p[m] { j } else { m });
-    let keep: Vec<usize> = (0..n * k).filter(|&i| i < k || i % k != q).collect();
+    let keep: Vec<usize> = (0..n * k)
+        .filter(|&i| i / k == free || i % k != q)
+        .collect();
     let mut position = vec![usize::MAX; n * k];
     for (r, &i) in keep.iter().enumerate() {
         position[i] = r;
@@ -96,6 +100,17 @@ pub(crate) fn combine(w: &Mat, codes: impl Iterator<Item = Code>, k: usize) -> V
     pr
 }
 
+/// Index of the first datum at the smallest Euclidean distance from `target`.
+fn nearest(target: [f64; 3], xs: impl Iterator<Item = [f64; 3]>) -> usize {
+    let dist2 = |x: [f64; 3]| (0..3).map(|a| (target[a] - x[a]).powi(2)).sum::<f64>();
+    xs.enumerate()
+        .fold((0, f64::INFINITY), |(m, dm), (a, x)| {
+            let d = dist2(x);
+            if d < dm { (a, d) } else { (m, dm) }
+        })
+        .0
+}
+
 /// Probabilities before order-relation correction, summing to 1.
 pub fn cokrige(
     model: &TransitionModel,
@@ -114,13 +129,29 @@ pub fn cokrige(
             "datum {i} has code {c}, not one of the model's {k} categories"
         ));
     }
+    if !target.iter().all(|v| v.is_finite()) {
+        return invalid(format!("target {target:?} has a non-finite coordinate"));
+    }
+    if let Some((i, (x, _))) = data
+        .iter()
+        .enumerate()
+        .find(|(_, d)| !d.0.iter().all(|v| v.is_finite()))
+    {
+        return invalid(format!("datum {i} at {x:?} has a non-finite coordinate"));
+    }
     if data.is_empty() {
         return Ok(model.proportions.clone());
     }
+    memory::check(
+        crate::system_bytes(data.len(), k),
+        None,
+        "tpsim cokriging system",
+    )?;
     let sub = |a: [f64; 3], b: [f64; 3]| [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
     let w = weights(
         &model.proportions,
         data.len(),
+        nearest(target, data.iter().map(|d| d.0)),
         |a, b| model.transition(sub(data[b].0, data[a].0)),
         |a| model.transition(sub(target, data[a].0)),
         svd_cutoff,
@@ -142,6 +173,7 @@ pub(crate) fn cokrige_offsets(
     let w = weights(
         &nb.model.proportions,
         data.len(),
+        0,
         |a, b| nb.transition(sub(data[b].0, data[a].0)),
         |a| nb.transition(sub([0; 3], data[a].0)),
         svd_cutoff,
@@ -175,51 +207,51 @@ pub fn predict(
 ) -> Result<Prediction> {
     let k = crate::check_inputs(model, grid, mask, hard, opts)?;
     let n_cells = grid.n_cells();
-    memory::check(
-        (n_cells as u64) * (k as u64 * 8 + 16),
-        opts.memory,
-        "tp_cokriging probabilities",
-    )?;
-    let table = model.table(grid, opts.closeness_limit, opts.memory)?;
+    let budget = opts.memory.or_else(memory::available_bytes);
+    let per_cell = (k * size_of::<f64>() + 2 * size_of::<Code>() + size_of::<f64>()) as u64;
+    let cells = (n_cells as u64).saturating_mul(per_cell);
+    memory::check(cells, budget, "tp_cokriging probabilities")?;
+    let (table, max_data) = crate::search_table(model, grid, opts, budget, cells)?;
     let nb = Neighbourhood::new(model, grid, &table);
     let mut informed = vec![MISSING; n_cells];
     for (&cell, &code) in hard.cells.iter().zip(&hard.codes) {
         informed[cell] = code;
     }
-    let rows: Vec<(Vec<f64>, bool)> = (0..n_cells)
-        .into_par_iter()
-        .map(|cell| {
+    let Some(total) = n_cells.checked_mul(k) else {
+        return invalid(format!(
+            "{n_cells} cells of {k} probabilities overflow the address space"
+        ));
+    };
+    let mut probabilities = vec![f64::NAN; total];
+    let n_corrected = probabilities
+        .par_chunks_mut(k)
+        .enumerate()
+        .map(|(cell, row)| {
             if mask.is_some_and(|m| !m[cell]) {
-                return Ok((vec![f64::NAN; k], false));
+                return Ok(0);
             }
             if informed[cell] != MISSING {
-                let mut one = vec![0.0; k];
-                one[informed[cell] as usize] = 1.0;
-                return Ok((one, false));
+                row.fill(0.0);
+                row[informed[cell] as usize] = 1.0;
+                return Ok(0);
             }
-            let mut data = Vec::with_capacity(opts.max_data);
-            nb.search(
-                cell,
-                &informed,
-                opts.max_data,
-                opts.max_per_octant,
-                &mut data,
-            );
+            let mut data = Vec::with_capacity(max_data);
+            nb.search(cell, &informed, max_data, opts.max_per_octant, &mut data);
             let mut pr = cokrige_offsets(&nb, &data, opts.svd_cutoff)?;
             let changed = correct(&mut pr);
-            Ok((pr, changed))
+            row.copy_from_slice(&pr);
+            Ok(usize::from(changed))
         })
-        .collect::<Result<_>>()?;
+        .try_reduce(|| 0, |a, b| Ok(a + b))?;
     let estimated = (0..n_cells)
         .filter(|&c| informed[c] == MISSING && !mask.is_some_and(|m| !m[c]))
         .count();
-    let n_corrected = rows.iter().filter(|r| r.1).count();
+    drop(informed);
     let corrected = if estimated == 0 {
         0.0
     } else {
         n_corrected as f64 / estimated as f64
     };
-    let probabilities = rows.into_iter().flat_map(|r| r.0).collect();
     Ok(Prediction::from_probabilities(k, probabilities, corrected))
 }
 
@@ -255,35 +287,40 @@ mod tests {
         .unwrap();
         let dir = [0.6, -0.48, 0.64];
         let at = |s: f64| [s * dir[0], s * dir[1], s * dir[2]];
-        let xs = [at(-1.3), at(0.4)];
+        let (x1, x2) = (at(-1.3), at(0.4));
         let x0 = at(1.5);
         let sub = |a: [f64; 3], b: [f64; 3]| [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-        let w = weights(
-            &model.proportions,
-            2,
-            |a, b| model.transition(sub(xs[b], xs[a])),
-            |a| model.transition(sub(x0, xs[a])),
-            1e-8,
-        )
-        .unwrap();
-        let t02 = model.transition(sub(x0, xs[1]));
-        // T(h) 1 = 1 puts (1 r^T, -1 r^T) in the null space, so the weights are unique only up
-        // to it: W1 = 1 r^T and W2 = T(x0 - x2) - 1 r^T, which leave every probability unchanged.
-        for i in 0..3 {
-            for j in 0..3 {
-                let r = w[(0, j)];
-                assert!((w[(i, j)] - r).abs() < 1e-10, "W1 {w}");
-                assert!((w[(3 + i, j)] + r - t02[(i, j)]).abs() < 1e-10, "W2 {w}");
-            }
-        }
-        for c1 in 0..3u32 {
-            for c2 in 0..3u32 {
-                let pr = combine(&w, [c1, c2].into_iter(), 3);
+        let t02 = model.transition(sub(x0, x2));
+        for (xs, i1, i2) in [([x1, x2], 0, 1), ([x2, x1], 1, 0)] {
+            assert_eq!(nearest(x0, xs.into_iter()), i2);
+            let w = weights(
+                &model.proportions,
+                2,
+                i2,
+                |a, b| model.transition(sub(xs[b], xs[a])),
+                |a| model.transition(sub(x0, xs[a])),
+                1e-8,
+            )
+            .unwrap();
+            for i in 0..3 {
                 for j in 0..3 {
-                    assert!((pr[j] - t02[(c2 as usize, j)]).abs() < 1e-10);
+                    assert!(w[(3 * i1 + i, j)].abs() < 1e-10, "W1 {w}");
+                    assert!((w[(3 * i2 + i, j)] - t02[(i, j)]).abs() < 1e-10, "W2 {w}");
+                }
+            }
+            for c1 in 0..3u32 {
+                for c2 in 0..3u32 {
+                    let mut codes = [0; 2];
+                    codes[i1] = c1;
+                    codes[i2] = c2;
+                    let pr = combine(&w, codes.into_iter(), 3);
+                    for j in 0..3 {
+                        assert!((pr[j] - t02[(c2 as usize, j)]).abs() < 1e-10);
+                    }
                 }
             }
         }
+        let xs = [x1, x2];
         let a = Mat::from_fn(6, 6, |r, c| {
             model.transition(sub(xs[c / 3], xs[r / 3]))[(r % 3, c % 3)]
         });

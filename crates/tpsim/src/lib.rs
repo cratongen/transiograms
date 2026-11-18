@@ -10,8 +10,8 @@ pub use cokriging::{cokrige, correct, predict};
 pub use quench::{objective, quench, quench_lags};
 pub use sis::simulate;
 
-use varvite_core::{Grid, Result, Snapped, invalid};
-use varvite_transiogram::TransitionModel;
+use varvite_core::{Code, Grid, Mat, Result, Snapped, invalid, memory};
+use varvite_transiogram::{Table, TransitionModel};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct QuenchOptions {
@@ -95,6 +95,14 @@ pub(crate) fn check_inputs(
             return invalid(format!("hard cell {cell} lies outside the mask"));
         }
     }
+    let mut sorted = hard.cells.clone();
+    sorted.sort_unstable();
+    if let Some(w) = sorted.windows(2).find(|w| w[0] == w[1]) {
+        return invalid(format!(
+            "hard cell {} appears more than once; give each cell one code",
+            w[0]
+        ));
+    }
     if !opts.max_data.is_multiple_of(2) {
         return invalid(format!("max_data must be even, got {}", opts.max_data));
     }
@@ -114,6 +122,54 @@ pub(crate) fn check_inputs(
         check_quench(q)?;
     }
     Ok(k)
+}
+
+/// Peak bytes of one cokriging system with `n` data: the reduced matrix, the copy the SVD
+/// bidiagonalises, U and V^T, plus right-hand sides, solutions, index vectors and the search list.
+pub(crate) fn system_bytes(n: usize, k: usize) -> u64 {
+    let m = (n as u64).saturating_mul(k as u64);
+    m.saturating_mul(m)
+        .saturating_mul(4 * 8)
+        .saturating_add(m.saturating_mul(16 * (k as u64 + 1) * 8))
+        .saturating_add((n as u64).saturating_mul(size_of::<([i64; 3], Code)>() as u64))
+        .saturating_add(1 << 12)
+}
+
+fn table_bytes(t: &Table) -> u64 {
+    let mat = size_of::<Mat>();
+    let bytes = t.offsets.capacity() * size_of::<[i64; 3]>()
+        + t.closeness.capacity() * size_of::<f64>()
+        + t.transition.capacity() * mat
+        + t.transition
+            .iter()
+            .map(|m| m.len() * size_of::<f64>())
+            .sum::<usize>();
+    let buckets = (t.offsets.len() * 8 / 7 + 1).next_power_of_two().max(8);
+    (bytes + buckets * (size_of::<([i64; 3], usize)>() + 1) + 64) as u64
+}
+
+/// The search table, built within what `held` bytes leave of `budget`, and `max_data` capped at
+/// its length (the search never returns more), after checking that `held`, the table, its index
+/// and one cokriging system per thread fit in `budget`.
+pub(crate) fn search_table(
+    model: &TransitionModel,
+    grid: &Grid,
+    opts: &Options,
+    budget: Option<u64>,
+    held: u64,
+) -> Result<(Table, usize)> {
+    let table = model.table(
+        grid,
+        opts.closeness_limit,
+        budget.map(|b| b.saturating_sub(held)),
+    )?;
+    let n = opts.max_data.min(table.offsets.len());
+    let threads = rayon::current_num_threads() as u64;
+    let needed = held
+        .saturating_add(table_bytes(&table))
+        .saturating_add(threads.saturating_mul(system_bytes(n, model.k())));
+    memory::check(needed, budget, "tpsim search table and cokriging systems")?;
+    Ok((table, n))
 }
 
 pub(crate) fn check_mask(grid: &Grid, mask: Option<&[bool]>) -> Result<()> {

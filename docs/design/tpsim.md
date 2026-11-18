@@ -85,4 +85,21 @@ fails, and records the change under "Implementer decisions".
 
 ## Implementer decisions
 
-(empty)
+- M5 sizes (section 6): cell (6, 6, 1) instead of (1, 1, 0.25), same 64 x 64 x 32 count. At
+  the spec sizes the untruncated section 5 bound is 3 sigma = 0.194 for category 0, far above
+  0.02. At (6, 6, 1) it is 0.0199, 0.0151 and 0.0124 for categories 0, 1 and 2 (test
+  `implementer_m5_sizes_pass_the_untruncated_variance_assertion`, brute force over every lag).
+  The x and y auto-transiogram RMSE then covers 4 lags (`2 * 12 / 6`).
+- Cokriging null-space gauge (section 7 screening check): row `q = argmax p` is fixed at 0 in
+  every `W_alpha` except that of the datum nearest the target (first one on ties). On a line
+  x1 < x2 < x0 this gives literally `W1 = 0` and `W2 = T(x0 - x2)`. Probabilities do not depend
+  on the gauge.
+- `max_data` is capped at the search table length before any allocation, and the cokriging
+  system of that size is checked against the memory budget, so a huge `max_data` returns
+  `InvalidInput` or runs instead of overflowing.
+- Non-finite datum or target coordinates in `cokrige` return `InvalidInput`.
+- Memory: `predict` and `simulate` check every buffer they hold (codes or probabilities, hard
+  and frozen flags, per-realization paths and quench state for the realizations in flight, the
+  table and its index, and one cokriging system per thread) against one budget, and build the
+  table within what the rest leaves. `cokrige` checks its system against available memory.
+- Hard data with the same cell twice return `InvalidInput`.
