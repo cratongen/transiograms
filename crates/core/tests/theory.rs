@@ -142,6 +142,24 @@ fn expm_rate_properties() {
 }
 
 #[test]
+fn expm_rate_stays_stochastic_at_huge_lags() {
+    let q = RateMatrix::max_entropy(&[0.5, 0.3, 0.2], &[0.4, 0.1, 0.05])
+        .unwrap()
+        .matrix()
+        .clone();
+    let pi = gth_stationary(&q).unwrap();
+    for h in [1e3, 1e4, 1e6, 1e9] {
+        let t = expm_rate(&q, h);
+        for i in 0..3 {
+            assert!((t.row(i).sum() - 1.0).abs() < 1e-12, "h = {h}");
+            for j in 0..3 {
+                assert!((t[(i, j)] - pi[j]).abs() < 1e-10, "h = {h}: {t}");
+            }
+        }
+    }
+}
+
+#[test]
 fn expm_rate_two_state_closed_form() {
     let (a, b) = (0.7, 0.2);
     let s = a + b;

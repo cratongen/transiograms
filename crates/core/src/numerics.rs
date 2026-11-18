@@ -160,15 +160,22 @@ pub fn expm_rate(q: &Mat, h: f64) -> Mat {
             break;
         }
     }
+    normalise_rows(&mut t);
+    // Rounding in row sums grows with every squaring; renormalising each one keeps rows
+    // stochastic to rounding at any lag.
     for _ in 0..s {
         t = &t * &t;
+        normalise_rows(&mut t);
     }
+    t
+}
+
+fn normalise_rows(t: &mut Mat) {
     for mut row in t.row_iter_mut() {
         let sum: f64 = row.iter().sum();
         debug_assert!((sum - 1.0).abs() < 1e-12, "uniformization row sum {sum}");
         row /= sum;
     }
-    t
 }
 
 /// General matrix exponential (nalgebra Pade, Higham 2005); a cross-check for `expm_rate`.
