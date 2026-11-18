@@ -1,0 +1,307 @@
+//! `Categories` and `Grid`.
+
+use numpy::ndarray::Array2;
+use numpy::{IntoPyArray, PyArray1, PyArray2};
+use pyo3::prelude::*;
+use pyo3::types::{PyList, PyString};
+use varvite_core::{Categories, Grid, MISSING};
+
+use crate::args::{codes, coords, to_rust};
+use crate::invalid;
+
+fn json<T: serde::Serialize>(v: &T) -> PyResult<String> {
+    serde_json::to_string(v).map_err(invalid)
+}
+
+fn unjson<T: serde::de::DeserializeOwned>(text: &str, what: &str) -> PyResult<T> {
+    serde_json::from_str(text).map_err(|e| invalid(format!("not {what} JSON: {e}")))
+}
+
+/// A label as text: None and NaN are missing; integral floats lose their decimal point.
+fn label(obj: &Bound<PyAny>) -> PyResult<Option<String>> {
+    if obj.is_none() {
+        return Ok(None);
+    }
+    if let Ok(s) = obj.cast::<PyString>() {
+        return Ok(Some(s.to_str()?.to_string()));
+    }
+    if let Ok(i) = obj.extract::<i64>() {
+        return Ok(Some(i.to_string()));
+    }
+    match obj.extract::<f64>() {
+        Ok(f) if f.is_nan() => Ok(None),
+        Ok(f) if f.fract() == 0.0 && f.abs() < 9e15 => Ok(Some((f as i64).to_string())),
+        Ok(f) => Ok(Some(f.to_string())),
+        Err(_) => Ok(Some(obj.str()?.to_str()?.to_string())),
+    }
+}
+
+fn labels(obj: &Bound<PyAny>) -> PyResult<Vec<Option<String>>> {
+    let list = obj
+        .py()
+        .import("numpy")?
+        .call_method1("asarray", (obj, "object"))?
+        .call_method1("reshape", (-1i64,))?
+        .call_method0("tolist")?;
+    list.cast::<PyList>()?.iter().map(|o| label(&o)).collect()
+}
+
+/// Named categories: a code is the index of its name.
+///
+/// Parameters
+/// ----------
+/// names : sequence of str
+///     Category names in code order, unique and non-empty.
+/// colors : sequence of str, optional
+///     One matplotlib color per name.
+#[pyclass(module = "varvite", name = "Categories", frozen, eq, from_py_object)]
+#[derive(Clone, PartialEq)]
+pub struct PyCategories(pub Categories);
+
+#[pymethods]
+impl PyCategories {
+    #[new]
+    #[pyo3(signature = (names, *, colors=None))]
+    fn new(names: Vec<String>, colors: Option<Vec<String>>) -> PyResult<Self> {
+        Categories::new(names, colors).map(Self).map_err(to_rust)
+    }
+
+    /// Categories from the sorted unique non-missing labels; numeric order when every label is an
+    /// integer.
+    #[staticmethod]
+    fn from_labels(labels: &Bound<PyAny>) -> PyResult<Self> {
+        let l = self::labels(labels)?;
+        Categories::from_labels(l.iter().map(Option::as_deref))
+            .map(Self)
+            .map_err(to_rust)
+    }
+
+    #[getter]
+    fn names(&self) -> Vec<String> {
+        self.0.names.clone()
+    }
+
+    #[getter]
+    fn colors(&self) -> Option<Vec<String>> {
+        self.0.colors.clone()
+    }
+
+    /// Codes (int64, -1 for None or NaN) of `labels`; unknown labels raise InvalidInput.
+    fn encode<'py>(
+        &self,
+        py: Python<'py>,
+        labels: &Bound<'py, PyAny>,
+    ) -> PyResult<Bound<'py, PyArray1<i64>>> {
+        let l = self::labels(labels)?;
+        let codes = self
+            .0
+            .encode(l.iter().map(Option::as_deref))
+            .map_err(to_rust)?;
+        Ok(PyArray1::from_vec(
+            py,
+            codes
+                .into_iter()
+                .map(|c| if c == MISSING { -1 } else { c as i64 })
+                .collect(),
+        ))
+    }
+
+    /// Names (object array, None for -1) of `codes`.
+    fn decode<'py>(
+        &self,
+        py: Python<'py>,
+        codes: &Bound<'py, PyAny>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let codes = self::codes(codes, "codes")?;
+        varvite_core::codes::check_codes(&codes, self.0.len()).map_err(to_rust)?;
+        let names: Vec<Option<&str>> = codes.iter().map(|&c| self.0.name(c)).collect();
+        py.import("numpy")?.call_method1("array", (names, "object"))
+    }
+
+    fn __len__(&self) -> usize {
+        self.0.len()
+    }
+
+    fn to_json(&self) -> PyResult<String> {
+        json(&self.0)
+    }
+
+    #[staticmethod]
+    fn from_json(text: &str) -> PyResult<Self> {
+        let c: Categories = unjson(text, "Categories")?;
+        Categories::new(c.names, c.colors)
+            .map(Self)
+            .map_err(to_rust)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("Categories({:?})", self.0.names)
+    }
+}
+
+/// Axis-aligned grid, cells x fastest, then y, then z.
+///
+/// Parameters
+/// ----------
+/// origin : sequence of 3 floats
+///     Corner of the first cell (minimum x, y, z).
+/// size : sequence of 3 floats
+///     Cell size along x, y and z.
+/// count : sequence of 3 ints
+///     Number of cells along x, y and z; 1 along z for a 2D grid.
+#[pyclass(module = "varvite", name = "Grid", frozen, eq, from_py_object)]
+#[derive(Clone, PartialEq)]
+pub struct PyGrid(pub Grid);
+
+#[pymethods]
+impl PyGrid {
+    #[new]
+    fn new(origin: [f64; 3], size: [f64; 3], count: [usize; 3]) -> PyResult<Self> {
+        Grid::new(origin, size, count).map(Self).map_err(to_rust)
+    }
+
+    #[getter]
+    fn origin(&self) -> (f64, f64, f64) {
+        let o = self.0.origin;
+        (o[0], o[1], o[2])
+    }
+
+    #[getter]
+    fn size(&self) -> (f64, f64, f64) {
+        let s = self.0.size;
+        (s[0], s[1], s[2])
+    }
+
+    #[getter]
+    fn count(&self) -> (usize, usize, usize) {
+        let c = self.0.count;
+        (c[0], c[1], c[2])
+    }
+
+    #[getter]
+    fn n_cells(&self) -> usize {
+        self.0.n_cells()
+    }
+
+    /// `(nz, ny, nx)`, so `values.reshape(grid.shape)` indexes `[k, j, i]`.
+    #[getter]
+    fn shape(&self) -> (usize, usize, usize) {
+        let c = self.0.count;
+        (c[2], c[1], c[0])
+    }
+
+    /// Cell centroids, shape `(n_cells, 3)`.
+    #[getter]
+    fn coords<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f64>> {
+        let n = self.0.n_cells();
+        let flat: Vec<f64> = (0..n).flat_map(|i| self.0.centroid(i)).collect();
+        Array2::from_shape_vec((n, 3), flat)
+            .unwrap()
+            .into_pyarray(py)
+    }
+
+    /// Cell index (uint64, ascending) and code (int64) of each snapped cell. Points outside the
+    /// grid or mask and missing codes are skipped; several points in a cell keep the one nearest
+    /// to the centroid, ties to the first.
+    #[pyo3(signature = (coords, codes, *, mask=None))]
+    fn snap<'py>(
+        &self,
+        py: Python<'py>,
+        coords: &Bound<'py, PyAny>,
+        codes: &Bound<'py, PyAny>,
+        mask: Option<Vec<bool>>,
+    ) -> PyResult<(Bound<'py, PyArray1<u64>>, Bound<'py, PyArray1<i64>>)> {
+        let xyz = self::coords(coords, "coords")?;
+        let codes = self::codes(codes, "codes")?;
+        let s = self
+            .0
+            .snap(&xyz, &codes, mask.as_deref())
+            .map_err(to_rust)?;
+        Ok((
+            PyArray1::from_vec(py, s.cells.into_iter().map(|c| c as u64).collect()),
+            PyArray1::from_vec(py, s.codes.into_iter().map(|c| c as i64).collect()),
+        ))
+    }
+
+    fn to_json(&self) -> PyResult<String> {
+        json(&self.0)
+    }
+
+    #[staticmethod]
+    fn from_json(text: &str) -> PyResult<Self> {
+        let g: Grid = unjson(text, "Grid")?;
+        Grid::new(g.origin, g.size, g.count)
+            .map(Self)
+            .map_err(to_rust)
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "Grid(origin={:?}, size={:?}, count={:?})",
+            self.0.origin, self.0.size, self.0.count
+        )
+    }
+}
+
+pub fn register(m: &Bound<PyModule>) -> PyResult<()> {
+    m.add_class::<PyCategories>()?;
+    m.add_class::<PyGrid>()?;
+    m.add_function(wrap_pyfunction!(_sequence_runs, m)?)?;
+    m.add_function(wrap_pyfunction!(_sequences, m)?)?;
+    Ok(())
+}
+
+/// Test hook for the shared sequence keywords: `(hole, rows, codes)` of every run.
+#[pyfunction]
+#[pyo3(signature = (codes, *, holes=None, from_=None, to=None, depth=None, step=None, gap=1e-6, categories=None, data=None, direction="up"))]
+#[allow(clippy::too_many_arguments)]
+fn _sequence_runs<'py>(
+    codes: Bound<'py, PyAny>,
+    holes: Option<Bound<'py, PyAny>>,
+    from_: Option<Bound<'py, PyAny>>,
+    to: Option<Bound<'py, PyAny>>,
+    depth: Option<Bound<'py, PyAny>>,
+    step: Option<f64>,
+    gap: f64,
+    categories: Option<Bound<'py, PyAny>>,
+    data: Option<Bound<'py, PyAny>>,
+    direction: &str,
+) -> PyResult<Vec<(usize, Vec<usize>, Vec<u32>)>> {
+    let dir = crate::args::direction(direction)?;
+    let set = crate::args::sequence_set(crate::args::SequenceArgs {
+        codes,
+        holes,
+        from_,
+        to,
+        depth,
+        step,
+        gap,
+        categories,
+        data,
+    })?;
+    Ok(set
+        .runs(dir, gap)
+        .into_iter()
+        .map(|r| (r.hole, r.rows, r.codes))
+        .collect())
+}
+
+/// Test hook for HMM sequence input: `(t, d, values, rows)` per sequence, and the row count.
+#[pyfunction]
+#[pyo3(signature = (sequences, *, holes=None, data=None, direction="up"))]
+fn _sequences(
+    sequences: &Bound<PyAny>,
+    holes: Option<&Bound<PyAny>>,
+    data: Option<&Bound<PyAny>>,
+    direction: &str,
+) -> PyResult<(Vec<(usize, usize, Vec<f64>, Vec<usize>)>, usize)> {
+    let dir = crate::args::direction(direction)?;
+    let (seqs, map) = crate::args::sequences(sequences, holes, data, dir, None)?;
+    Ok((
+        seqs.into_iter()
+            .zip(map.rows)
+            .map(|(s, r)| (s.t, s.d, s.x, r))
+            .collect(),
+        map.n_rows,
+    ))
+}

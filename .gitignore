@@ -10,8 +10,6 @@ __pycache__/
 /.pixi/
 /.compat/
 pixi.lock
-/docs/learn/
-/learn/**/*.png
-/python/boitata/_viewer.js
-node_modules/
 /.codegraph/
+/.pytest_cache/
+/.ruff_cache/

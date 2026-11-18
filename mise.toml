@@ -1,0 +1,54 @@
+[env]
+_.path = ["~/.cargo/bin"]
+UV_PYTHON = "3.13"
+
+[tools]
+python = "3.13"
+uv = "0.12"
+pixi = "0.81"
+micromamba = "2.9"
+git-cliff = "2.13"
+
+[tasks.build]
+run = "cargo build --workspace"
+
+[tasks."py:sync"]
+run = "uv sync -q --inexact"
+
+[tasks."py:build"]
+depends = ["py:sync"]
+run = "uv run --no-sync maturin develop -q --uv --release"
+
+[tasks.test]
+depends = ["py:build"]
+run = ["cargo test --workspace --exclude varvite-py", "uv run --no-sync pytest -q"]
+
+[tasks.lint]
+depends = ["py:sync"]
+run = [
+  "cargo fmt --all --check",
+  "cargo clippy --workspace --all-targets -- -D warnings",
+  "uv run --no-sync ruff check python examples",
+  "uv run --no-sync ruff format --check python examples",
+]
+
+[tasks.verify]
+depends = ["lint", "test"]
+
+[tasks.bench]
+run = "cargo bench --workspace --exclude varvite-py"
+
+[tasks.examples]
+depends = ["py:build"]
+run = "uv run --no-sync python examples/render.py"
+
+[tasks.docs]
+depends = ["py:build"]
+run = "uv run --no-sync mkdocs serve"
+
+[tasks.docs-build]
+depends = ["py:build"]
+run = "uv run --no-sync mkdocs build --strict"
+
+[tasks.changelog]
+run = "git-cliff -o CHANGELOG.md"

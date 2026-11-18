@@ -1,0 +1,55 @@
+[build-system]
+requires = ["maturin>=1.10,<2"]
+build-backend = "maturin"
+
+[project]
+name = "varvite"
+description = "Markov models for geostatistics: chains, hidden Markov models, transiograms and categorical grid simulation"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["geostatistics", "markov chain", "hidden markov model", "transiogram", "t-progs", "geology"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering",
+    "Typing :: Typed",
+]
+dependencies = ["numpy>=1.26"]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+plot = ["matplotlib>=3.8"]
+all = ["matplotlib>=3.8"]
+
+[dependency-groups]
+dev = [
+    "maturin>=1.10,<2",
+    "pytest>=8",
+    "ruff>=0.6",
+    "scipy>=1.13",
+    "matplotlib>=3.8",
+    "mkdocs-material",
+    "mkdocstrings[python]",
+    "mkdocs-gallery",
+]
+
+[tool.maturin]
+manifest-path = "crates/py/Cargo.toml"
+module-name = "varvite._varvite"
+python-source = "python"
+locked = true
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]
+
+[tool.ruff]
+line-length = 110

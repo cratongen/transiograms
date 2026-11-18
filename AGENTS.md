@@ -12,40 +12,48 @@ codes, and grids with boitata through NumPy arrays.
 
 ## Commands
 
-Planned tasks, pinned in `mise.toml` (Python, uv, pixi, micromamba) and
+Tasks live in `mise.toml` (Python, uv, pixi, micromamba, git-cliff) and
 `rust-toolchain.toml` (Rust):
 
 ```sh
-mise install        # [planned] one-time setup
-mise run build      # [planned] cargo build --workspace
-mise run test       # [planned] rust tests, maturin develop, pytest
-mise run bench      # [planned] criterion benchmarks + Python comparison rounds
-mise run lint       # [planned] rustfmt --check, clippy -D warnings, ruff check + format --check
-mise run verify     # [planned] lint + test (must pass before a PR)
-mise run examples   # [planned] rerun examples/* and rewrite their figures
-mise run docs       # [planned] mkdocs serve
-mise run docs-build # [planned] mkdocs build --strict
+mise install        # one-time setup
+mise run build      # cargo build --workspace
+mise run test       # rust tests, maturin develop, pytest
+mise run lint       # rustfmt --check, clippy -D warnings, ruff check + format --check
+mise run verify     # lint + test (must pass before a PR)
+mise run bench      # cargo bench (no benches yet)
+mise run examples   # rerun examples/*/*/example_*.py and rewrite their README.md and figures
+mise run docs       # mkdocs serve
+mise run docs-build # mkdocs build --strict
+mise run changelog  # git-cliff -o CHANGELOG.md
 mise run compat     # [planned] install via pip, uv, pixi, and conda
 ```
 
+A single crate: `mise exec -- cargo test -p varvite-<short>`.
+
 ## Layout
 
-Planned repository layout:
+The API contract is `docs/design/spec.md`, with one algorithm file per crate beside it.
 
-- `crates/` - Rust workspace:
-  - `core` - category codes, transition matrices, seeded RNG helpers, validation
-  - `chain` - embedded and continuous-lag Markov chains, stationarity and Markov tests, 1D simulation
-  - `hmm` - hidden Markov and hidden semi-Markov models, emissions, forward-backward, Viterbi, Baum-Welch, model selection
-  - `transiogram` - experimental and analytical transiograms, joint multi-category fitting
-  - `spatial` - T-PROGS transition-probability simulation, MCRF, and MCP on 2D/3D grids
-  - `py` - pyo3 (`abi3-py311`) binding crate
+- `crates/` - Rust workspace, directory `crates/<short>`, package `varvite-<short>`:
+  - `core` - category codes, sequences and beds, transition and rate matrices, grids, seeded
+    streams, numerics (GTH, matrix exponential and logarithm, IPF), special functions, memory
+    budget, and `synthetic` (seeded test data with known parameters)
+  - `chain` - embedded, fixed-step and continuous-lag Markov chains, tests, entropy, sojourns, 1D simulation
+  - `hmm` - hidden Markov models: emissions, forward-backward, Viterbi, Baum-Welch
+  - `hsmm` - hidden semi-Markov models and state-count selection (depends on `hmm`)
+  - `transiogram` - experimental transiograms, 1D models and the 3D `TransitionModel`
+  - `tpsim` - T-PROGS cokriging, sequential simulation and quenching (depends on `transiogram`)
+  - `mcrf` - MCRF simulation and MCP prediction (depends on `transiogram`)
+  - `py` - pyo3 (`abi3-py311`) binding crate `_varvite`, one module per area
 - `python/varvite/` - Python package (`__init__.py`, `_varvite.pyi` stub, `plot.py`, `datasets.py`, `checks.py`, `errors.py`).
-- `python/tests/` - pytest suite and property tests.
+- `python/tests/` - pytest suite (`test_<area>.py`).
 - `examples/` - numbered narrative scripts rendered into docs (`mise run examples`).
-- `docs/` - mkdocs site (`index.md`, `install.md`, API and example pages).
+- `docs/` - mkdocs site (`index.md`, `install.md`, `api/`, `design/`).
 
 New Rust algorithms go into the matching `crates/` subdomain, their pyo3 bindings
-go into `crates/py`, and the Python wrapper and `.pyi` stub go into `python/varvite/`.
+go into `crates/py/src/<area>.rs`, and the Python wrapper and `.pyi` stub go into `python/varvite/`.
+Shared files carry `// >>> <area>` / `# >>> <area>` markers; edit only inside your area's markers.
 
 ## Conventions
 

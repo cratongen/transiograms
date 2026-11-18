@@ -1,0 +1,34 @@
+site_name: varvite
+site_description: Markov models for geostatistics.
+repo_name: varvite
+edit_uri: ""
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Install: install.md
+  - API:
+      - Core: api/core.md
+  - Design:
+      - Contract: design/spec.md
+      - Core: design/core.md
+      - Chain: design/chain.md
+      - HMM: design/hmm.md
+      - HSMM: design/hsmm.md
+      - Transiograms: design/transiogram.md
+      - TP simulation: design/tpsim.md
+      - MCRF and MCP: design/mcrf.md

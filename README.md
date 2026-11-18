@@ -71,7 +71,7 @@ The API draws inspiration from the compositional design of the original `pomegra
 
 ### M5: Transition-probability simulation on grids
 
-- **Scope**: `crates/spatial` T-PROGS engine (`vv.tprogs_simulate`), 3D anisotropy from principal Markov rates or mean lens dimensions, sequential transition-probability indicator simulation, and simulated annealing quenching on 2D/3D grids conditioned to point or interval samples.
+- **Scope**: `crates/tpsim` T-PROGS engine (`vv.tprogs_simulate`), 3D anisotropy from principal Markov rates or mean lens dimensions, sequential transition-probability indicator simulation, and simulated annealing quenching on 2D/3D grids conditioned to point or interval samples.
 - **Acceptance check**: Every realization reproduces all hard conditioning grid nodes without exception, and the ensemble average over 20 seeded realizations reproduces input category proportions within `0.02` and input directional auto-transiograms within `0.05` RMSE up to two correlation lengths.
 
 ### M6: MCRF and MCP on grids

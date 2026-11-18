@@ -1,0 +1,38 @@
+[workspace]
+members = ["crates/*"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+nalgebra = "0.33"
+rayon = "1.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+thiserror = "1"
+pyo3 = { version = "0.29", features = ["abi3-py311"] }
+numpy = "0.29"
+proptest = "1"
+criterion = "0.8"
+varvite-core = { path = "crates/core" }
+varvite-chain = { path = "crates/chain" }
+varvite-hmm = { path = "crates/hmm" }
+varvite-hsmm = { path = "crates/hsmm" }
+varvite-transiogram = { path = "crates/transiogram" }
+varvite-tpsim = { path = "crates/tpsim" }
+varvite-mcrf = { path = "crates/mcrf" }
+
+[workspace.lints.clippy]
+needless_range_loop = "allow"
+type_complexity = "allow"
+
+[profile.test]
+opt-level = 3
+
+[profile.dev.package."*"]
+opt-level = 3
