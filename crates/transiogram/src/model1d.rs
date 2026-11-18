@@ -189,11 +189,17 @@ impl Model1D {
         })
     }
 
-    /// `h < 0` by the reversal identity.
+    /// `h < 0` by the reversal identity; `|h| = inf` gives the sill `1 p^T`, NaN `h` a NaN matrix.
     pub fn transition(&self, h: f64) -> Mat {
         let k = self.proportions().len();
         if h == 0.0 {
             return Mat::identity(k, k);
+        }
+        if h.is_nan() {
+            return Mat::from_element(k, k, f64::NAN);
+        }
+        if h.is_infinite() {
+            return Mat::from_fn(k, k, |_, j| self.proportions()[j]);
         }
         if h < 0.0 {
             return reverse(&self.transition(-h), self.proportions());

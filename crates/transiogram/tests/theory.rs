@@ -1,3 +1,6 @@
+use std::sync::mpsc;
+use std::time::Duration;
+
 use varvite_core::synthetic::{drillholes, layered_field, rate_holes};
 use varvite_core::{Direction, Error, Grid, MISSING, Mat, RateMatrix, SequenceSet, Stream};
 use varvite_transiogram::{
@@ -623,4 +626,410 @@ fn results_do_not_depend_on_thread_count() {
     assert_eq!(one.2, four.2);
     assert_eq!(one.3, four.3);
     assert_eq!(one.4, four.4);
+}
+
+#[test]
+fn markov_transition_at_infinite_lag_returns() {
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let m = Model1D::markov(carle()).unwrap();
+        let r = std::panic::catch_unwind(|| m.transition(f64::INFINITY));
+        let _ = tx.send(r.map_err(|e| {
+            e.downcast_ref::<String>()
+                .cloned()
+                .or_else(|| e.downcast_ref::<&str>().map(|s| s.to_string()))
+                .unwrap_or_default()
+        }));
+    });
+    let got = rx
+        .recv_timeout(Duration::from_secs(30))
+        .expect("Model1D::transition(inf) neither returned nor panicked within 30 s");
+    let t = got.unwrap_or_else(|msg| panic!("Model1D::transition(inf) panicked: {msg}"));
+    for i in 0..3 {
+        for j in 0..3 {
+            assert!((t[(i, j)] - P[j]).abs() < 1e-10, "T(inf) = {t}");
+        }
+    }
+}
+
+fn gslib_accepts(s: [f64; 3], dir: [f64; 2], atol: f64, bw: f64, vbw: f64) -> bool {
+    let (a, d) = (dir[0].to_radians(), dir[1].to_radians());
+    let u = [a.sin() * d.cos(), a.cos() * d.cos(), -d.sin()];
+    let len = (s[0] * s[0] + s[1] * s[1] + s[2] * s[2]).sqrt();
+    let along = s[0] * u[0] + s[1] * u[1] + s[2] * u[2];
+    if len == 0.0 || along <= 0.0 {
+        return false;
+    }
+    let angle = (along / len).clamp(-1.0, 1.0).acos().to_degrees();
+    if angle > atol + 1e-9 {
+        return false;
+    }
+    let horiz_perp = [a.cos(), -a.sin(), 0.0];
+    let vert_perp = [a.sin() * d.sin(), a.cos() * d.sin(), d.cos()];
+    let dot = |v: [f64; 3]| (s[0] * v[0] + s[1] * v[1] + s[2] * v[2]).abs();
+    dot(horiz_perp) <= bw && dot(vert_perp) <= vbw
+}
+
+#[test]
+fn directional_point_estimator_matches_brute_force() {
+    let mut s = Stream::new(3, &[9]);
+    let n = 400;
+    let xyz: Vec<[f64; 3]> = (0..n)
+        .map(|_| [s.uniform() * 30.0, s.uniform() * 30.0, s.uniform() * 10.0])
+        .collect();
+    let codes: Vec<u32> = (0..n).map(|_| s.categorical(&P) as u32).collect();
+    for dir in [[0.0, 0.0], [37.0, 20.0], [120.0, -60.0], [250.0, 5.0]] {
+        for directed in [true, false] {
+            let spec = PairSpec {
+                direction: Some(dir),
+                lag: 2.0,
+                n_lags: 5,
+                lag_tolerance: 1.3,
+                angle_tolerance: 25.0,
+                bandwidth: 3.0,
+                vertical_bandwidth: 1.5,
+                directed,
+                pairs: PairFilter::All,
+            };
+            let got = experimental(&xyz, &codes, None, 3, &spec).unwrap();
+            let mut want = vec![Mat::zeros(3, 3); 5];
+            for t in 0..n {
+                for h in 0..n {
+                    if t == h {
+                        continue;
+                    }
+                    let sv: [f64; 3] = std::array::from_fn(|a| xyz[h][a] - xyz[t][a]);
+                    let ok = gslib_accepts(sv, dir, 25.0, 3.0, 1.5)
+                        || (!directed && gslib_accepts(sv.map(|v| -v), dir, 25.0, 3.0, 1.5));
+                    if !ok {
+                        continue;
+                    }
+                    let d = (sv[0] * sv[0] + sv[1] * sv[1] + sv[2] * sv[2]).sqrt();
+                    for l in 1..=5 {
+                        if (d - l as f64 * 2.0).abs() <= 1.3 {
+                            want[l - 1][(codes[t] as usize, codes[h] as usize)] += 1.0;
+                        }
+                    }
+                }
+            }
+            assert_eq!(got.counts, want, "direction {dir:?} directed {directed}");
+        }
+    }
+}
+
+fn overlap(a: (f64, f64), b: (f64, f64)) -> f64 {
+    (a.1.min(b.1) - a.0.max(b.0)).max(0.0)
+}
+
+#[test]
+fn downhole_irregular_matches_pairwise_overlaps() {
+    let mut s = Stream::new(5, &[1]);
+    let mut ids = Vec::new();
+    let (mut from, mut to, mut codes) = (Vec::new(), Vec::new(), Vec::new());
+    for hole in 0..3 {
+        let mut z = 0.0;
+        for _ in 0..40 {
+            z += if s.uniform() < 0.2 { 0.05 } else { 0.0 };
+            let len = 0.1 + 2.0 * s.uniform();
+            ids.push(format!("h{hole}"));
+            from.push(z);
+            to.push(z + len);
+            codes.push(if s.uniform() < 0.05 {
+                MISSING
+            } else {
+                s.categorical(&P) as u32
+            });
+            z += len;
+        }
+    }
+    let seqs = SequenceSet::from_intervals(&ids, &from, &to, &codes, 3).unwrap();
+    let lags = [0.03, 0.4, 1.7, 5.0, 11.3];
+    for direction in [Direction::Down, Direction::Up] {
+        let got = downhole(&seqs, direction, &lags, 0.1).unwrap();
+        let runs = seqs.runs(direction, 0.1);
+        for (l, &h) in lags.iter().enumerate() {
+            let mut want = Mat::zeros(3, 3);
+            for run in &runs {
+                let n = run.codes.len();
+                let (r0, r1) = (run.start[0], run.end[n - 1]);
+                for a in 0..n {
+                    for b in 0..n {
+                        let ab = overlap(
+                            (run.start[a], run.end[a]),
+                            (run.start[b] - h, run.end[b] - h),
+                        );
+                        if ab <= 0.0 {
+                            continue;
+                        }
+                        let lo = run.start[a].max(run.start[b] - h).max(r0);
+                        let hi = run.end[a].min(run.end[b] - h).min(r1 - h);
+                        want[(run.codes[a] as usize, run.codes[b] as usize)] += (hi - lo).max(0.0);
+                    }
+                }
+            }
+            let diff = (&got.counts[l] - &want).abs().max();
+            assert!(diff < 1e-9, "{direction:?} h={h}: {diff}");
+        }
+    }
+}
+
+#[test]
+fn grid_estimator_negative_offset_matches_brute_force() {
+    let grid = Grid::new([0.0; 3], [1.0, 2.0, 0.5], [7, 5, 6]).unwrap();
+    let mut s = Stream::new(8, &[3]);
+    let codes: Vec<u32> = (0..grid.n_cells())
+        .map(|_| {
+            if s.uniform() < 0.1 {
+                MISSING
+            } else {
+                s.categorical(&P) as u32
+            }
+        })
+        .collect();
+    let offset = [-1, 2, -1];
+    let got = on_grid(&codes, &grid, None, offset, 3, 3).unwrap();
+    let [nx, ny, nz] = grid.count.map(|c| c as i64);
+    for l in 1..=3i64 {
+        let mut want = Mat::zeros(3, 3);
+        for k in 0..nz {
+            for j in 0..ny {
+                for i in 0..nx {
+                    let (i2, j2, k2) = (i + l * offset[0], j + l * offset[1], k + l * offset[2]);
+                    if !(0..nx).contains(&i2) || !(0..ny).contains(&j2) || !(0..nz).contains(&k2) {
+                        continue;
+                    }
+                    let a = codes[(i + nx * (j + ny * k)) as usize];
+                    let b = codes[(i2 + nx * (j2 + ny * k2)) as usize];
+                    if a != MISSING && b != MISSING {
+                        want[(a as usize, b as usize)] += 1.0;
+                    }
+                }
+            }
+        }
+        assert_eq!(got.counts[l as usize - 1], want, "l={l}");
+        let step = (1.0f64 + 16.0 + 0.25).sqrt();
+        assert!((got.lags[l as usize - 1] - l as f64 * step).abs() < 1e-12);
+    }
+}
+
+fn axis_rates(p: &[f64], r00: f64, r01: f64, r10: f64, r11: f64) -> RateMatrix {
+    let partial = Mat::from_row_slice(3, 3, &[r00, r01, 0.0, r10, r11, 0.0, 0.0, 0.0, 0.0]);
+    RateMatrix::from_partial(&partial, p, 2).unwrap()
+}
+
+#[test]
+fn table_shell_stop_matches_brute_force_on_anisotropic_models() {
+    let p = [0.3, 0.4, 0.3];
+    let model = TransitionModel::new(
+        p.to_vec(),
+        [
+            axis_rates(&p, -1.0, 1.0, 0.0, -1.0),
+            axis_rates(&p, -1.0, 0.0, 0.0, -1.0),
+            axis_rates(&p, -2.0, 0.0, 0.5, -1.5),
+        ],
+        [0.0; 3],
+        2,
+    )
+    .unwrap();
+    for size in [
+        [1.0, 1.0, 1.0],
+        [0.2, 3.0, 1.0],
+        [0.05, 1.0, 4.0],
+        [1.0, 0.1, 0.3],
+    ] {
+        let grid = Grid::new([0.0; 3], size, [21, 21, 7]).unwrap();
+        for limit in [0.3, 0.05, 0.01, 1e-3] {
+            let t = model.table(&grid, limit, None).unwrap();
+            let mut brute = Vec::new();
+            for dz in -6i64..=6 {
+                for dy in -20i64..=20 {
+                    for dx in -20i64..=20 {
+                        let d = [dx, dy, dz];
+                        if d != [0; 3] && model.closeness(grid.lag(d)) >= limit {
+                            brute.push(d);
+                        }
+                    }
+                }
+            }
+            let mut got = t.offsets.clone();
+            got.sort();
+            brute.sort();
+            assert_eq!(got.len(), brute.len(), "size {size:?} limit {limit}");
+            assert_eq!(got, brute, "size {size:?} limit {limit}");
+        }
+    }
+}
+
+#[test]
+fn fit_markov_with_an_absent_category_and_a_start() {
+    let r = carle();
+    let lags: Vec<f64> = (1..=6).map(f64::from).collect();
+    let exact: Vec<Mat> = lags
+        .iter()
+        .map(|&h| r.transition(h).matrix().clone())
+        .collect();
+    let mut probabilities = exact.clone();
+    let mut tails = vec![vec![1.0, 1.0, 1.0]; lags.len()];
+    for (p, t) in probabilities.iter_mut().zip(tails.iter_mut()) {
+        for j in 0..3 {
+            p[(1, j)] = f64::NAN;
+        }
+        t[1] = 0.0;
+    }
+    let exp = varvite_transiogram::Experimental {
+        lags: lags.clone(),
+        mean_lags: lags.clone(),
+        counts: exact,
+        probabilities,
+        tail_totals: tails,
+        directed: true,
+    };
+    let fit = Model1D::fit_markov(&exp, Some(&P), 2, Some(&r)).unwrap();
+    let Model1D::Markov { rates, .. } = &fit else {
+        panic!()
+    };
+    assert!(rates.matrix().iter().all(|v| v.is_finite()), "{rates:?}");
+    for &h in &lags {
+        let t = fit.transition(h);
+        let want = r.transition(h);
+        for j in 0..3 {
+            assert!((t[(0, j)] - want.matrix()[(0, j)]).abs() < 1e-4, "h={h}");
+        }
+    }
+}
+
+#[test]
+fn transition_at_non_finite_lags() {
+    let sill = Mat::from_fn(3, 3, |_, j| P[j]);
+    for m in [Model1D::markov(carle()).unwrap(), entrywise()] {
+        assert_eq!(m.transition(f64::INFINITY), sill);
+        assert_eq!(m.transition(f64::NEG_INFINITY), sill);
+        assert!(max_diff(&m.transition(1e9), &sill) < 1e-10);
+        assert!(m.transition(f64::NAN).iter().all(|v| v.is_nan()));
+    }
+}
+
+fn two_category(lengths: [[f64; 2]; 3], rotation: [f64; 3]) -> TransitionModel {
+    let p = [0.5, 0.5];
+    let rates: Vec<RateMatrix> = lengths
+        .iter()
+        .map(|l| RateMatrix::max_entropy(&p, l).unwrap())
+        .collect();
+    TransitionModel::new(p.to_vec(), rates.try_into().unwrap(), rotation, 1).unwrap()
+}
+
+/// Spec 4.5: the table holds every offset with closeness >= limit. A model whose long axis
+/// runs along (2, 1) has no integer offset of shell 1 near that ray, so a stop after the first
+/// empty shell quits before reaching (2, 1), whose closeness is about 0.956.
+#[test]
+fn table_keeps_every_offset_above_the_limit_for_a_rotated_model() {
+    let azimuth = -(0.5f64).atan().to_degrees();
+    let m = two_category([[100.0; 2], [0.05; 2], [1.0; 2]], [azimuth, 0.0, 0.0]);
+    let grid = Grid::new([0.0; 3], [1.0; 3], [10, 10, 1]).unwrap();
+    let limit = 0.01;
+    let c = m.closeness(grid.lag([2, 1, 0]));
+    assert!(c > 0.9, "closeness of (2, 1, 0) = {c}");
+    let mut brute = Vec::new();
+    for dy in -9i64..=9 {
+        for dx in -9i64..=9 {
+            let d = [dx, dy, 0];
+            if d != [0; 3] && m.closeness(grid.lag(d)) >= limit {
+                brute.push(d);
+            }
+        }
+    }
+    let t = m.table(&grid, limit, None).unwrap();
+    let mut got = t.offsets.clone();
+    got.sort();
+    brute.sort();
+    assert_eq!(got, brute, "table offsets vs brute force");
+}
+
+#[test]
+fn table_matches_brute_force_on_rotated_anisotropic_models() {
+    for rotation in [
+        [-26.565, 0.0, 0.0],
+        [35.0, 20.0, -15.0],
+        [110.0, -60.0, 45.0],
+    ] {
+        let models = [
+            (
+                two_category([[30.0; 2], [0.3; 2], [2.0; 2]], rotation),
+                Grid::new([0.0; 3], [1.0, 0.7, 0.5], [13, 11, 7]).unwrap(),
+            ),
+            (
+                model3d(rotation),
+                Grid::new([0.0; 3], [8.0, 6.0, 1.0], [13, 11, 7]).unwrap(),
+            ),
+        ];
+        for (m, grid) in &models {
+            for limit in [0.5, 0.05, 1e-3] {
+                let mut brute = Vec::new();
+                for dz in -6i64..=6 {
+                    for dy in -10i64..=10 {
+                        for dx in -12i64..=12 {
+                            let d = [dx, dy, dz];
+                            if d != [0; 3] && m.closeness(grid.lag(d)) >= limit {
+                                brute.push(d);
+                            }
+                        }
+                    }
+                }
+                let mut got = m.table(grid, limit, None).unwrap().offsets;
+                got.sort();
+                brute.sort();
+                assert_eq!(got, brute, "rotation {rotation:?} limit {limit}");
+            }
+        }
+    }
+}
+
+fn message(e: Box<dyn std::any::Any + Send>) -> String {
+    e.downcast_ref::<String>()
+        .cloned()
+        .or_else(|| e.downcast_ref::<&str>().map(|s| s.to_string()))
+        .unwrap_or_default()
+}
+
+#[test]
+fn on_grid_with_a_huge_offset_returns_instead_of_panicking() {
+    let grid = Grid::new([0.0; 3], [1.0; 3], [2, 1, 1]).unwrap();
+    for offset in [[i64::MAX, 0, 0], [i64::MIN, 0, 0], [1, i64::MIN, 0]] {
+        let r = std::panic::catch_unwind(|| on_grid(&[0, 1], &grid, None, offset, 3, 2));
+        match r {
+            Ok(Ok(e)) => assert!(e.counts.iter().all(|c| *c == Mat::zeros(2, 2))),
+            Ok(Err(_)) => {}
+            Err(p) => panic!("on_grid panicked: {}", message(p)),
+        }
+    }
+}
+
+#[test]
+fn point_estimator_with_large_coordinates_returns_instead_of_panicking() {
+    let spec = PairSpec {
+        direction: None,
+        lag: 1.0,
+        n_lags: 2,
+        lag_tolerance: 0.5,
+        angle_tolerance: 22.5,
+        bandwidth: f64::INFINITY,
+        vertical_bandwidth: f64::INFINITY,
+        directed: true,
+        pairs: PairFilter::All,
+    };
+    let xyz = [
+        [1e20, 0.0, 0.0],
+        [1e20, 0.0, 0.0],
+        [-1e20, -1e300, 0.0],
+        [-1e20, -1e300, 1.0],
+    ];
+    let r = std::panic::catch_unwind(|| experimental(&xyz, &[0, 1, 0, 1], None, 2, &spec));
+    match r {
+        Ok(Ok(e)) => {
+            assert_eq!(e.counts[0][(0, 1)] + e.counts[0][(1, 0)], 2.0);
+            assert_eq!(e.counts[1], Mat::zeros(2, 2));
+        }
+        Ok(Err(e)) => panic!("unexpected error {e}"),
+        Err(p) => panic!("experimental panicked: {}", message(p)),
+    }
 }

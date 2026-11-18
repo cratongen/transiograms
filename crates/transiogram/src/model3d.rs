@@ -158,7 +158,7 @@ impl TransitionModel {
         self.proportions.len()
     }
 
-    fn axes(&self) -> [[f64; 3]; 3] {
+    pub(crate) fn axes(&self) -> [[f64; 3]; 3] {
         let [a, d, r] = self.rotation.map(f64::to_radians);
         let x1 = [a.cos(), -a.sin(), 0.0];
         let y1 = [a.sin(), a.cos(), 0.0];
