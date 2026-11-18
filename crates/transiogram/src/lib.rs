@@ -1,5 +1,3 @@
-#![allow(unused_variables)]
-
 //! Experimental transiograms (points, downhole intervals, grids), 1D transiogram models and the
 //! 3D transition model with rotation, rate interpolation, closeness and offset tables.
 
