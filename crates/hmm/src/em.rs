@@ -89,12 +89,13 @@ impl Hmm {
             fresh
                 .into_iter()
                 .enumerate()
-                .map(|(j, e)| {
-                    if frozen(j) {
-                        self.emissions[j].clone()
-                    } else {
-                        e
+                .map(|(j, e)| match (e, self.emissions.get(j)) {
+                    _ if frozen(j) => self.emissions[j].clone(),
+                    (Emission::Categorical(mut c), Some(Emission::Categorical(t))) => {
+                        c.pseudocount = t.pseudocount;
+                        Emission::Categorical(c)
                     }
+                    (e, _) => e,
                 })
                 .collect()
         } else {
