@@ -1,5 +1,3 @@
-#![allow(unused_variables)]
-
 //! Hidden Markov models: emission families, scaled and log forward-backward, Viterbi and
 //! posterior decoding, Baum-Welch over many sequences, sampling and information criteria.
 
