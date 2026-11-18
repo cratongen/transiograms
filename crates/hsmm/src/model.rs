@@ -96,6 +96,18 @@ pub(crate) fn check_max_duration(max_duration: &[usize]) -> Result<()> {
 }
 
 impl Hsmm {
+    /// Pseudocounts of `template`'s categorical emissions and durations, state by state.
+    pub(crate) fn carry_pseudocounts(&mut self, template: &Hsmm) {
+        for (e, t) in self.emissions.iter_mut().zip(&template.emissions) {
+            if let (Emission::Categorical(c), Emission::Categorical(tc)) = (e, t) {
+                c.pseudocount = tc.pseudocount;
+            }
+        }
+        for (d, t) in self.durations.iter_mut().zip(&template.durations) {
+            d.pseudocount = t.pseudocount;
+        }
+    }
+
     pub fn new(
         start: Vec<f64>,
         transition: Mat,

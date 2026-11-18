@@ -290,6 +290,7 @@ impl Hsmm {
                             if !ip.duration {
                                 m.durations = t.durations.clone();
                             }
+                            m.carry_pseudocounts(t);
                         }
                         m
                     }

@@ -106,7 +106,7 @@ impl Duration {
         }
     }
 
-    pub(crate) fn validate(&self, m: usize) -> Result<()> {
+    pub fn validate(&self, m: usize) -> Result<()> {
         let ok = match self {
             Duration::Geometric { p } => *p > 0.0 && *p <= 1.0,
             Duration::Poisson { rate } => *rate >= 0.0 && rate.is_finite(),
