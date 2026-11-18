@@ -1,5 +1,3 @@
-#![allow(unused_variables)]
-
 //! Markov chain random field simulation and Markov-type categorical prediction (Li and Zhang
 //! Eq. 14) on grids.
 
@@ -11,6 +9,9 @@ pub mod simulate;
 pub use conditional::{conditional, conditional_eq13};
 pub use predict::predict;
 pub use simulate::simulate;
+
+use varvite_core::{Code, Grid, MISSING, Result, Snapped, invalid};
+use varvite_transiogram::TransitionModel;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Neighbourhood {
@@ -38,4 +39,43 @@ impl Default for Options {
             memory: None,
         }
     }
+}
+
+/// Validates the inputs and returns the hard codes laid out per cell (MISSING elsewhere).
+pub(crate) fn hard_codes(
+    model: &TransitionModel,
+    grid: &Grid,
+    mask: Option<&[bool]>,
+    hard: &Snapped,
+) -> Result<Vec<Code>> {
+    let n = grid.n_cells();
+    let k = model.k();
+    if model.proportions.iter().any(|&p| p.is_nan() || p <= 0.0) {
+        return invalid("every proportion must be positive");
+    }
+    if let Some(m) = mask
+        && m.len() != n
+    {
+        return invalid(format!(
+            "mask has {} values but the grid has {n} cells",
+            m.len()
+        ));
+    }
+    if hard.cells.len() != hard.codes.len() {
+        return invalid("hard data need one code per cell");
+    }
+    let mut codes = vec![MISSING; n];
+    for (&cell, &code) in hard.cells.iter().zip(&hard.codes) {
+        if cell >= n {
+            return invalid(format!("hard cell {cell} is outside the grid of {n} cells"));
+        }
+        if code as usize >= k {
+            return invalid(format!("hard code {code} at cell {cell} is not in 0..{k}"));
+        }
+        if mask.is_some_and(|m| !m[cell]) {
+            return invalid(format!("hard cell {cell} is outside the mask"));
+        }
+        codes[cell] = code;
+    }
+    Ok(codes)
 }
