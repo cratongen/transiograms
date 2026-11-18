@@ -8,6 +8,8 @@ use varvite_mcrf::{Options, predict, simulate};
 use varvite_transiogram::TransitionModel;
 
 const P: [f64; 3] = [0.5, 0.3, 0.2];
+const SPEC_SIZE: [f64; 3] = [1.0, 1.0, 0.25];
+const SPEC_COUNT: [usize; 3] = [64, 64, 32];
 const SIZE: [f64; 3] = [4.0, 4.0, 1.0];
 const COUNT: [usize; 3] = [96, 96, 32];
 
@@ -60,24 +62,46 @@ fn proportion_sd(model: &TransitionModel, grid: &Grid, limit: f64) -> Vec<f64> {
         .collect()
 }
 
+/// mcrf.md "Implementer decisions": the spec grid fails the variance assertion, which is why
+/// the proportion check runs on the enlarged grid.
+#[test]
+fn spec_m6_grid_fails_the_variance_assertion() {
+    let grid = Grid::new([0.0; 3], SPEC_SIZE, SPEC_COUNT).unwrap();
+    let sd = proportion_sd(&model(), &grid, Options::default().closeness_limit);
+    for (k, sd) in sd.iter().enumerate() {
+        assert!(3.0 * sd > 0.1, "category {k}: 3 sigma = {}", 3.0 * sd);
+    }
+}
+
+#[test]
+fn m6_acceptance_spec_grid() {
+    m6(SPEC_SIZE, SPEC_COUNT, false);
+}
+
 #[test]
 fn m6_acceptance() {
-    let grid = Grid::new([0.0; 3], SIZE, COUNT).unwrap();
+    m6(SIZE, COUNT, true);
+}
+
+fn m6(size: [f64; 3], count: [usize; 3], check_proportions: bool) {
+    let grid = Grid::new([0.0; 3], size, count).unwrap();
     let model = model();
     let opts = Options {
         n_realizations: 20,
         seed: 0,
         ..Options::default()
     };
-    for (k, sd) in proportion_sd(&model, &grid, opts.closeness_limit)
-        .iter()
-        .enumerate()
-    {
-        assert!(3.0 * sd < 0.02, "category {k}: 3 sigma = {}", 3.0 * sd);
+    if check_proportions {
+        for (k, sd) in proportion_sd(&model, &grid, opts.closeness_limit)
+            .iter()
+            .enumerate()
+        {
+            assert!(3.0 * sd < 0.02, "category {k}: 3 sigma = {}", 3.0 * sd);
+        }
     }
 
     let hard = holes(&model, &grid);
-    assert_eq!(hard.cells.len(), 16 * COUNT[2]);
+    assert_eq!(hard.cells.len(), 16 * count[2]);
     let pred = predict(&model, &grid, None, &hard, &opts).unwrap();
     for row in pred.probabilities.chunks(3) {
         assert!(row.iter().all(|&p| p >= 0.0));
@@ -101,6 +125,9 @@ fn m6_acceptance() {
         for &c in codes {
             counts[c as usize] += 1.0;
         }
+    }
+    if !check_proportions {
+        return;
     }
     let total: f64 = counts.iter().sum();
     for k in 0..3 {

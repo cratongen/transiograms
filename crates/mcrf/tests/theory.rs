@@ -433,3 +433,240 @@ fn same_seed_gives_identical_output_for_any_thread_count() {
     .unwrap();
     assert_ne!(one.codes, other.codes);
 }
+
+fn cyclic() -> RateMatrix {
+    RateMatrix::new(Mat::from_row_slice(
+        3,
+        3,
+        &[-0.6, 0.6, 0.0, 0.0, -1.0, 1.0, 1.5, 0.0, -1.5],
+    ))
+    .unwrap()
+}
+
+fn model_with(z: RateMatrix, lengths: [f64; 3]) -> TransitionModel {
+    let lateral = RateMatrix::max_entropy(&P, &lengths).unwrap();
+    TransitionModel::new(P.to_vec(), [lateral.clone(), lateral, z], [0.0; 3], 2).unwrap()
+}
+
+#[test]
+fn conditional_is_finite_for_sparse_rates_at_small_lags() {
+    let model = model_with(cyclic(), [3.0, 2.0, 1.5]);
+    for e in 1..=12 {
+        let h = 10f64.powi(-e);
+        for (a, b) in [(0u32, 2u32), (2, 0), (0, 1), (1, 0), (1, 2), (2, 1)] {
+            let nb = [([0.0, 0.0, -h], a), ([0.0, 0.0, h], b)];
+            if let Some(p) = conditional(&model, &nb) {
+                assert!(
+                    p.iter().all(|v| v.is_finite() && *v >= 0.0),
+                    "h={h} codes ({a},{b}): {p:?}"
+                );
+                assert!((p.iter().sum::<f64>() - 1.0).abs() < 1e-12, "h={h}: {p:?}");
+            }
+        }
+    }
+}
+
+fn zyx(d: [i64; 3]) -> [i64; 3] {
+    [d[2], d[1], d[0]]
+}
+
+/// Slow reference: every informed cell, closeness from the model, sorted, sectors by sign.
+fn reference_row(
+    model: &TransitionModel,
+    grid: &Grid,
+    informed: &[Code],
+    cell: usize,
+    opts: &Options,
+) -> Vec<f64> {
+    let ijk = grid.ijk(cell).map(|v| v as i64);
+    let mut cand: Vec<([i64; 3], f64, Code)> = Vec::new();
+    for (c, &code) in informed.iter().enumerate() {
+        if code == MISSING || c == cell {
+            continue;
+        }
+        let o = grid.ijk(c).map(|v| v as i64);
+        let d = [o[0] - ijk[0], o[1] - ijk[1], o[2] - ijk[2]];
+        let pos = zyx(d).into_iter().find(|&v| v != 0).is_some_and(|v| v > 0);
+        let canon = if pos { d } else { d.map(|v| -v) };
+        let cl = model.closeness(grid.lag(canon));
+        if cl >= opts.closeness_limit {
+            cand.push((d, cl, code));
+        }
+    }
+    cand.sort_by(|a, b| b.1.total_cmp(&a.1).then(zyx(a.0).cmp(&zyx(b.0))));
+    let dims = if grid.is_2d() { 2 } else { 3 };
+    let mut filled = [false; 8];
+    let mut nb: Vec<([f64; 3], Code)> = Vec::new();
+    for (d, _, code) in cand {
+        match opts.neighbourhood {
+            Neighbourhood::Sectors => {
+                let s: usize = (0..dims).map(|a| ((d[a] >= 0) as usize) << a).sum();
+                if filled[s] {
+                    continue;
+                }
+                filled[s] = true;
+            }
+            Neighbourhood::Nearest(n) => {
+                if nb.len() == n {
+                    break;
+                }
+            }
+        }
+        nb.push((grid.lag(d), code));
+    }
+    loop {
+        if let Some(p) = conditional(model, &nb) {
+            return p;
+        }
+        nb.pop();
+    }
+}
+
+fn check_against_reference(model: &TransitionModel, grid: &Grid, n_data: usize, seed: u64) {
+    let mut s = Stream::new(seed, &[tag::SAMPLE]);
+    let mut cells: Vec<usize> = (0..n_data)
+        .map(|_| s.below(grid.n_cells() as u64) as usize)
+        .collect();
+    cells.sort();
+    cells.dedup();
+    let codes: Vec<Code> = cells.iter().map(|_| s.below(3) as Code).collect();
+    let mut informed = vec![MISSING; grid.n_cells()];
+    for (&c, &k) in cells.iter().zip(&codes) {
+        informed[c] = k;
+    }
+    let hard = Snapped {
+        cells,
+        codes,
+        conflicts: 0,
+        outside: 0,
+    };
+    for neighbourhood in [Neighbourhood::Sectors, Neighbourhood::Nearest(5)] {
+        for limit in [0.01, 0.3] {
+            let opts = Options {
+                neighbourhood,
+                closeness_limit: limit,
+                ..Options::default()
+            };
+            let pred = predict(model, grid, None, &hard, &opts).unwrap();
+            for cell in 0..grid.n_cells() {
+                if informed[cell] != MISSING {
+                    continue;
+                }
+                let want = reference_row(model, grid, &informed, cell, &opts);
+                let got = &pred.probabilities[cell * 3..cell * 3 + 3];
+                for k in 0..3 {
+                    assert!(
+                        (got[k] - want[k]).abs() < 1e-10,
+                        "{neighbourhood:?} limit {limit} cell {cell} {:?}: {got:?} vs {want:?}",
+                        grid.ijk(cell)
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn predict_matches_slow_reference_3d() {
+    let grid = Grid::new([0.0; 3], [1.0, 1.0, 0.25], [9, 7, 6]).unwrap();
+    check_against_reference(&model_with(golden_q(), [3.0, 2.0, 1.5]), &grid, 25, 3);
+}
+
+#[test]
+fn predict_matches_slow_reference_2d() {
+    let grid = Grid::new([0.0; 3], [1.0, 0.5, 1.0], [11, 9, 1]).unwrap();
+    check_against_reference(&model_with(golden_q(), [3.0, 2.0, 1.5]), &grid, 15, 4);
+}
+
+#[test]
+fn predict_matches_slow_reference_strong_anisotropy() {
+    let grid = Grid::new([0.0; 3], [4.0, 4.0, 0.05], [8, 8, 6]).unwrap();
+    check_against_reference(&model_with(golden_q(), [30.0, 20.0, 15.0]), &grid, 20, 7);
+}
+
+#[test]
+fn simulate_single_cell_and_zero_realizations() {
+    let grid = Grid::new([0.0; 3], [1.0; 3], [1, 1, 1]).unwrap();
+    let model = model_with(golden_q(), [3.0, 2.0, 1.5]);
+    let empty = Snapped {
+        cells: vec![],
+        codes: vec![],
+        conflicts: 0,
+        outside: 0,
+    };
+    let opts = Options {
+        n_realizations: 3,
+        ..Options::default()
+    };
+    let r = simulate(&model, &grid, None, &empty, &opts).unwrap();
+    assert!(r.codes.iter().all(|&c| c < 3));
+    let p = predict(&model, &grid, None, &empty, &opts).unwrap();
+    for k in 0..3 {
+        assert!((p.probabilities[k] - P[k]).abs() < 1e-15);
+    }
+    let none = simulate(
+        &model,
+        &grid,
+        None,
+        &empty,
+        &Options {
+            n_realizations: 0,
+            ..Options::default()
+        },
+    )
+    .unwrap();
+    assert!(none.codes.is_empty());
+}
+
+#[test]
+fn simulate_memory_check_is_independent_of_thread_count() {
+    let grid = Grid::new([0.0; 3], [1.0; 3], [20, 20, 20]).unwrap();
+    let model = model_with(golden_q(), [3.0, 2.0, 1.5]);
+    let empty = Snapped {
+        cells: vec![],
+        codes: vec![],
+        conflicts: 0,
+        outside: 0,
+    };
+    let n_cells = grid.n_cells() as u64;
+    let opts = Options {
+        n_realizations: 4,
+        closeness_limit: 0.3,
+        memory: Some(4 * n_cells * 4 + n_cells * 8 + 1000),
+        ..Options::default()
+    };
+    let run = |threads: usize| {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(threads)
+            .build()
+            .unwrap()
+            .install(|| simulate(&model, &grid, None, &empty, &opts).is_ok())
+    };
+    assert_eq!(run(1), run(4), "1 thread vs 4 threads disagree on success");
+}
+
+/// The budget covers the codes (4 bytes per cell per realization), `corrected` (8 bytes per
+/// realization), the compact table (offset, column-major K x K matrix and sector byte per
+/// offset) and per-realization neighbour and probability scratch; `memory.rs` checks the peak.
+#[test]
+fn simulate_memory_budget_is_codes_plus_table_plus_scratch() {
+    let grid = Grid::new([0.0; 3], [1.0; 3], [80, 80, 40]).unwrap();
+    let model = model_with(golden_q(), [3.0, 2.0, 1.5]);
+    let empty = snapped(vec![], vec![]);
+    let n = 3u64;
+    let m = model.table(&grid, 0.3, None).unwrap().offsets.len() as u64;
+    let needed =
+        n * grid.n_cells() as u64 * 4 + n * 8 + m * (24 + 9 * 8 + 1) + n * (8.min(m) * 8 + 3 * 8);
+    let opts = |memory: u64| Options {
+        n_realizations: n as usize,
+        closeness_limit: 0.3,
+        memory: Some(memory),
+        ..Options::default()
+    };
+    assert!(simulate(&model, &grid, None, &empty, &opts(needed)).is_ok());
+    let e = simulate(&model, &grid, None, &empty, &opts(needed - 1)).unwrap_err();
+    assert!(
+        e.to_string().contains(&format!("needs {needed} bytes")),
+        "{e}"
+    );
+}

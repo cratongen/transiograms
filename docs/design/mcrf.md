@@ -64,4 +64,13 @@ collected in index order. Memory check as in tpsim.
 
 ## Implementer decisions
 
-(empty)
+- M6 grid. On the spec grid (64 x 64 x 32, cell 1 x 1 x 0.25) the tpsim.md section 5 variance
+  assertion fails: 3 sigma = 0.180 / 0.141 / 0.118 for categories 0 / 1 / 2, against the 0.02
+  required. The proportion check therefore runs on 96 x 96 x 32 with cell 4 x 4 x 1, where it
+  holds. The spec grid still runs every other M6 assertion (probability rows, one-hot hard cells,
+  hard data in each of the 20 realizations), and a test asserts that it fails the variance bound
+  (`crates/mcrf/tests/acceptance.rs`).
+- Memory check. `simulate` checks `n * n_cells * 4` bytes of codes before building the table,
+  then codes plus the table (`(K^2 + 4) * 8` bytes per offset) against the same budget. Building
+  the table runs its own check (`TransitionModel::table`, which adds working space for the build)
+  against the same budget.

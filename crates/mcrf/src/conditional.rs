@@ -1,17 +1,19 @@
 use varvite_core::{Code, Mat};
 use varvite_transiogram::TransitionModel;
 
-/// Eq. 14 into `out` from `(T(h_g), c_g)` pairs; false when every candidate has zero likelihood.
+/// Eq. 14 into `out` from `(T(h_g), c_g)` pairs, each `T` a column-major K x K slice; false
+/// when every candidate has zero likelihood.
 pub(crate) fn eq14<'a>(
     proportions: &[f64],
-    terms: impl Iterator<Item = (&'a Mat, Code)> + Clone,
+    terms: impl Iterator<Item = (&'a [f64], Code)> + Clone,
     out: &mut [f64],
 ) -> bool {
+    let n = out.len();
     for (k, s) in out.iter_mut().enumerate() {
         *s = proportions[k].ln()
             + terms
                 .clone()
-                .map(|(t, c)| t[(k, c as usize)].ln())
+                .map(|(t, c)| t[c as usize * n + k].ln())
                 .sum::<f64>();
     }
     normalise_log(out)
@@ -35,9 +37,18 @@ fn normalise_log(s: &mut [f64]) -> bool {
 
 /// Zero-likelihood policy: drop the last neighbour (lowest closeness, ties to the last found)
 /// and retry; with none left the result is `p`.
-pub(crate) fn resolve(proportions: &[f64], terms: &[(&Mat, Code)], out: &mut [f64]) {
-    for m in (0..=terms.len()).rev() {
-        if eq14(proportions, terms[..m].iter().copied(), out) {
+pub(crate) fn resolve<'a>(
+    proportions: &[f64],
+    found: &[(u32, Code)],
+    transition: impl Fn(u32) -> &'a [f64] + Copy,
+    out: &mut [f64],
+) {
+    for m in (0..=found.len()).rev() {
+        if eq14(
+            proportions,
+            found[..m].iter().map(|&(t, c)| (transition(t), c)),
+            out,
+        ) {
             return;
         }
     }
@@ -63,7 +74,9 @@ pub fn conditional(model: &TransitionModel, neighbours: &[([f64; 3], Code)]) -> 
     let mut out = vec![0.0; model.k()];
     eq14(
         &model.proportions,
-        mats.iter().zip(neighbours.iter().map(|&(_, c)| c)),
+        mats.iter()
+            .map(|m| m.as_slice())
+            .zip(neighbours.iter().map(|&(_, c)| c)),
         &mut out,
     )
     .then_some(out)

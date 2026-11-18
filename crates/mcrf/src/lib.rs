@@ -41,13 +41,13 @@ impl Default for Options {
     }
 }
 
-/// Validates the inputs and returns the hard codes laid out per cell (MISSING elsewhere).
-pub(crate) fn hard_codes(
+/// Validates the inputs without allocating.
+pub(crate) fn validate(
     model: &TransitionModel,
     grid: &Grid,
     mask: Option<&[bool]>,
     hard: &Snapped,
-) -> Result<Vec<Code>> {
+) -> Result<()> {
     let n = grid.n_cells();
     let k = model.k();
     if model.proportions.iter().any(|&p| p.is_nan() || p <= 0.0) {
@@ -64,7 +64,6 @@ pub(crate) fn hard_codes(
     if hard.cells.len() != hard.codes.len() {
         return invalid("hard data need one code per cell");
     }
-    let mut codes = vec![MISSING; n];
     for (&cell, &code) in hard.cells.iter().zip(&hard.codes) {
         if cell >= n {
             return invalid(format!("hard cell {cell} is outside the grid of {n} cells"));
@@ -75,7 +74,30 @@ pub(crate) fn hard_codes(
         if mask.is_some_and(|m| !m[cell]) {
             return invalid(format!("hard cell {cell} is outside the mask"));
         }
+    }
+    Ok(())
+}
+
+/// Writes the hard codes into `codes` (MISSING elsewhere); later duplicates win.
+pub(crate) fn place_hard(hard: &Snapped, codes: &mut [Code]) {
+    codes.fill(MISSING);
+    for (&cell, &code) in hard.cells.iter().zip(&hard.codes) {
         codes[cell] = code;
     }
-    Ok(codes)
+}
+
+/// Product of `factors` in bytes, or `InvalidInput` naming `what` when it overflows `u64`.
+pub(crate) fn product(factors: &[u64], what: &str) -> Result<u64> {
+    match factors.iter().try_fold(1u64, |a, &b| a.checked_mul(b)) {
+        Some(v) => Ok(v),
+        None => invalid(format!("{what} is too large: its size overflows 64 bits")),
+    }
+}
+
+/// Sum in bytes, or `InvalidInput` naming `what` when it overflows `u64`.
+pub(crate) fn sum(terms: &[u64], what: &str) -> Result<u64> {
+    match terms.iter().try_fold(0u64, |a, &b| a.checked_add(b)) {
+        Some(v) => Ok(v),
+        None => invalid(format!("{what} is too large: its size overflows 64 bits")),
+    }
 }
