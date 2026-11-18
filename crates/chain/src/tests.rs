@@ -118,22 +118,26 @@ fn kept(n: &Mat) -> Vec<usize> {
     }
 }
 
-/// Expected counts under (quasi-)independence on the kept categories, full size with zeros
-/// elsewhere, and the kept set.
-fn independence_expected(n: &Mat, structural_diagonal: bool) -> Result<(Mat, Vec<usize>)> {
+/// Expected counts under (quasi-)independence, full size with zeros elsewhere, and the kept rows
+/// and columns. Quasi-independence keeps the categories left by `kept`; the ordinary contingency
+/// keeps every row and every column with a positive margin.
+fn independence_expected(
+    n: &Mat,
+    structural_diagonal: bool,
+) -> Result<(Mat, Vec<usize>, Vec<usize>)> {
     let m = n.nrows();
-    let keep = kept(n);
-    let r = keep.len();
-    let rows: Vec<f64> = keep
-        .iter()
-        .map(|&i| keep.iter().map(|&j| n[(i, j)]).sum())
-        .collect();
-    let cols: Vec<f64> = keep
-        .iter()
-        .map(|&j| keep.iter().map(|&i| n[(i, j)]).sum())
-        .collect();
     let mut e = Mat::zeros(m, m);
     if structural_diagonal {
+        let keep = kept(n);
+        let r = keep.len();
+        let rows: Vec<f64> = keep
+            .iter()
+            .map(|&i| keep.iter().map(|&j| n[(i, j)]).sum())
+            .collect();
+        let cols: Vec<f64> = keep
+            .iter()
+            .map(|&j| keep.iter().map(|&i| n[(i, j)]).sum())
+            .collect();
         if r <= 2 {
             return invalid(format!(
                 "an embedded chain with {r} categories always alternates; no test exists"
@@ -145,20 +149,26 @@ fn independence_expected(n: &Mat, structural_diagonal: bool) -> Result<(Mat, Vec
                 e[(i, j)] = q[(a, b)];
             }
         }
-    } else {
-        if r < 2 {
-            return invalid(format!(
-                "the independence test needs at least 2 observed categories, got {r}"
-            ));
-        }
-        let total: f64 = rows.iter().sum();
-        for (a, &i) in keep.iter().enumerate() {
-            for (b, &j) in keep.iter().enumerate() {
-                e[(i, j)] = rows[a] * cols[b] / total;
-            }
+        return Ok((e, keep.clone(), keep));
+    }
+    let rows: Vec<f64> = (0..m).map(|i| n.row(i).sum()).collect();
+    let cols: Vec<f64> = (0..m).map(|j| n.column(j).sum()).collect();
+    let rk: Vec<usize> = (0..m).filter(|&i| rows[i] > 0.0).collect();
+    let ck: Vec<usize> = (0..m).filter(|&j| cols[j] > 0.0).collect();
+    if rk.len() < 2 || ck.len() < 2 {
+        return invalid(format!(
+            "the independence test needs at least 2 categories with exits and 2 with entries, got {} and {}",
+            rk.len(),
+            ck.len()
+        ));
+    }
+    let total: f64 = rows.iter().sum();
+    for &i in &rk {
+        for &j in &ck {
+            e[(i, j)] = rows[i] * cols[j] / total;
         }
     }
-    Ok((e, keep))
+    Ok((e, rk, ck))
 }
 
 impl MarkovChain {
@@ -170,7 +180,7 @@ impl MarkovChain {
     }
 
     fn structural_diagonal(&self) -> bool {
-        self.kind == Kind::Embedded && self.transition.is_embedded()
+        self.kind == Kind::Embedded && !self.self_transitions
     }
 
     /// Order 1 against independence: quasi-independence for embedded chains, ordinary
@@ -179,14 +189,14 @@ impl MarkovChain {
     pub fn independence_test(&self, method: Method) -> Result<TestResult> {
         let n = self.counts_or_raise()?;
         let structural = self.structural_diagonal();
-        let (e, keep) = independence_expected(n, structural)?;
-        let r = keep.len();
+        let (e, rk, ck) = independence_expected(n, structural)?;
+        let r = rk.len();
         let df = if structural {
             r * r - 3 * r + 1
         } else {
-            (r - 1) * (r - 1)
+            (r - 1) * (ck.len() - 1)
         };
-        let cells = keep.iter().flat_map(|&i| keep.iter().map(move |&j| (i, j)));
+        let cells = rk.iter().flat_map(|&i| ck.iter().map(move |&j| (i, j)));
         let (stat, small, allowed) = statistic(
             cells.map(|(i, j)| (n[(i, j)], e[(i, j)], !(structural && i == j))),
             method,
@@ -233,17 +243,18 @@ impl MarkovChain {
         ))
     }
 
-    /// `Pi_obs - Pi_expected` under quasi-independence (Miall 1973); positive entries are
-    /// preferred paths. Rows and columns of categories dropped for a zero margin are NaN.
+    /// `Pi_obs - Pi_expected` under quasi-independence (Miall 1973), or under ordinary
+    /// independence when the diagonal is not structural; positive entries are preferred paths.
+    /// Rows and columns of categories dropped for a zero margin are NaN.
     pub fn difference_matrix(&self) -> Result<Mat> {
         let n = self.counts_or_raise()?;
-        let (e, keep) = independence_expected(n, self.structural_diagonal())?;
+        let (e, rk, ck) = independence_expected(n, self.structural_diagonal())?;
         let m = n.nrows();
         let p = self.transition.matrix();
         let mut d = Mat::from_element(m, m, f64::NAN);
-        for &i in &keep {
+        for &i in &rk {
             let s: f64 = e.row(i).sum();
-            for &j in &keep {
+            for &j in &ck {
                 d[(i, j)] = p[(i, j)] - e[(i, j)] / s;
             }
         }
@@ -271,12 +282,51 @@ fn history_counts(
     out
 }
 
+/// Raises unless the `history_counts` tables of `order` (`copies` of them) plus `extra` bytes fit
+/// the memory budget.
+fn check_histories(
+    seqs: &[Vec<Code>],
+    m: usize,
+    order: usize,
+    copies: u64,
+    extra: u64,
+) -> Result<()> {
+    let positions: u64 = seqs
+        .iter()
+        .map(|s| s.len().saturating_sub(order) as u64)
+        .sum();
+    // Per distinct history (at most one per position): its key, its row, two Vec headers and a
+    // B-tree slot.
+    let per = (order as u64)
+        .checked_mul(4)
+        .and_then(|b| b.checked_add(m as u64 * 8 + 80));
+    match per
+        .and_then(|p| p.checked_mul(positions))
+        .and_then(|b| b.checked_mul(copies)?.checked_add(extra))
+    {
+        Some(b) => varvite_core::memory::check(b, None, "order test history tables"),
+        None => invalid(format!(
+            "order {order} with {m} categories overflows the address space"
+        )),
+    }
+}
+
 fn fixed_order_test(
     seqs: &[Vec<Code>],
     m: usize,
     order: usize,
     method: Method,
 ) -> Result<TestResult> {
+    let n_hist = u32::try_from(order)
+        .ok()
+        .and_then(|o| m.checked_pow(o))
+        .filter(|&h| h.checked_mul(m * 8).is_some());
+    let Some(n_hist) = n_hist else {
+        return invalid(format!(
+            "order {order} with {m} categories gives more than 2^64 histories; lower the order"
+        ));
+    };
+    check_histories(seqs, m, order, 2, (n_hist * m * 8) as u64)?;
     let fine = history_counts(seqs, m, order, order);
     let mut coarse: BTreeMap<Vec<Code>, Vec<f64>> = BTreeMap::new();
     for (s, row) in &fine {
@@ -292,8 +342,6 @@ fn fixed_order_test(
             "no run is longer than {order} steps; give longer sequences"
         ));
     }
-    let n_hist = m.pow(order as u32);
-    varvite_core::memory::check((n_hist * m * 8) as u64, None, "order test expected table")?;
     let mut expected = Mat::zeros(n_hist, m);
     let index = |s: &[Code]| s.iter().fold(0usize, |a, &c| a * m + c as usize);
     let mut cells = Vec::new();
@@ -420,7 +468,18 @@ pub fn select_order(seqs: &SequenceSet, opts: &FitOptions, max_order: usize) -> 
         return invalid("select_order needs kind Fixed");
     }
     let m = seqs.n_categories;
+    let n_params = |k: usize| {
+        u32::try_from(k)
+            .ok()
+            .and_then(|k| m.checked_pow(k)?.checked_mul(m.saturating_sub(1)))
+    };
+    if n_params(max_order).is_none() {
+        return invalid(format!(
+            "max_order {max_order} with {m} categories gives more than 2^64 parameters; lower it"
+        ));
+    }
     let s = sequences(seqs, opts)?;
+    check_histories(&s, m, max_order, 1, 0)?;
     let n: usize = s.iter().map(|x| x.len().saturating_sub(max_order)).sum();
     if n == 0 {
         return invalid(format!(
@@ -446,7 +505,7 @@ pub fn select_order(seqs: &SequenceSet, opts: &FitOptions, max_order: usize) -> 
                     .sum::<f64>()
             })
             .sum();
-        let np = m.pow(k as u32) * (m - 1);
+        let np = n_params(k).expect("bounded by n_params(max_order)");
         t.orders.push(k);
         t.log_likelihood.push(ll);
         t.n_params.push(np);

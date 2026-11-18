@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use varvite_core::{
     Code, Direction, EmptyRow, Mat, Projection, RateMatrix, Result, SequenceSet, TransitionMatrix,
     invalid,
+    numerics::{components, gth_stationary},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -56,6 +57,9 @@ pub struct MarkovChain {
     pub bed_frequencies: Vec<f64>,
     /// Fixed: how far `logm(P) / step` moved to be a generator.
     pub projection: Option<Projection>,
+    /// Embedded fitted with `self_transitions`: the diagonal is observed, not structural.
+    #[serde(default)]
+    pub self_transitions: bool,
 }
 
 /// Code sequences whose consecutive entries are the transitions the options count: bed codes for
@@ -122,6 +126,32 @@ pub(crate) fn stochastic(mut p: Mat) -> Result<TransitionMatrix> {
         }
     }
     TransitionMatrix::new(p)
+}
+
+/// Stationary law of `p` when it has one closed class; transient categories get 0. Several
+/// closed classes raise as `TransitionMatrix::stationary`.
+pub(crate) fn stationary(p: &TransitionMatrix) -> Result<Vec<f64>> {
+    let (m, k) = (p.matrix(), p.k());
+    let classes = components(m);
+    let closed: Vec<&Vec<usize>> = classes
+        .iter()
+        .filter(|c| {
+            c.iter()
+                .all(|&i| (0..k).all(|j| m[(i, j)] <= 0.0 || c.contains(&j)))
+        })
+        .collect();
+    let [c] = closed.as_slice() else {
+        return p.stationary();
+    };
+    if c.len() == k {
+        return p.stationary();
+    }
+    let x = gth_stationary(&Mat::from_fn(c.len(), c.len(), |a, b| m[(c[a], c[b])]))?;
+    let mut out = vec![0.0; k];
+    for (a, &i) in c.iter().enumerate() {
+        out[i] = x[a];
+    }
+    Ok(out)
 }
 
 /// `p_ij / (1 - p_ii)` with a zero diagonal; a row with `p_ii = 1` raises.
@@ -214,6 +244,7 @@ impl MarkovChain {
                     transition,
                     generator: Some(generator),
                     projection: None,
+                    self_transitions: opts.self_transitions,
                 })
             }
             Kind::Fixed { step } => {
@@ -233,8 +264,8 @@ impl MarkovChain {
     }
 
     fn fixed(p: TransitionMatrix, step: f64, direction: Direction) -> Result<Self> {
-        let proportions = p.stationary()?;
-        let bed_frequencies = embedded_of(&p)?.stationary()?;
+        let proportions = stationary(&p)?;
+        let bed_frequencies = stationary(&embedded_of(&p)?)?;
         let mean_lengths = (0..p.k())
             .map(|i| step / (1.0 - p.matrix()[(i, i)]))
             .collect();
@@ -253,6 +284,7 @@ impl MarkovChain {
             mean_lengths: Some(mean_lengths),
             bed_frequencies,
             projection,
+            self_transitions: false,
         })
     }
 
@@ -307,6 +339,7 @@ impl MarkovChain {
                             mean_lengths: None,
                             bed_frequencies: nu,
                             projection: None,
+                            self_transitions: false,
                         })
                     }
                 }
@@ -329,6 +362,7 @@ impl MarkovChain {
             transition,
             generator: Some(q),
             projection: None,
+            self_transitions: false,
         })
     }
 
@@ -437,7 +471,7 @@ impl MarkovChain {
         if n_steps == 0 {
             return invalid("n_steps must be at least 1");
         }
-        let pi = self.transition.stationary()?;
+        let pi = stationary(&self.transition)?;
         let z = varvite_core::numerics::fundamental_matrix(self.transition.matrix(), &pi)?;
         Ok((0..self.k())
             .map(|k| {

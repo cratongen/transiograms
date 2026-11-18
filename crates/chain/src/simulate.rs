@@ -110,28 +110,52 @@ fn frozen(hard: &Hard, start: Start, k: usize, len: usize) -> Result<Vec<(usize,
     Ok(out)
 }
 
-/// Columns `P^r e_b` for `r = 0..=n`.
-pub(crate) fn bridge_columns(p: &Mat, b: usize, n: usize) -> Vec<Vec<f64>> {
-    let k = p.nrows();
-    let mut cols = Vec::with_capacity(n + 1);
-    let mut v = vec![0.0; k];
-    v[b] = 1.0;
-    cols.push(v);
-    for _ in 0..n {
-        let last = cols.last().unwrap();
-        let next: Vec<f64> = (0..k)
-            .map(|i| (0..k).map(|j| p[(i, j)] * last[j]).sum())
-            .collect();
-        cols.push(next);
+/// Columns `P^r e_b` for `r = 0..=n`, `k` entries per power in one buffer. Once a column is
+/// constant (relative spread <= 1e-15) every later power equals it, so the cache stops there and
+/// `get` reuses the last one (chain.md section 9).
+pub(crate) struct Columns {
+    k: usize,
+    data: Vec<f64>,
+}
+
+impl Columns {
+    pub(crate) fn new(p: &Mat, b: usize, n: usize) -> Self {
+        let k = p.nrows();
+        let mut data = vec![0.0; k];
+        data[b] = 1.0;
+        for r in 0..n {
+            let last = &data[r * k..(r + 1) * k];
+            let (lo, hi) = last
+                .iter()
+                .fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), &v| {
+                    (a.min(v), b.max(v))
+                });
+            if hi - lo <= 1e-15 * hi {
+                break;
+            }
+            let next: Vec<f64> = (0..k)
+                .map(|i| (0..k).map(|j| p[(i, j)] * last[j]).sum())
+                .collect();
+            data.extend(next);
+        }
+        Self { k, data }
     }
-    cols
+
+    pub(crate) fn get(&self, r: usize) -> &[f64] {
+        let r = r.min(self.data.len() / self.k - 1);
+        &self.data[r * self.k..(r + 1) * self.k]
+    }
+
+    /// Upper bound on the bytes `new(p, b, n)` stores.
+    fn bytes(k: usize, n: usize) -> Option<u64> {
+        (n as u64).checked_add(1)?.checked_mul(k as u64 * 8)
+    }
 }
 
 /// `P(x_{t+1} = j | x_t = i, x_n = b) = P_ij (P^(n-t-1))_jb / (P^(n-t))_ib` (unnormalised).
-pub(crate) fn bridge_weights(p: &Mat, cols: &[Vec<f64>], i: usize, remaining: usize) -> Vec<f64> {
-    (0..p.nrows())
-        .map(|j| p[(i, j)] * cols[remaining - 1][j])
-        .collect()
+pub(crate) fn bridge_weights(p: &Mat, cols: &Columns, i: usize, remaining: usize) -> Vec<f64> {
+    let c = cols.get(remaining - 1);
+    (0..p.nrows()).map(|j| p[(i, j)] * c[j]).collect()
 }
 
 struct Discrete {
@@ -139,7 +163,7 @@ struct Discrete {
     pi: Vec<f64>,
     reversed: Option<Mat>,
     frozen: Vec<(usize, usize)>,
-    bridges: Vec<Vec<Vec<f64>>>,
+    bridges: Vec<Columns>,
     len: usize,
 }
 
@@ -151,13 +175,18 @@ impl Discrete {
         len: usize,
     ) -> Result<Self> {
         let k = p.k();
-        let span: usize = frozen.windows(2).map(|w| w[1].0 - w[0].0 + 1).sum();
-        memory::check((span * k * 8) as u64, None, "bridge probabilities")?;
+        let bytes = frozen.windows(2).try_fold(0u64, |acc, w| {
+            acc.checked_add(Columns::bytes(k, w[1].0 - w[0].0)?)
+        });
+        match bytes {
+            Some(b) => memory::check(b, None, "bridge probabilities")?,
+            None => return invalid("the bridge probabilities overflow the address space"),
+        }
         let mut bridges = Vec::new();
         for w in frozen.windows(2) {
             let ((t0, a), (t1, b)) = (w[0], w[1]);
-            let cols = bridge_columns(p.matrix(), b, t1 - t0);
-            if cols[t1 - t0][a] <= 0.0 {
+            let cols = Columns::new(p.matrix(), b, t1 - t0);
+            if cols.get(t1 - t0)[a] <= 0.0 {
                 return invalid(format!(
                     "hard data at positions {t0} and {t1} are impossible under the chain"
                 ));
@@ -179,34 +208,35 @@ impl Discrete {
     }
 
     fn draw(&self, start: Start, st: &mut Stream) -> Vec<Code> {
-        let mut x = vec![0usize; self.len];
+        let mut x: Vec<Code> = vec![0; self.len];
         let Some(&(f0, c0)) = self.frozen.first() else {
             x[0] = match start {
-                Start::Code(c) => c as usize,
-                Start::Stationary => st.categorical(&self.pi),
+                Start::Code(c) => c,
+                Start::Stationary => st.categorical(&self.pi) as Code,
             };
             for t in 1..self.len {
-                x[t] = st.categorical(&row(&self.p, x[t - 1]));
+                x[t] = st.categorical(&row(&self.p, x[t - 1] as usize)) as Code;
             }
-            return x.into_iter().map(|c| c as Code).collect();
+            return x;
         };
-        x[f0] = c0;
+        x[f0] = c0 as Code;
         if let Some(r) = &self.reversed {
             for t in (0..f0).rev() {
-                x[t] = st.categorical(&row(r, x[t + 1]));
+                x[t] = st.categorical(&row(r, x[t + 1] as usize)) as Code;
             }
         }
         for (w, cols) in self.frozen.windows(2).zip(&self.bridges) {
             let (t0, t1) = (w[0].0, w[1].0);
             for t in t0..t1 {
-                x[t + 1] = st.categorical(&bridge_weights(&self.p, cols, x[t], t1 - t));
+                x[t + 1] =
+                    st.categorical(&bridge_weights(&self.p, cols, x[t] as usize, t1 - t)) as Code;
             }
         }
         let last = self.frozen.last().unwrap().0;
         for t in (last + 1)..self.len {
-            x[t] = st.categorical(&row(&self.p, x[t - 1]));
+            x[t] = st.categorical(&row(&self.p, x[t - 1] as usize)) as Code;
         }
-        x.into_iter().map(|c| c as Code).collect()
+        x
     }
 }
 
@@ -293,7 +323,7 @@ impl Bridge {
         }
         let mut times: Vec<f64> = (0..n).map(|_| self.from + st.uniform() * length).collect();
         times.sort_by(f64::total_cmp);
-        let cols = bridge_columns(&self.r, self.b, n);
+        let cols = Columns::new(&self.r, self.b, n);
         let mut x = self.a;
         let mut left = self.from;
         for (idx, &t) in times.iter().enumerate() {
@@ -340,7 +370,19 @@ impl MarkovChain {
                         (self.transition.clone(), self.bed_frequencies.clone())
                     }
                 };
-                memory::check((n * len * 4) as u64, None, "simulated codes")?;
+                let frozen_bytes = if hard.codes.is_empty() { 0 } else { 16 };
+                let needed = (len as u64)
+                    .checked_mul(4)
+                    .and_then(|row| row.checked_mul(n as u64)?.checked_add(row))
+                    .and_then(|b| b.checked_add((len as u64).checked_mul(frozen_bytes)?));
+                match needed {
+                    Some(b) => memory::check(b, None, "simulated codes")?,
+                    None => {
+                        return invalid(format!(
+                            "{n} realizations of {len} codes overflow the address space"
+                        ));
+                    }
+                }
                 let sim = Discrete::new(&p, pi, frozen(hard, start, k, len)?, len)?;
                 let out = (0..n)
                     .into_par_iter()
@@ -368,6 +410,29 @@ impl MarkovChain {
             return invalid(format!("length must be positive and finite, got {length}"));
         }
         check_hard(hard, k, 0.0, length)?;
+        for i in 1..hard.codes.len() {
+            let point = hard.from[i] == hard.to[i] || hard.from[i - 1] == hard.to[i - 1];
+            if point && hard.from[i] == hard.to[i - 1] && hard.codes[i] != hard.codes[i - 1] {
+                return invalid(format!(
+                    "hard data give position {} two codes, {} and {}",
+                    hard.from[i],
+                    hard.codes[i - 1],
+                    hard.codes[i]
+                ));
+            }
+        }
+        let mu = (0..k).map(|j| -q.matrix()[(j, j)]).fold(0.0, f64::max);
+        let jumps =
+            mu * length + 10.0 * (mu * length).sqrt() + 10.0 + 2.0 * hard.codes.len() as f64;
+        // Per realization a jump costs a Gillespie or bridge bed (24 bytes, held twice) and an
+        // output bed (20 bytes); one bridge holds its N times and at most N + 1 cached columns.
+        let needed = n as f64 * jumps * 68.0 + jumps * 8.0 * (k as f64 + 2.0);
+        if needed.is_nan() || needed >= u64::MAX as f64 {
+            return invalid(format!(
+                "{n} realizations over length {length} need about {needed:e} bytes"
+            ));
+        }
+        memory::check(needed as u64, None, "simulated beds")?;
         let mut cond: Vec<(f64, f64, usize)> = (0..hard.codes.len())
             .map(|i| {
                 (
@@ -461,9 +526,9 @@ mod tests {
     fn bridge_path_probabilities_match_exhaustive_enumeration() {
         let p = Mat::from_row_slice(3, 3, &[0.2, 0.5, 0.3, 0.6, 0.1, 0.3, 0.25, 0.25, 0.5]);
         let (a, b, n) = (0usize, 2usize, 6usize);
-        let cols = bridge_columns(&p, b, n);
+        let cols = Columns::new(&p, b, n);
         let pn = TransitionMatrix::new(p.clone()).unwrap().power(n as u64)[(a, b)];
-        assert!((cols[n][a] - pn).abs() < 1e-15);
+        assert!((cols.get(n)[a] - pn).abs() < 1e-15);
         let mut total = 0.0;
         for idx in 0..3usize.pow(5) {
             let mut x = vec![a];
@@ -480,5 +545,25 @@ mod tests {
             total += sampler;
         }
         assert!((total - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn bridge_columns_stop_at_convergence_and_match_powers() {
+        let p = Mat::from_row_slice(2, 2, &[0.9, 0.1, 0.2, 0.8]);
+        let cols = Columns::new(&p, 1, 1_000_000);
+        assert!(cols.data.len() <= 2 * 200, "{} entries", cols.data.len());
+        for r in [0, 1, 7, 60, 150, 5_000, 1_000_000] {
+            for i in 0..2 {
+                let exact = 1.0 / 3.0 + ((i == 1) as u8 as f64 - 1.0 / 3.0) * 0.7f64.powi(r);
+                assert!((cols.get(r as usize)[i] - exact).abs() < 1e-14, "r = {r}");
+            }
+        }
+        let flip = Mat::from_row_slice(2, 2, &[0.0, 1.0, 1.0, 0.0]);
+        let cols = Columns::new(&flip, 0, 9);
+        assert_eq!(cols.data.len(), 2 * 10);
+        assert_eq!(
+            (cols.get(9), cols.get(8)),
+            (&[0.0, 1.0][..], &[1.0, 0.0][..])
+        );
     }
 }

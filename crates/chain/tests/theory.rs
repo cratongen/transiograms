@@ -1,3 +1,5 @@
+use std::process::Command;
+
 use proptest::prelude::*;
 use varvite_chain::*;
 use varvite_core::rng::tag;
@@ -864,4 +866,307 @@ fn serde_round_trip() {
     let t = c.independence_test(Method::G).unwrap();
     let back: TestResult = serde_json::from_str(&serde_json::to_string(&t).unwrap()).unwrap();
     assert_eq!(back, t);
+}
+
+fn no_repeat_sequence() -> SequenceSet {
+    let pattern: [Code; 9] = [0, 1, 2, 0, 2, 1, 0, 1, 2];
+    let s: Vec<Code> = pattern.iter().copied().cycle().take(900).collect();
+    SequenceSet::from_regular(&[s], 3).unwrap()
+}
+
+/// Reruns the ignored test `name` in a child capped at `kb` KiB of address space, one thread,
+/// 300 s; an allocation the library should have refused aborts the child instead of the machine.
+fn bounded(name: &str, kb: u64) -> std::process::ExitStatus {
+    let exe = std::env::current_exe().unwrap();
+    Command::new("sh")
+        .arg("-c")
+        .arg(format!(
+            "ulimit -v {kb}; exec timeout 300 \"$0\" --exact {name} --ignored --test-threads 1"
+        ))
+        .arg(exe)
+        .env("RAYON_NUM_THREADS", "1")
+        .env("MALLOC_ARENA_MAX", "1")
+        .status()
+        .unwrap()
+}
+
+fn assert_bounded(name: &str, kb: u64) {
+    let s = bounded(name, kb);
+    assert!(
+        s.success(),
+        "{name} failed under a {kb} KiB address-space cap: {s:?}"
+    );
+}
+
+#[test]
+fn self_transition_independence_uses_ordinary_contingency() {
+    let seqs = no_repeat_sequence();
+    let opts = FitOptions {
+        self_transitions: true,
+        ..Default::default()
+    };
+    let c = MarkovChain::fit(&seqs, &opts).unwrap();
+    let n = c.counts.clone().unwrap();
+    let rows: Vec<f64> = (0..3).map(|i| n.row(i).sum()).collect();
+    let cols: Vec<f64> = (0..3).map(|j| n.column(j).sum()).collect();
+    let total: f64 = rows.iter().sum();
+    let t = c.independence_test(Method::Pearson).unwrap();
+    assert_eq!(
+        t.df, 4,
+        "chain.md section 3: self_transitions gives df (m'-1)^2"
+    );
+    let e = t.expected.unwrap();
+    for i in 0..3 {
+        for j in 0..3 {
+            let want = rows[i] * cols[j] / total;
+            assert!(
+                (e[(i, j)] - want).abs() < 1e-9,
+                "E[{i},{j}] = {} but r_i c_j / N = {want}",
+                e[(i, j)]
+            );
+        }
+    }
+}
+
+#[test]
+#[ignore = "run by its bounded parent"]
+fn inner_order_test_huge_order() {
+    let s: Vec<Code> = (0..40).map(|i| (i % 4) as Code).collect();
+    let seqs = SequenceSet::from_regular(&[s], 4).unwrap();
+    let opts = FitOptions {
+        kind: Kind::Fixed { step: 1.0 },
+        ..Default::default()
+    };
+    let r = std::panic::catch_unwind(|| order_test(&seqs, &opts, 33, Method::G));
+    assert!(matches!(r, Ok(Err(_))), "order 33 with m = 4 panicked");
+}
+
+#[test]
+fn order_test_with_huge_order_raises_instead_of_panicking() {
+    assert_bounded("inner_order_test_huge_order", 2_000_000);
+}
+
+#[test]
+#[ignore = "run by its bounded parent"]
+fn inner_select_order_huge_order() {
+    let s: Vec<Code> = (0..40).map(|i| (i % 4) as Code).collect();
+    let seqs = SequenceSet::from_regular(&[s], 4).unwrap();
+    let opts = FitOptions {
+        kind: Kind::Fixed { step: 1.0 },
+        ..Default::default()
+    };
+    let r = std::panic::catch_unwind(|| select_order(&seqs, &opts, 33));
+    assert!(matches!(r, Ok(Err(_))), "max_order 33 with m = 4 panicked");
+}
+
+#[test]
+fn select_order_with_huge_order_raises_instead_of_panicking() {
+    assert_bounded("inner_select_order_huge_order", 2_000_000);
+}
+
+#[test]
+#[ignore = "run by its bounded parent"]
+fn inner_simulate_huge_n() {
+    let p = TransitionMatrix::new(Mat::from_row_slice(2, 2, &[0.5, 0.5, 0.5, 0.5])).unwrap();
+    let c =
+        MarkovChain::from_transition(p, Kind::Fixed { step: 1.0 }, None, Direction::Up).unwrap();
+    let r = std::panic::catch_unwind(|| {
+        c.simulate(
+            Target::Steps(4),
+            &Hard::default(),
+            Start::Stationary,
+            1usize << 62,
+            0,
+        )
+        .map(|_| ())
+    });
+    assert!(matches!(r, Ok(Err(_))), "n = 2^62, 4 steps: {r:?}");
+}
+
+#[test]
+fn simulate_with_huge_n_raises_instead_of_panicking() {
+    assert_bounded("inner_simulate_huge_n", 2_000_000);
+}
+
+#[test]
+#[ignore = "run by its bounded parent"]
+fn inner_length_simulation_huge_length() {
+    let c = MarkovChain::from_rates(golden_q(), Direction::Up).unwrap();
+    let r = c.simulate(
+        Target::Length(1e12),
+        &Hard::default(),
+        Start::Stationary,
+        1,
+        0,
+    );
+    assert!(
+        r.is_err(),
+        "about 3e11 beds requested and the call returned Ok"
+    );
+}
+
+#[test]
+fn length_simulation_validates_size_before_allocating() {
+    assert_bounded("inner_length_simulation_huge_length", 1_000_000);
+}
+
+#[test]
+#[ignore = "run by its bounded parent"]
+fn inner_long_discrete_bridge() {
+    let len = 30_000_000usize;
+    let p = TransitionMatrix::new(Mat::from_row_slice(2, 2, &[0.9, 0.1, 0.2, 0.8])).unwrap();
+    let c =
+        MarkovChain::from_transition(p, Kind::Fixed { step: 1.0 }, None, Direction::Up).unwrap();
+    let last = (len - 1) as f64;
+    let hard = Hard {
+        from: vec![0.0, last],
+        to: vec![0.0, last],
+        codes: vec![0, 1],
+    };
+    let Simulated::Codes(x) = c
+        .simulate(Target::Steps(len), &hard, Start::Stationary, 1, 0)
+        .unwrap()
+    else {
+        panic!("steps give codes")
+    };
+    assert_eq!((x[0][0], x[0][len - 1]), (0, 1));
+}
+
+#[test]
+fn discrete_bridge_reuses_converged_powers() {
+    // chain.md 9: P^r stops at convergence and is reused, so a 3e7-step bridge needs the
+    // 3e7-entry path buffers (about 360 MB) and not 3e7 stored columns.
+    assert_bounded("inner_long_discrete_bridge", 1_200_000);
+}
+
+#[test]
+fn length_mode_rejects_two_codes_at_one_point() {
+    let c = MarkovChain::from_rates(golden_q(), Direction::Up).unwrap();
+    let hard = Hard {
+        from: vec![5.0, 5.0],
+        to: vec![5.0, 5.0],
+        codes: vec![0, 1],
+    };
+    let r = c.simulate(Target::Length(10.0), &hard, Start::Stationary, 1, 0);
+    assert!(
+        r.is_err(),
+        "two hard codes at position 5 were accepted: {r:?}"
+    );
+    let p = golden_q().transition(1.0);
+    let f =
+        MarkovChain::from_transition(p, Kind::Fixed { step: 1.0 }, None, Direction::Up).unwrap();
+    assert!(
+        f.simulate(Target::Steps(10), &hard, Start::Stationary, 1, 0)
+            .is_err()
+    );
+}
+
+#[test]
+fn sojourn_mean_length_matches_embedded_fit() {
+    let holes: Vec<String> = ["a", "a", "a", "a", "a", "a", "b", "b", "b"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    let from = [0.0, 1.0, 3.0, 4.0, 5.0, 7.0, 0.0, 2.0, 3.0];
+    let to = [1.0, 3.0, 4.0, 5.0, 7.0, 8.0, 2.0, 3.0, 4.0];
+    let codes = [0, 1, 0, MISSING, 2, 1, 2, 0, 1];
+    let seqs = SequenceSet::from_intervals(&holes, &from, &to, &codes, 3).unwrap();
+    let opts = FitOptions {
+        on_empty_row: EmptyRow::Uniform,
+        ..Default::default()
+    };
+    let c = MarkovChain::fit(&seqs, &opts).unwrap();
+    let s = sojourn(&seqs, opts.direction, opts.gap);
+    let n = c.counts.as_ref().unwrap();
+    let t = c.exposure.as_ref().unwrap();
+    for j in 0..3 {
+        assert!((s.total[j] - t[j]).abs() < 1e-12, "T[{j}]");
+        let exits: f64 = n.row(j).sum();
+        let want = if exits > 0.0 { t[j] / exits } else { f64::NAN };
+        let got = s.mean_length[j];
+        assert!(
+            (got - want).abs() < 1e-12 || (got.is_nan() && want.is_nan()),
+            "category {j}: sojourn mean_length {got}, T_j / exits_j = {want}"
+        );
+    }
+}
+
+#[test]
+fn fixed_order1_and_independence_test_agree() {
+    let mut s: Vec<Code> = [0, 1, 1, 0, 0, 0, 1, 0, 1, 1]
+        .iter()
+        .copied()
+        .cycle()
+        .take(200)
+        .collect();
+    s.push(2);
+    let seqs = SequenceSet::from_regular(&[s], 3).unwrap();
+    let opts = FitOptions {
+        kind: Kind::Fixed { step: 1.0 },
+        direction: Direction::Down,
+        on_empty_row: EmptyRow::Uniform,
+        ..Default::default()
+    };
+    let a = MarkovChain::fit(&seqs, &opts)
+        .unwrap()
+        .independence_test(Method::G)
+        .unwrap();
+    let b = order_test(&seqs, &opts, 1, Method::G).unwrap();
+    assert_eq!(
+        (a.df, a.statistic),
+        (b.df, b.statistic),
+        "independence_test and order_test(1) differ on the same counts"
+    );
+}
+
+#[test]
+fn from_geology_rejects_proportions_not_summing_to_one() {
+    let mut pi = Mat::zeros(3, 3);
+    pi[(0, 1)] = 0.6;
+    pi[(1, 0)] = 0.7;
+    let r = MarkovChain::from_geology(
+        &[0.5, 0.5, 0.5],
+        &[4.0, 2.0, 1.0],
+        Some(&pi),
+        2,
+        false,
+        Direction::Up,
+    );
+    assert!(
+        r.is_err(),
+        "proportions summing to 1.5: {:?}",
+        r.map(|c| c.proportions)
+    );
+}
+
+#[test]
+fn fixed_fit_with_a_category_only_at_the_top_of_a_hole() {
+    let mut s: Vec<Code> = vec![2];
+    s.extend(
+        [0, 1, 1, 0, 0, 0, 1, 0, 1, 1]
+            .iter()
+            .copied()
+            .cycle()
+            .take(200),
+    );
+    let seqs = SequenceSet::from_regular(&[s], 3).unwrap();
+    let opts = FitOptions {
+        kind: Kind::Fixed { step: 1.0 },
+        direction: Direction::Down,
+        ..Default::default()
+    };
+    let c = MarkovChain::fit(&seqs, &opts);
+    assert!(
+        c.is_ok(),
+        "category 2 is transient (row 2 = (1, 0, 0), column 2 empty): the stationary law is unique with p_2 = 0, but fit failed: {:?}",
+        c.err()
+    );
+    assert_eq!(c.unwrap().proportions[2], 0.0);
+}
+
+#[test]
+fn sojourn_with_nan_gap_does_not_panic() {
+    let seqs = no_repeat_sequence();
+    let r = std::panic::catch_unwind(|| sojourn(&seqs, Direction::Up, f64::NAN));
+    assert!(r.is_ok(), "sojourn with gap NaN panicked");
 }
