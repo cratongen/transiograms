@@ -9,11 +9,11 @@ use varvite_core::{Categories, Grid, MISSING};
 use crate::args::{codes, coords, to_rust};
 use crate::invalid;
 
-fn json<T: serde::Serialize>(v: &T) -> PyResult<String> {
+pub(crate) fn json<T: serde::Serialize>(v: &T) -> PyResult<String> {
     serde_json::to_string(v).map_err(invalid)
 }
 
-fn unjson<T: serde::de::DeserializeOwned>(text: &str, what: &str) -> PyResult<T> {
+pub(crate) fn unjson<T: serde::de::DeserializeOwned>(text: &str, what: &str) -> PyResult<T> {
     serde_json::from_str(text).map_err(|e| invalid(format!("not {what} JSON: {e}")))
 }
 

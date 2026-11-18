@@ -1,12 +1,10 @@
-#![allow(dead_code)]
-
 //! Argument coercion shared by every area module.
 
-use numpy::PyReadonlyArray1;
-use numpy::PyReadonlyArray2;
+use numpy::ndarray::{Array2, Array3};
+use numpy::{IntoPyArray, PyArray1, PyArray2, PyArray3, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyString};
-use varvite_core::{Code, Direction, MISSING, SequenceSet};
+use varvite_core::{Code, Direction, MISSING, Mat, SequenceSet};
 use varvite_hmm::Sequence;
 
 use crate::core::PyCategories;
@@ -133,10 +131,30 @@ fn median(mut v: Vec<f64>) -> Option<f64> {
     })
 }
 
+/// Median positive within-hole spacing of `depth`.
+pub fn infer_step(holes: &[String], depth: &[f64]) -> PyResult<f64> {
+    let mut by_hole: std::collections::HashMap<&str, Vec<f64>> = Default::default();
+    for (h, &v) in holes.iter().zip(depth) {
+        by_hole.entry(h).or_default().push(v);
+    }
+    let mut spacings = Vec::new();
+    for v in by_hole.values_mut() {
+        v.sort_by(f64::total_cmp);
+        spacings.extend(v.windows(2).map(|w| w[1] - w[0]).filter(|s| *s > 0.0));
+    }
+    median(spacings).ok_or_else(|| invalid("cannot infer step from depth; pass step="))
+}
+
 /// Intervals from `from_` and `to`, regular samples from `depth`, else unit-step codes in row
 /// order per hole. Samples spaced wider than `step` leave a gap of `spacing - step`, which breaks
 /// the run when larger than `gap`.
 pub fn sequence_set(a: SequenceArgs) -> PyResult<SequenceSet> {
+    Ok(sequence_set_step(a)?.0)
+}
+
+/// `sequence_set` and the sampling step: `step`, inferred from `depth`, 1 for unit-step codes,
+/// None for intervals without `step`.
+pub fn sequence_set_step(a: SequenceArgs) -> PyResult<(SequenceSet, Option<f64>)> {
     let data = a.data.as_ref();
     let col = |o: &Option<Bound<'_, PyAny>>, what: &str| -> PyResult<Option<Vec<f64>>> {
         o.as_ref()
@@ -159,32 +177,26 @@ pub fn sequence_set(a: SequenceArgs) -> PyResult<SequenceSet> {
         col(&a.to, "to")?,
         col(&a.depth, "depth")?,
     );
-    let set = match (from, to, depth) {
+    let (set, step) = match (from, to, depth) {
         (Some(_), _, Some(_)) | (_, Some(_), Some(_)) => {
             return Err(invalid("give either from_ and to, or depth, not both"));
         }
-        (Some(f), Some(t), None) => SequenceSet::from_intervals(&holes, &f, &t, &codes, k),
+        (Some(f), Some(t), None) => (
+            SequenceSet::from_intervals(&holes, &f, &t, &codes, k),
+            a.step,
+        ),
         (Some(_), None, None) | (None, Some(_), None) => {
             return Err(invalid("give from_ and to together"));
         }
         (None, None, Some(d)) => {
             let step = match a.step {
                 Some(s) => s,
-                None => {
-                    let mut by_hole: std::collections::HashMap<&str, Vec<f64>> = Default::default();
-                    for (h, &v) in holes.iter().zip(&d) {
-                        by_hole.entry(h).or_default().push(v);
-                    }
-                    let mut spacings = Vec::new();
-                    for v in by_hole.values_mut() {
-                        v.sort_by(f64::total_cmp);
-                        spacings.extend(v.windows(2).map(|w| w[1] - w[0]).filter(|s| *s > 0.0));
-                    }
-                    median(spacings)
-                        .ok_or_else(|| invalid("cannot infer step from depth; pass step="))?
-                }
+                None => infer_step(&holes, &d)?,
             };
-            SequenceSet::from_samples(&holes, &d, &codes, step, k)
+            (
+                SequenceSet::from_samples(&holes, &d, &codes, step, k),
+                Some(step),
+            )
         }
         (None, None, None) => {
             let mut seen: std::collections::HashMap<&str, f64> = Default::default();
@@ -197,10 +209,13 @@ pub fn sequence_set(a: SequenceArgs) -> PyResult<SequenceSet> {
                 })
                 .collect();
             let to: Vec<f64> = from.iter().map(|f| f + 1.0).collect();
-            SequenceSet::from_intervals(&holes, &from, &to, &codes, k)
+            (
+                SequenceSet::from_intervals(&holes, &from, &to, &codes, k),
+                Some(1.0),
+            )
         }
     };
-    set.map_err(to_rust)
+    Ok((set.map_err(to_rust)?, step))
 }
 
 /// Where each step of each sequence came from, so outputs return in input row order.
@@ -214,7 +229,7 @@ pub struct RowMap {
     pub direction: Direction,
 }
 
-fn matrix(obj: &Bound<PyAny>, what: &str) -> PyResult<(usize, usize, Vec<f64>)> {
+pub fn matrix(obj: &Bound<PyAny>, what: &str) -> PyResult<(usize, usize, Vec<f64>)> {
     let array =
         asarray(obj, "float64").map_err(|_| invalid(format!("{what} must be a numeric array")))?;
     let ndim: usize = array.getattr("ndim")?.extract()?;
@@ -334,4 +349,85 @@ pub fn to_rust(e: varvite_core::Error) -> PyErr {
         varvite_core::Error::InvalidInput(m) => invalid(m),
         varvite_core::Error::Convergence(m) => convergence(m),
     }
+}
+
+pub fn vec1<'py>(py: Python<'py>, v: Vec<f64>) -> Bound<'py, PyArray1<f64>> {
+    PyArray1::from_vec(py, v)
+}
+
+pub fn mat2<'py>(py: Python<'py>, m: &Mat) -> Bound<'py, PyArray2<f64>> {
+    Array2::from_shape_fn((m.nrows(), m.ncols()), |(i, j)| m[(i, j)]).into_pyarray(py)
+}
+
+/// `(n, r, c)` stack of equally shaped matrices.
+pub fn mat3<'py>(py: Python<'py>, ms: &[Mat], r: usize, c: usize) -> Bound<'py, PyArray3<f64>> {
+    Array3::from_shape_fn((ms.len(), r, c), |(n, i, j)| ms[n][(i, j)]).into_pyarray(py)
+}
+
+/// A 2-D float64 matrix.
+pub fn mat(obj: &Bound<PyAny>, what: &str) -> PyResult<Mat> {
+    let array =
+        asarray(obj, "float64").map_err(|_| invalid(format!("{what} must be a numeric matrix")))?;
+    let a: PyReadonlyArray2<f64> = array
+        .extract()
+        .map_err(|_| invalid(format!("{what} must be a 2-D numeric matrix")))?;
+    let v = a.as_array();
+    let (r, c) = v.dim();
+    Ok(Mat::from_fn(r, c, |i, j| v[(i, j)]))
+}
+
+/// `(n, 3)` lags or one `(3,)` lag; the flag says whether one lag was given.
+pub fn lags3(obj: &Bound<PyAny>, what: &str) -> PyResult<(Vec<[f64; 3]>, bool)> {
+    let array = asarray(obj, "float64").map_err(|_| invalid(format!("{what} must be numeric")))?;
+    let ndim: usize = array.getattr("ndim")?.extract()?;
+    let single = ndim == 1;
+    let (n, d, x) = matrix(&array, what)?;
+    let (n, d, x) = if single { (1, n, x) } else { (n, d, x) };
+    if d != 3 {
+        return Err(invalid(format!("{what} must have shape (3,) or (n, 3)")));
+    }
+    Ok((
+        (0..n)
+            .map(|i| [x[3 * i], x[3 * i + 1], x[3 * i + 2]])
+            .collect(),
+        single,
+    ))
+}
+
+/// A float or a 1-D array of floats; the flag says whether a scalar was given.
+pub fn scalar_or_floats(obj: &Bound<PyAny>, what: &str) -> PyResult<(Vec<f64>, bool)> {
+    if let Ok(v) = obj.extract::<f64>() {
+        return Ok((vec![v], true));
+    }
+    Ok((floats(obj, what)?, false))
+}
+
+/// Hole ids as u32 indices in first-appearance order.
+pub fn hole_indices(ids: &[String]) -> Vec<u32> {
+    let mut seen: std::collections::HashMap<&str, u32> = Default::default();
+    ids.iter()
+        .map(|h| {
+            let n = seen.len() as u32;
+            *seen.entry(h).or_insert(n)
+        })
+        .collect()
+}
+
+/// Mask of `n` booleans, or None.
+pub fn mask(obj: Option<&Bound<PyAny>>, n: usize) -> PyResult<Option<Vec<bool>>> {
+    let Some(obj) = obj.filter(|o| !o.is_none()) else {
+        return Ok(None);
+    };
+    let m: Vec<bool> = asarray(obj, "bool")?
+        .call_method1("reshape", (-1i64,))?
+        .call_method0("tolist")?
+        .extract()
+        .map_err(|_| invalid("mask must be a boolean array"))?;
+    if m.len() != n {
+        return Err(invalid(format!(
+            "mask has {} values for {n} cells",
+            m.len()
+        )));
+    }
+    Ok(Some(m))
 }
