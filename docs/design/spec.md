@@ -499,7 +499,8 @@ pub fn nelder_mead(f: impl Fn(&[f64]) -> f64, x0: &[f64], step: f64, tol: f64, m
 `memory.rs`: `available_bytes() -> Option<u64>`, `check(needed, memory, what) -> Result<()>`.
 
 `serde_mat.rs`: `serialize` / `deserialize` for `Mat` as `Vec<Vec<f64>>` (row-major), for
-`#[serde(with = "varvite_core::serde_mat")]`.
+`#[serde(with = "varvite_core::serde_mat")]`; submodules `option`, `vec` and `values` (`Vec<f64>`).
+NaN is written as JSON `null` and read back as NaN.
 
 ### 4.2 varvite-chain
 
@@ -634,6 +635,7 @@ impl Emission {
     pub fn n_params(&self) -> usize;            // 0 when frozen
     pub fn sample(&self, rng: &mut Stream) -> Vec<f64>;
     pub fn validate(&self) -> Result<()>;
+    pub fn frozen(&self) -> bool;
 }
 
 pub enum Family { Categorical { n_symbols: usize }, Gaussian { covariance_type: CovarianceType },
@@ -691,6 +693,11 @@ impl Hmm {
 }
 /// Over all sequences, index-order reduction.
 pub fn n_observed(data: &[Sequence]) -> usize; // steps with at least one observed channel
+/// Shared with hsmm: per-channel (mean, population variance) of observed values; the weighted
+/// emission M-step (`w[n][t]` occupancy of sequence n at step t); one state's emission log prior.
+pub fn pooled_moments(data: &[Sequence]) -> (Vec<f64>, Vec<f64>);           // sequence.rs
+pub fn update_emission(e: &Emission, state: usize, data: &[Sequence], w: &[Vec<f64>], eps: f64, v: &[f64]) -> Result<Emission>; // em.rs
+pub fn emission_log_prior(e: &Emission, eps: f64, pooled_variance: &[f64]) -> f64; // model.rs
 pub fn kmeans(points: &Mat, k: usize, stream: &mut Stream) -> Vec<usize>;
 ```
 
