@@ -1,5 +1,3 @@
-#![allow(unused_variables)]
-
 //! Markov chains along drillholes: embedded, fixed-step and continuous-lag fits, statistical
 //! tests, entropy, sojourn statistics and 1D simulation with bridges.
 
