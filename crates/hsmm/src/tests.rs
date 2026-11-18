@@ -372,20 +372,55 @@ fn duration_m_step_closed_forms() {
         .map(|(i, c)| (i + 1) as f64 * c)
         .sum::<f64>()
         / total;
-    let Duration::Geometric { p } = Duration::Geometric { p: 0.5 }.fit(&counts, 0.0).unwrap()
+    let mut padded = counts.to_vec();
+    padded.resize(400, 0.0);
+    let Duration::Geometric { p } = Duration::Geometric { p: 0.5 }.fit(&padded, 0.0).unwrap()
     else {
         panic!()
     };
     assert!(close(1.0 / p, mbar, 1e-14));
-    let Duration::Poisson { rate } = Duration::Poisson { rate: 1.0 }.fit(&counts, 0.0).unwrap()
+    let Duration::Poisson { rate } = Duration::Poisson { rate: 1.0 }.fit(&padded, 0.0).unwrap()
     else {
         panic!()
     };
     assert!(close(1.0 + rate, mbar, 1e-14));
+    let m = counts.len();
+    for template in [
+        Duration::Geometric { p: 0.5 },
+        Duration::Poisson { rate: 1.0 },
+    ] {
+        let law = template.fit(&counts, 0.0).unwrap();
+        assert!(close(law.mean(m), mbar, 1e-10), "{law:?}");
+        let s0 = law.weighted_log_lik(&counts, m);
+        let nudged = |f: f64| match law {
+            Duration::Geometric { p } => Duration::Geometric { p: p * f },
+            Duration::Poisson { rate } => Duration::Poisson { rate: rate * f },
+            _ => unreachable!(),
+        };
+        for f in [1.0 - 1e-3, 1.0 + 1e-3] {
+            assert!(nudged(f).weighted_log_lik(&counts, m) <= s0, "{law:?} {f}");
+        }
+    }
     let nb = Duration::NegativeBinomial { r: 1.0, p: 0.5 }
         .fit(&counts, 0.0)
         .unwrap();
-    let Duration::NegativeBinomial { r, .. } = nb else {
+    let Duration::NegativeBinomial { r, p } = nb else {
+        panic!()
+    };
+    let s0 = nb.weighted_log_lik(&counts, m);
+    for fr in [1.0 - 1e-3, 1.0, 1.0 + 1e-3] {
+        for fp in [1.0 - 1e-3, 1.0, 1.0 + 1e-3] {
+            let other = Duration::NegativeBinomial {
+                r: r * fr,
+                p: (p * fp).min(1.0),
+            };
+            assert!(other.weighted_log_lik(&counts, m) <= s0, "{fr} {fp}");
+        }
+    }
+    let Duration::NegativeBinomial { r, .. } = Duration::NegativeBinomial { r: 1.0, p: 0.5 }
+        .fit(&padded, 0.0)
+        .unwrap()
+    else {
         panic!()
     };
     let score = |r: f64| {
@@ -393,7 +428,7 @@ fn duration_m_step_closed_forms() {
             r,
             p: r / (r + mbar - 1.0),
         }
-        .weighted_log_lik(&counts, counts.len())
+        .weighted_log_lik(&padded, padded.len())
     };
     let s0 = score(r);
     assert!(score(r * (1.0 + 1e-3)) <= s0 && score(r * (1.0 - 1e-3)) <= s0);

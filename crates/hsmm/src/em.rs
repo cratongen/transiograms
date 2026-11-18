@@ -115,9 +115,15 @@ impl Hsmm {
                 }
                 if counts.iter().sum::<f64>() > 0.0 {
                     let pc = self.durations[j].pseudocount;
+                    let m = self.max_duration[j];
                     let law = self.durations[j].law.fit(&counts, pc)?;
-                    law.validate(self.max_duration[j])?;
-                    self.durations[j].law = law;
+                    law.validate(m)?;
+                    let current = self.durations[j].law.weighted_log_lik(&counts, m);
+                    if matches!(law, Duration::Empirical { .. })
+                        || law.weighted_log_lik(&counts, m) >= current
+                    {
+                        self.durations[j].law = law;
+                    }
                 }
             }
         }
@@ -316,6 +322,7 @@ impl Hsmm {
         clamps: Option<&[Clamp]>,
         opts: &FitOptions,
     ) -> Result<FitReport> {
+        self.validate()?;
         let (model, report) = Hsmm::fit_restarts(
             Some(self),
             self.k(),

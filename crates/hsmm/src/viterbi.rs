@@ -78,6 +78,7 @@ pub(crate) fn viterbi_core(tab: &Tables, lb: &Mat) -> Result<(Vec<u32>, f64)> {
 
 impl Hsmm {
     pub fn viterbi(&self, seq: &Sequence, clamp: Option<&Clamp>) -> Result<(Vec<u32>, f64)> {
+        self.validate()?;
         let (_, lb) = log_b(&self.emissions, seq, clamp)?;
         viterbi_core(&self.tables(), &lb)
     }

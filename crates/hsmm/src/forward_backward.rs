@@ -1,6 +1,6 @@
 use varvite_core::numerics::logsumexp;
 use varvite_core::rng::tag;
-use varvite_core::{Mat, Result, Stream, invalid};
+use varvite_core::{Mat, Result, Stream, invalid, memory};
 use varvite_hmm::{Clamp, Emission, Sequence};
 
 use crate::model::{Hsmm, Tables};
@@ -15,6 +15,9 @@ pub struct SegmentPosterior {
     pub entropy: f64,
 }
 
+/// `(t + 1) x K` matrices alive in one pass: two emission tables, F, S, G, H and gamma.
+const PASS_MATRICES: usize = 7;
+
 /// `(unclamped, clamped)` emission log densities, `t x K`.
 pub(crate) fn log_b(
     emissions: &[Emission],
@@ -23,11 +26,10 @@ pub(crate) fn log_b(
 ) -> Result<(Mat, Mat)> {
     let k = emissions.len();
     let (t, d) = (seq.t, seq.d);
-    if seq.x.len() != t * d {
+    if t.checked_mul(d) != Some(seq.x.len()) {
         return invalid(format!(
-            "sequence holds {} values, expected t x d = {}",
-            seq.x.len(),
-            t * d
+            "sequence holds {} values, expected t x d = {t} x {d}",
+            seq.x.len()
         ));
     }
     if emissions[0].dim() != d {
@@ -35,6 +37,14 @@ pub(crate) fn log_b(
             "sequence has {d} channels, the emissions have {}",
             emissions[0].dim()
         ));
+    }
+    let bytes = t
+        .checked_add(1)
+        .and_then(|r| r.checked_mul(k))
+        .and_then(|c| c.checked_mul(PASS_MATRICES * size_of::<f64>()));
+    match bytes {
+        Some(b) => memory::check(b as u64, None, "HSMM pass over the sequence")?,
+        None => return invalid(format!("a sequence of {t} steps overflows usize")),
     }
     let lb = Mat::from_fn(t, k, |s, j| {
         emissions[j].log_density(&seq.x[s * d..(s + 1) * d])
@@ -347,6 +357,7 @@ pub(crate) fn sample_posterior_core(
 
 impl Hsmm {
     pub fn log_likelihood(&self, seq: &Sequence, clamp: Option<&Clamp>) -> Result<f64> {
+        self.validate()?;
         let lnl = self.log_likelihood_or_neg_inf(seq, clamp)?;
         if lnl == f64::NEG_INFINITY {
             let (_, lb) = log_b(&self.emissions, seq, clamp)?;
@@ -366,6 +377,7 @@ impl Hsmm {
     }
 
     pub fn posterior(&self, seq: &Sequence, clamp: Option<&Clamp>) -> Result<SegmentPosterior> {
+        self.validate()?;
         let (free, lb) = log_b(&self.emissions, seq, clamp)?;
         posterior_core(&self.tables(), &lb, &free, None)
     }
@@ -378,7 +390,22 @@ impl Hsmm {
         seed: u64,
         index: u64,
     ) -> Result<Vec<Vec<u32>>> {
+        self.validate()?;
         let (_, lb) = log_b(&self.emissions, seq, clamp)?;
+        let bytes = seq
+            .t
+            .checked_mul(size_of::<u32>())
+            .and_then(|b| b.checked_add(size_of::<Vec<u32>>()))
+            .and_then(|b| b.checked_mul(n));
+        match bytes {
+            Some(b) => memory::check(b as u64, None, &format!("{n} posterior paths"))?,
+            None => {
+                return invalid(format!(
+                    "{n} posterior paths of {} steps overflow usize",
+                    seq.t
+                ));
+            }
+        }
         let mut stream = Stream::new(seed, &[tag::SAMPLE, index]);
         sample_posterior_core(&self.tables(), &lb, n, &mut stream)
     }

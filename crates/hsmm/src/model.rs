@@ -1,7 +1,7 @@
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use varvite_core::rng::tag;
-use varvite_core::{Mat, Result, Stream, invalid};
+use varvite_core::{Mat, Result, Stream, invalid, memory};
 use varvite_hmm::{Clamp, Emission, Family, Hmm, Params, Priors, Sequence};
 
 use crate::duration::{Duration, DurationDist, DurationFamily};
@@ -77,6 +77,24 @@ fn check_probabilities(v: &[f64], what: &str) -> Result<()> {
     Ok(())
 }
 
+/// Per (state, u) the model holds `log_d`, `log_dd`, a raw pmf and duration counts.
+const DURATION_TABLES: usize = 4;
+
+/// Rejects `max_duration` of 0 and duration tables above the memory budget, before allocating.
+pub(crate) fn check_max_duration(max_duration: &[usize]) -> Result<()> {
+    if let Some(j) = max_duration.iter().position(|&m| m == 0) {
+        return invalid(format!("max_duration must be at least 1 (state {j})"));
+    }
+    let bytes = max_duration
+        .iter()
+        .try_fold(0usize, |acc, &m| acc.checked_add(m))
+        .and_then(|s| s.checked_mul(DURATION_TABLES * size_of::<f64>()));
+    match bytes {
+        Some(b) => memory::check(b as u64, None, "duration tables"),
+        None => invalid("max_duration values overflow usize"),
+    }
+}
+
 impl Hsmm {
     pub fn new(
         start: Vec<f64>,
@@ -85,6 +103,26 @@ impl Hsmm {
         emissions: Vec<Emission>,
         max_duration: Vec<usize>,
     ) -> Result<Self> {
+        let model = Hsmm {
+            start,
+            transition,
+            durations,
+            emissions,
+            max_duration,
+        };
+        model.validate()?;
+        Ok(model)
+    }
+
+    /// Public fields and deserialised JSON bypass `new`, so entry points validate again.
+    pub(crate) fn validate(&self) -> Result<()> {
+        let Hsmm {
+            start,
+            transition,
+            durations,
+            emissions,
+            max_duration,
+        } = self;
         let k = start.len();
         if k == 0 {
             return invalid("an HSMM needs at least one state");
@@ -100,7 +138,8 @@ impl Hsmm {
                 max_duration.len()
             ));
         }
-        check_probabilities(&start, "start")?;
+        check_max_duration(max_duration)?;
+        check_probabilities(start, "start")?;
         for i in 0..k {
             if transition[(i, i)] != 0.0 {
                 return invalid(format!("transition diagonal must be 0 (row {i})"));
@@ -110,26 +149,20 @@ impl Hsmm {
                 check_probabilities(&row, &format!("transition row {i}"))?;
             }
         }
-        for (j, (d, &m)) in durations.iter().zip(&max_duration).enumerate() {
+        for (j, (d, &m)) in durations.iter().zip(max_duration).enumerate() {
             if !(d.pseudocount >= 0.0 && d.pseudocount.is_finite()) {
                 return invalid(format!("duration {j} pseudocount must be non-negative"));
             }
             d.law.validate(m)?;
         }
-        for e in &emissions {
+        for e in emissions {
             e.validate()?;
         }
         let dim = emissions[0].dim();
         if emissions.iter().any(|e| e.dim() != dim) {
             return invalid("every emission must have the same number of channels");
         }
-        Ok(Hsmm {
-            start,
-            transition,
-            durations,
-            emissions,
-            max_duration,
-        })
+        Ok(())
     }
 
     /// Geometric equivalence: `d_j` geometric with `p = 1 - a_jj`, `p_ij = a_ij / (1 - a_jj)`.
@@ -182,6 +215,7 @@ impl Hsmm {
                 max_duration.len()
             ));
         }
+        check_max_duration(max_duration)?;
         if clamps.is_some_and(|c| c.len() != data.len()) {
             return invalid("give one clamp per sequence");
         }

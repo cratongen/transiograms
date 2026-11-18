@@ -1,7 +1,9 @@
-use varvite_core::Mat;
+use std::panic::{AssertUnwindSafe, catch_unwind};
+
+use varvite_core::{Mat, Stream};
 use varvite_hmm::{
     CovarianceType, Emission, Family, FitOptions, Gaussian, Hmm, Implementation, Ordering, Params,
-    Sequence,
+    Priors, Sequence,
 };
 use varvite_hsmm::{
     Duration, DurationDist, DurationFamily, Hsmm, ModelKind, SelectionSpec, select_states,
@@ -392,4 +394,337 @@ fn clamped_fit_and_impossible_clamp() {
     }
     let err = model.log_likelihood(&data[0], Some(&none)).unwrap_err();
     assert!(err.to_string().contains("step 10"), "{err}");
+}
+
+fn two_state(laws: Duration, m: usize) -> Hsmm {
+    Hsmm::new(
+        vec![0.5, 0.5],
+        Mat::from_row_slice(2, 2, &[0.0, 1.0, 1.0, 0.0]),
+        vec![dist(laws.clone()), dist(laws)],
+        vec![gaussian(&[-0.5], 1.0), gaussian(&[2.0], 1.0)],
+        vec![m, m],
+    )
+    .unwrap()
+}
+
+/// `max_duration` far below the true bed thickness keeps truncation active; EM stays monotone.
+#[test]
+fn em_monotone_under_active_truncation() {
+    let mut truth = two_state(Duration::NegativeBinomial { r: 8.0, p: 0.4 }, 80);
+    truth.emissions = vec![gaussian(&[0.0], 1.0), gaussian(&[1.5], 1.0)];
+    let data = sequences(&truth, 8, 150, 11);
+    let mut failures = Vec::new();
+    for m in [3usize, 5] {
+        for law in [
+            Duration::Geometric { p: 0.5 },
+            Duration::Poisson { rate: 1.0 },
+            Duration::NegativeBinomial { r: 1.0, p: 0.5 },
+            Duration::Empirical {
+                pmf: vec![1.0 / m as f64; m],
+            },
+        ] {
+            let fam = match law {
+                Duration::Geometric { .. } => DurationFamily::Geometric,
+                Duration::Poisson { .. } => DurationFamily::Poisson,
+                Duration::NegativeBinomial { .. } => DurationFamily::NegativeBinomial,
+                Duration::Empirical { .. } => DurationFamily::Empirical,
+            };
+            let mut model = two_state(law, m);
+            let opts = FitOptions {
+                params: sted(),
+                init_params: Params::parse("").unwrap(),
+                n_init: 1,
+                tol: 1e-12,
+                max_iter: 60,
+                ordering: Ordering::None,
+                ..FitOptions::default()
+            };
+            match model.fit(&diag(), fam, &data, None, &opts) {
+                Ok(report) => {
+                    for w in report.history.windows(2) {
+                        if w[1] < w[0] - 1e-12 * w[0].abs() {
+                            failures.push(format!("{fam:?} m={m}: {} -> {}", w[0], w[1]));
+                        }
+                    }
+                }
+                Err(e) => failures.push(format!("{fam:?} m={m}: {e}")),
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
+}
+
+/// The duration M-step maximises `sum_u N(u) ln d(u)` for `d` truncated on `1..=M`, so a law
+/// renormalised from the untruncated closed form cannot beat it.
+#[test]
+fn duration_m_step_is_truncated_mle() {
+    let counts = [1.0, 1.0, 8.0];
+    let m = counts.len();
+    let score =
+        |law: &Duration| -> f64 { law.log_pmf(m).iter().zip(&counts).map(|(l, c)| c * l).sum() };
+    let grid = |f: &dyn Fn(f64) -> Duration| -> f64 {
+        (1..2000)
+            .map(|i| score(&f(i as f64 / 2000.0)))
+            .fold(f64::NEG_INFINITY, f64::max)
+    };
+    let cases: [(Duration, f64); 3] = [
+        (
+            Duration::Geometric { p: 0.5 },
+            grid(&|x| Duration::Geometric { p: x }),
+        ),
+        (
+            Duration::Poisson { rate: 1.0 },
+            grid(&|x| Duration::Poisson { rate: 100.0 * x }),
+        ),
+        (
+            Duration::NegativeBinomial { r: 1.0, p: 0.5 },
+            (1..200)
+                .map(|i| {
+                    grid(&|x| Duration::NegativeBinomial {
+                        r: i as f64 / 10.0,
+                        p: x,
+                    })
+                })
+                .fold(f64::NEG_INFINITY, f64::max),
+        ),
+    ];
+    for (template, best) in cases {
+        let fitted = template.fit(&counts, 0.0).unwrap();
+        assert!(
+            score(&fitted) >= best - 1e-12,
+            "{fitted:?} {} < {best}",
+            score(&fitted)
+        );
+    }
+    for (template, other) in [
+        (
+            Duration::Geometric { p: 0.5 },
+            Duration::Geometric { p: 0.01 },
+        ),
+        (
+            Duration::Poisson { rate: 1.0 },
+            Duration::Poisson { rate: 20.0 },
+        ),
+    ] {
+        let fitted = template.fit(&counts, 0.0).unwrap();
+        assert!(score(&fitted) >= score(&other), "{fitted:?} vs {other:?}");
+    }
+}
+
+fn small_data() -> Vec<Sequence> {
+    sequences(&two_state(Duration::Geometric { p: 0.3 }, 30), 3, 40, 1)
+}
+
+/// `Ok(true)` when the call returned `Err`, `Ok(false)` when it returned `Ok`, `Err` on a panic.
+fn outcome<T>(f: impl FnOnce() -> varvite_core::Result<T>) -> Result<bool, String> {
+    match catch_unwind(AssertUnwindSafe(f)) {
+        Ok(r) => Ok(r.is_err()),
+        Err(p) => Err(p
+            .downcast_ref::<String>()
+            .cloned()
+            .or_else(|| p.downcast_ref::<&str>().map(|s| s.to_string()))
+            .unwrap_or_default()),
+    }
+}
+
+fn one_state(m: usize) -> varvite_core::Result<Hsmm> {
+    Hsmm::new(
+        vec![1.0],
+        Mat::zeros(1, 1),
+        vec![dist(Duration::Geometric { p: 0.5 })],
+        vec![gaussian(&[0.0], 1.0)],
+        vec![m],
+    )
+}
+
+#[test]
+fn initialize_rejects_zero_max_duration() {
+    let data = small_data();
+    let got = outcome(|| {
+        Hsmm::initialize(
+            2,
+            &diag(),
+            DurationFamily::Geometric,
+            &data,
+            None,
+            &Priors::default(),
+            &[0, 0],
+            &mut Stream::new(0, &[1]),
+        )
+    });
+    assert_eq!(got, Ok(true), "initialize with max_duration 0");
+}
+
+fn selection_with(max_duration: usize) -> SelectionSpec {
+    SelectionSpec {
+        states: vec![2],
+        family: diag(),
+        kind: ModelKind::Hsmm {
+            duration: DurationFamily::Geometric,
+            max_duration: Some(max_duration),
+        },
+        fit: FitOptions {
+            max_iter: 2,
+            ..FitOptions::default()
+        },
+        cv_folds: Some(0),
+    }
+}
+
+#[test]
+fn select_states_rejects_zero_and_absurd_max_duration() {
+    let data = small_data();
+    for m in [0, 1usize << 40, usize::MAX] {
+        let spec = selection_with(m);
+        let got = outcome(|| select_states(&data, None, &spec));
+        assert_eq!(got, Ok(true), "select_states with max_duration Some({m})");
+    }
+}
+
+#[test]
+fn new_rejects_absurd_max_duration_without_panicking() {
+    assert_eq!(outcome(|| one_state(usize::MAX)), Ok(true));
+    assert_eq!(outcome(|| one_state(usize::MAX / 2)), Ok(true));
+}
+
+/// 2^36 steps need 2 TiB of duration tables: rejected by the memory budget before allocating.
+#[test]
+fn new_rejects_huge_max_duration_before_allocating() {
+    let e = one_state(1usize << 36).unwrap_err().to_string();
+    assert!(e.contains("duration tables"), "{e}");
+}
+
+#[test]
+fn entry_points_revalidate_public_fields() {
+    let mut m = two_state(Duration::Geometric { p: 0.3 }, 5);
+    m.max_duration = vec![1usize << 40, 5];
+    let seq = Sequence {
+        t: 3,
+        d: 1,
+        x: vec![0.0, 3.0, 0.0],
+    };
+    assert_eq!(outcome(|| m.log_likelihood(&seq, None)), Ok(true));
+    assert_eq!(outcome(|| m.posterior(&seq, None)), Ok(true));
+    assert_eq!(outcome(|| m.viterbi(&seq, None)), Ok(true));
+    assert_eq!(
+        outcome(|| m.sample_posterior(&seq, None, 2, 0, 0)),
+        Ok(true)
+    );
+    let data = small_data();
+    let opts = FitOptions {
+        max_iter: 2,
+        ..FitOptions::default()
+    };
+    assert_eq!(
+        outcome(|| m.fit(&diag(), DurationFamily::Geometric, &data, None, &opts)),
+        Ok(true)
+    );
+}
+
+#[test]
+fn log_likelihood_rejects_overflowing_sequence_shape() {
+    let m = two_state(Duration::Geometric { p: 0.3 }, 5);
+    for (t, d) in [(usize::MAX, 2), (1usize << 40, 1)] {
+        let seq = Sequence {
+            t,
+            d,
+            x: Vec::new(),
+        };
+        assert_eq!(outcome(|| m.log_likelihood(&seq, None)), Ok(true));
+        assert_eq!(outcome(|| m.viterbi(&seq, None)), Ok(true));
+        assert_eq!(outcome(|| m.posterior(&seq, None)), Ok(true));
+    }
+}
+
+#[test]
+fn sample_posterior_rejects_absurd_draw_count() {
+    let m = two_state(Duration::Geometric { p: 0.3 }, 5);
+    let seq = Sequence {
+        t: 3,
+        d: 1,
+        x: vec![0.5, 2.0, 0.5],
+    };
+    for n in [usize::MAX, 1usize << 50] {
+        let got = outcome(|| m.sample_posterior(&seq, None, n, 0, 0));
+        assert_eq!(got, Ok(true), "sample_posterior with n = {n}");
+    }
+    assert_eq!(m.sample_posterior(&seq, None, 4, 0, 0).unwrap().len(), 4);
+}
+
+#[test]
+fn duration_fit_rejects_bad_pseudocount() {
+    for pc in [-1.0, f64::NAN, f64::INFINITY] {
+        for law in [
+            Duration::Empirical {
+                pmf: vec![0.5, 0.5],
+            },
+            Duration::Geometric { p: 0.5 },
+        ] {
+            assert!(
+                law.fit(&[0.0, 5.0], pc).is_err(),
+                "{law:?} pseudocount {pc}"
+            );
+        }
+    }
+}
+
+fn score(law: &Duration, counts: &[f64]) -> f64 {
+    law.log_pmf(counts.len())
+        .iter()
+        .zip(counts)
+        .map(|(l, c)| if *c == 0.0 { 0.0 } else { c * l })
+        .sum()
+}
+
+/// Brute-force grid maximum of the truncated weighted log-likelihood; the fit must reach it.
+#[test]
+fn duration_fits_reach_the_grid_maximum() {
+    let mut stream = Stream::new(42, &[7]);
+    let mut failures = Vec::new();
+    for case in 0..12 {
+        let m = 2 + case % 7;
+        let counts: Vec<f64> = (0..m)
+            .map(|_| {
+                let u = stream.categorical(&[1.0, 1.0, 1.0, 1.0]);
+                (u as f64) * 1.5
+            })
+            .collect();
+        if counts.iter().sum::<f64>() == 0.0 {
+            continue;
+        }
+        let ps: Vec<f64> = (1..=2000).map(|i| i as f64 / 2000.0).collect();
+        let geo_best = ps
+            .iter()
+            .map(|&p| score(&Duration::Geometric { p }, &counts))
+            .fold(f64::NEG_INFINITY, f64::max);
+        let rates: Vec<f64> = (0..=2000)
+            .map(|i| 10f64.powf(-3.0 + 9.0 * i as f64 / 2000.0))
+            .collect();
+        let poi_best = rates
+            .iter()
+            .map(|&rate| score(&Duration::Poisson { rate }, &counts))
+            .fold(f64::NEG_INFINITY, f64::max);
+        let rs: Vec<f64> = (0..=120)
+            .map(|i| 10f64.powf(-3.0 + 7.0 * i as f64 / 120.0))
+            .collect();
+        let mut nb_best = f64::NEG_INFINITY;
+        for &r in &rs {
+            for i in 1..=400 {
+                let p = i as f64 / 400.0;
+                nb_best = nb_best.max(score(&Duration::NegativeBinomial { r, p }, &counts));
+            }
+        }
+        for (template, best) in [
+            (Duration::Geometric { p: 0.5 }, geo_best),
+            (Duration::Poisson { rate: 1.0 }, poi_best),
+            (Duration::NegativeBinomial { r: 1.0, p: 0.5 }, nb_best),
+        ] {
+            let fitted = template.fit(&counts, 0.0).unwrap();
+            let s = score(&fitted, &counts);
+            if s < best - 1e-9 * (1.0 + best.abs()) {
+                failures.push(format!("{counts:?}: {fitted:?} scores {s} < grid {best}"));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
 }

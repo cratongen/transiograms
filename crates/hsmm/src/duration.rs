@@ -28,6 +28,62 @@ fn ln_mul(a: f64, b: f64) -> f64 {
     if a == 0.0 { 0.0 } else { a * b }
 }
 
+const MIN_P: f64 = 1e-12;
+const POISSON_MAX_RATE: f64 = 1e6;
+
+/// Mean of `q(u) ∝ exp(h(u) + theta (u - 1))` on `1..=m`.
+fn tilted_mean(h: &impl Fn(usize) -> f64, m: usize, theta: f64) -> f64 {
+    let lw: Vec<f64> = (1..=m)
+        .map(|u| h(u) + ln_mul((u - 1) as f64, theta))
+        .collect();
+    let total = logsumexp(&lw);
+    lw.iter()
+        .enumerate()
+        .map(|(i, l)| (i + 1) as f64 * (l - total).exp())
+        .sum()
+}
+
+fn matches_mean(h: &impl Fn(usize) -> f64, m: usize, theta: f64, mbar: f64) -> bool {
+    (tilted_mean(h, m, theta) - mbar).abs() <= 1e-12 * mbar
+}
+
+/// The truncated law is an exponential family in `theta` with statistic `u - 1`, so its weighted
+/// log-likelihood is concave and maximised where the truncated mean equals `mbar`; the mean is
+/// increasing in `theta`, so bisection finds the root, or `hi` when `mbar` is out of reach.
+fn solve_mean(h: &impl Fn(usize) -> f64, m: usize, mbar: f64, hi: f64) -> f64 {
+    if tilted_mean(h, m, hi) <= mbar {
+        return hi;
+    }
+    let mut lo = hi.min(0.0) - 1.0;
+    while tilted_mean(h, m, lo) > mbar {
+        lo = hi - 2.0 * (hi - lo);
+    }
+    let mut hi = hi;
+    for _ in 0..200 {
+        let mid = 0.5 * (lo + hi);
+        if mid <= lo || mid >= hi {
+            break;
+        }
+        if tilted_mean(h, m, mid) > mbar {
+            hi = mid;
+        } else {
+            lo = mid;
+        }
+    }
+    0.5 * (lo + hi)
+}
+
+/// `p` of a law `∝ exp(h(u)) (1 - p)^(u - 1)` maximising the likelihood truncated on `1..=m`;
+/// `closed` (the untruncated MLE) is kept when truncation leaves its mean at `mbar`.
+fn truncated_p(h: impl Fn(usize) -> f64, m: usize, mbar: f64, closed: f64) -> f64 {
+    let closed = closed.min(1.0);
+    if closed >= 1.0 || matches_mean(&h, m, (-closed).ln_1p(), mbar) {
+        return closed;
+    }
+    let theta = solve_mean(&h, m, mbar, (-MIN_P).ln_1p());
+    (-theta.exp_m1()).clamp(MIN_P, 1.0)
+}
+
 impl Duration {
     /// Untruncated log pmf at `u >= 1`.
     fn raw_log_pmf(&self, u: usize) -> f64 {
@@ -117,6 +173,9 @@ impl Duration {
         if counts.iter().any(|c| !c.is_finite() || *c < 0.0) {
             return invalid("duration counts must be finite and non-negative");
         }
+        if !(pseudocount >= 0.0 && pseudocount.is_finite()) {
+            return invalid("duration pseudocount must be finite and non-negative");
+        }
         let total: f64 = counts.iter().sum();
         let first: f64 = counts
             .iter()
@@ -136,23 +195,31 @@ impl Duration {
             return invalid("duration fit needs positive total count");
         }
         let mbar = first / total;
+        let m = counts.len();
         Ok(match self {
             Duration::Geometric { .. } => Duration::Geometric {
-                p: (total / first).min(1.0),
+                p: truncated_p(|_| 0.0, m, mbar, 1.0 / mbar),
             },
-            Duration::Poisson { .. } => Duration::Poisson {
-                rate: (mbar - 1.0).max(0.0),
-            },
+            Duration::Poisson { .. } => {
+                let h = |u: usize| -ln_gamma(u as f64);
+                let closed = (mbar - 1.0).max(0.0);
+                let rate = if closed == 0.0 || matches_mean(&h, m, closed.ln(), mbar) {
+                    closed
+                } else {
+                    solve_mean(&h, m, mbar, POISSON_MAX_RATE.ln()).exp()
+                };
+                Duration::Poisson { rate }
+            }
             Duration::NegativeBinomial { .. } => {
                 if mbar <= 1.0 + 1e-12 {
                     return Ok(Duration::NegativeBinomial { r: 1.0, p: 1.0 });
                 }
-                let m = counts.len();
                 let law = |lr: f64| {
                     let r = lr.exp();
+                    let h = |u: usize| ln_gamma(u as f64 - 1.0 + r) - ln_gamma(u as f64);
                     Duration::NegativeBinomial {
                         r,
-                        p: r / (r + mbar - 1.0),
+                        p: truncated_p(h, m, mbar, r / (r + mbar - 1.0)),
                     }
                 };
                 let neg_score = |lr: f64| -law(lr).weighted_log_lik(counts, m);
