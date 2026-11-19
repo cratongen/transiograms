@@ -142,6 +142,31 @@ def test_uniform_embedded_rows_have_entropy_log2_m_minus_1():
     np.testing.assert_allclose(e.post, np.log2(3), atol=1e-12)
 
 
+def test_difference_matrix_is_observed_minus_quasi_independent():
+    rng = np.random.default_rng(3)
+    codes = rng.integers(0, 4, 2000)
+    c = vv.MarkovChain("embedded").fit(codes)
+    e = vv.checks.quasi_independence(c.counts)
+    want = c.transition_matrix - e / e.sum(axis=1, keepdims=True)
+    np.testing.assert_allclose(c.difference_matrix(), want, atol=1e-12)
+
+
+def test_asymmetry_is_the_antisymmetric_part_of_the_flux():
+    p = np.array([[0.1, 0.6, 0.3], [0.2, 0.2, 0.6], [0.7, 0.1, 0.2]])
+    c = vv.MarkovChain.from_matrix(p, step=1.0)
+    rate = p - np.eye(3) if c.generator is None else c.generator
+    w, v = np.linalg.eig(rate.T)
+    nu = np.real(v[:, np.argmin(np.abs(w))])
+    nu /= nu.sum()
+    f = nu[:, None] * rate
+    a = c.asymmetry()
+    np.testing.assert_allclose(a, f - f.T, atol=1e-12)
+    np.testing.assert_allclose(a, -a.T, atol=1e-15)
+    np.testing.assert_allclose(a.sum(axis=1), 0.0, atol=1e-12)
+    sym = vv.MarkovChain.from_matrix(np.full((3, 3), 1 / 3), step=1.0)
+    np.testing.assert_allclose(sym.asymmetry(), 0.0, atol=1e-12)
+
+
 def test_discrete_bridge_marginal_matches_closed_form():
     p = m1_chain().transition_matrix
     c = vv.MarkovChain.from_matrix(p, step=1.0)
@@ -209,6 +234,12 @@ def test_huge_requests_raise_before_allocating():
         m1_chain().simulate(0.5 * 2**40, n=2**20)
     with pytest.raises(vv.InvalidInput):
         vv.order_test(np.arange(40) % 4, order=33)
+    with pytest.raises(vv.InvalidInput, match="histories"):
+        vv.order_test(np.arange(2000) % 4, order=14)
+    assert vv.order_test(np.arange(2000) % 4, order=5).expected.shape == (4**5, 4)
+    wide = vv.MarkovChain.from_matrix(np.full((200, 200), 1 / 200), step=1.0)
+    with pytest.raises(vv.InvalidInput, match="transition_at"):
+        wide.transition_at(np.ones(10**6))
 
 
 def test_fixed_hard_points_freeze_the_cell_that_contains_them():

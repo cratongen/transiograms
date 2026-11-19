@@ -131,8 +131,6 @@ impl Sojourn {
                 let mut x: Vec<f64> = (0..n).map(|_| mean * st.exponential()).collect();
                 (ks_exponential(&mut x) >= d) as usize
             })
-            .collect::<Vec<_>>()
-            .iter()
             .sum::<usize>();
         Ok(TestResult {
             name: "exponential".into(),

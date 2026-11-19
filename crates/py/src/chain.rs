@@ -524,16 +524,24 @@ impl PyMarkovChain {
     ) -> PyResult<Bound<'py, PyAny>> {
         let c = self.fitted()?;
         let (hs, scalar) = scalar_or_floats(h, "h")?;
-        let ms = hs
-            .iter()
-            .map(|&h| c.transition_at(h).map(|t| t.matrix().clone()))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(to_rust)?;
-        let k = c.k();
         if scalar {
-            return Ok(mat2(py, &ms[0]).into_any());
+            let t = c.transition_at(hs[0]).map_err(to_rust)?;
+            return Ok(mat2(py, t.matrix()).into_any());
         }
-        Ok(crate::args::mat3(py, &ms, k, k).into_any())
+        let k = c.k();
+        let need = (hs.len() as u64).saturating_mul((k * k * 8) as u64);
+        varvite_core::memory::check(need, None, "transition_at output").map_err(to_rust)?;
+        let mut out = numpy::ndarray::Array3::<f64>::zeros((hs.len(), k, k));
+        for (n, &h) in hs.iter().enumerate() {
+            let t = c.transition_at(h).map_err(to_rust)?;
+            let m = t.matrix();
+            for i in 0..k {
+                for j in 0..k {
+                    out[(n, i, j)] = m[(i, j)];
+                }
+            }
+        }
+        Ok(numpy::IntoPyArray::into_pyarray(out, py).into_any())
     }
 
     /// Test of the counts against independence (quasi-independence for embedded chains).
@@ -553,6 +561,13 @@ impl PyMarkovChain {
             .map_err(to_rust)
     }
 
+    /// Hattori (1976) entropies of the chain, in bits.
+    ///
+    /// Returns
+    /// -------
+    /// Entropy
+    ///     ``post`` and ``pre`` per category (``pre`` is NaN for a category never entered),
+    ///     their normalized forms, the whole-chain entropy ``chain`` and its maximum ``max``.
     fn entropy(&self) -> PyResult<PyEntropy> {
         self.fitted()?.entropy().map(PyEntropy).map_err(to_rust)
     }
@@ -871,7 +886,9 @@ fn options(kind: &str, direction: &str, gap: f64, sampled: Option<f64>) -> PyRes
 /// ----------
 /// codes : array_like or str
 /// order : int
-///     Fixed chains: any order >= 1. Embedded chains: 1 (quasi-independence) or 2.
+///     Fixed chains: any order >= 1 with no more histories (``m ** order``) than
+///     transitions; a higher order raises ``InvalidInput``. Embedded chains: 1
+///     (quasi-independence) or 2.
 /// kind : {"fixed", "embedded"}
 /// direction : {"up", "down"}
 /// method : {"g", "pearson"}
@@ -920,6 +937,16 @@ fn order_test<'py>(
 
 /// AIC and BIC of fixed-step chains of order 0 to ``max_order``, all fitted on the same
 /// transitions.
+///
+/// Parameters
+/// ----------
+/// codes : array_like or str
+/// max_order : int
+///     Highest order fitted; the first ``max_order`` states of every run are dropped so that
+///     every order uses the same transitions.
+/// direction : {"up", "down"}
+/// holes, from_, to, depth, step, gap, categories, data
+///     The shared sequence arguments, as in ``MarkovChain.fit``.
 ///
 /// Returns
 /// -------

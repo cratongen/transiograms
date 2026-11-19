@@ -966,6 +966,48 @@ fn select_order_with_huge_order_raises_instead_of_panicking() {
 
 #[test]
 #[ignore = "run by its bounded parent"]
+fn inner_order_test_order_beyond_the_data() {
+    let s: Vec<Code> = (0..2000).map(|i| (i % 4) as Code).collect();
+    let seqs = SequenceSet::from_regular(&[s], 4).unwrap();
+    let opts = FitOptions {
+        kind: Kind::Fixed { step: 1.0 },
+        ..Default::default()
+    };
+    for order in [10, 12, 13, 14, 20] {
+        let e = order_test(&seqs, &opts, order, Method::G).unwrap_err();
+        assert!(e.to_string().contains("histories"), "order {order}: {e}");
+    }
+    let t = order_test(&seqs, &opts, 5, Method::G).unwrap();
+    assert_eq!(t.expected.unwrap().shape(), (1024, 4));
+}
+
+#[test]
+fn order_test_with_more_histories_than_transitions_raises_before_allocating() {
+    assert_bounded("inner_order_test_order_beyond_the_data", 2_000_000);
+}
+
+#[test]
+#[ignore = "run by its bounded parent"]
+fn inner_exponential_test_many_replicates() {
+    let so = Sojourn {
+        n_beds: vec![2],
+        n_open: vec![0],
+        total: vec![3.0],
+        mean_length: vec![1.5],
+        thickness: vec![vec![1.0, 2.0]],
+        open: vec![vec![false, false]],
+    };
+    let p = so.exponential_test(0, 60_000_000, 7).unwrap().p_value;
+    assert!(p > 0.0 && p <= 1.0, "{p}");
+}
+
+#[test]
+fn exponential_test_replicates_take_constant_memory() {
+    assert_bounded("inner_exponential_test_many_replicates", 300_000);
+}
+
+#[test]
+#[ignore = "run by its bounded parent"]
 fn inner_simulate_huge_n() {
     let p = TransitionMatrix::new(Mat::from_row_slice(2, 2, &[0.5, 0.5, 0.5, 0.5])).unwrap();
     let c =

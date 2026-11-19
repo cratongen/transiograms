@@ -326,6 +326,13 @@ fn fixed_order_test(
             "order {order} with {m} categories gives more than 2^64 histories; lower the order"
         ));
     };
+    let transitions: usize = seqs.iter().map(|s| s.len().saturating_sub(order)).sum();
+    if n_hist > transitions {
+        return invalid(format!(
+            "order {order} with {m} categories has {n_hist} histories but only {transitions} \
+             transitions; lower the order"
+        ));
+    }
     check_histories(seqs, m, order, 2, (n_hist * m * 8) as u64)?;
     let fine = history_counts(seqs, m, order, order);
     let mut coarse: BTreeMap<Vec<Code>, Vec<f64>> = BTreeMap::new();
