@@ -158,3 +158,29 @@ def test_json_pickle_and_errors():
         vv.TransitionModel(P, Q, Q, Q + 1.0)
     with pytest.raises(vv.InvalidInput):
         vv.experimental_transiogram(np.zeros((3, 3)), [0, 1, 0], lag=1.0, n_lags=2**40)
+
+
+def test_closeness_equals_the_determinant_root_and_the_two_category_closed_form():
+    m = model3d((30.0, 10.0, 0.0))
+    lags = np.array([[0.0, 0.0, 0.0], [5.0, -3.0, 1.0], [0.0, 0.0, 2.0], [40.0, 10.0, -4.0]])
+    c = m.closeness(lags)
+    assert c.shape == (4,)
+    assert c[0] == 1.0
+    np.testing.assert_allclose(c, np.linalg.det(m.transition(lags)) ** 0.5, rtol=1e-10)
+    assert m.closeness(lags[1]) == pytest.approx(c[1], rel=1e-14)
+    two = vv.TransitionModel.from_geology([0.4, 0.6], [[20.0, 30.0], [10.0, 15.0], [2.0, 3.0]])
+    h = np.outer([0.0, 0.5, 1.0, 3.0], [0.0, 0.0, 1.0])
+    rate_sum = 1 / 2.0 + 1 / 3.0
+    np.testing.assert_allclose(two.closeness(h), np.exp(-rate_sum * h[:, 2]), rtol=1e-10)
+
+
+def test_batched_transition_raises_before_allocating_an_absurd_stack():
+    k = 40
+    p = np.full(k, 1 / k)
+    big = vv.TransitionModel.from_geology(p, np.full((3, k), 5.0))
+    with pytest.raises(vv.InvalidInput, match="transition matrices of 40 x 40"):
+        big.transition(np.broadcast_to(np.ones(3), (10**7, 3)))
+    markov = vv.TransiogramModel.markov(big.rates_z)
+    with pytest.raises(vv.InvalidInput, match="transition matrices of 40 x 40"):
+        markov.transition(np.broadcast_to(1.0, 10**7))
+    assert big.closeness(np.ones((1000, 3))).shape == (1000,)

@@ -1,8 +1,9 @@
 //! Experimental transiograms, `TransiogramModel` (1D) and `TransitionModel` (3D).
 
-use numpy::{PyArray1, PyArray2, PyArray3};
+use numpy::ndarray::Array3;
+use numpy::{IntoPyArray, PyArray1, PyArray2, PyArray3};
 use pyo3::prelude::*;
-use varvite_core::{Mat, RateMatrix};
+use varvite_core::{Mat, RateMatrix, memory};
 use varvite_transiogram::{
     Entry, Experimental, Model1D, PairFilter, PairSpec, Structure, TransitionModel, downhole,
     experimental, on_grid,
@@ -295,6 +296,30 @@ fn finite_lags(h: &[f64]) -> PyResult<()> {
     }
 }
 
+/// `(n, k, k)` stack of `f(i)`, refused before allocating when it exceeds the available memory.
+fn stack<'py>(
+    py: Python<'py>,
+    n: usize,
+    k: usize,
+    f: impl Fn(usize) -> Mat + Sync,
+) -> PyResult<Bound<'py, PyArray3<f64>>> {
+    let bytes = (n as u64).saturating_mul((k * k) as u64).saturating_mul(8);
+    memory::check(
+        bytes,
+        None,
+        &format!("{n} transition matrices of {k} x {k}"),
+    )
+    .map_err(to_rust)?;
+    let mut a = Array3::<f64>::zeros((n, k, k));
+    py.detach(|| {
+        for (i, mut s) in a.outer_iter_mut().enumerate() {
+            let m = f(i);
+            s.indexed_iter_mut().for_each(|((r, c), v)| *v = m[(r, c)]);
+        }
+    });
+    Ok(a.into_pyarray(py))
+}
+
 /// One-directional transiogram model: a continuous-lag Markov chain (``markov``) or one
 /// analytical curve per entry (``entrywise``, Li 2007).
 #[pyclass(
@@ -461,6 +486,7 @@ impl PyTransiogramModel {
         }
     }
     /// ``T(h)``: ``(k, k)`` for a scalar, ``(n, k, k)`` for an array; negative lags by reversal.
+    /// Raises InvalidInput before allocating a stack larger than the available memory.
     fn transition<'py>(
         &self,
         py: Python<'py>,
@@ -468,12 +494,11 @@ impl PyTransiogramModel {
     ) -> PyResult<Bound<'py, PyAny>> {
         let (hs, scalar) = scalar_or_floats(h, "h")?;
         finite_lags(&hs)?;
-        let k = self.0.proportions().len();
-        let ms: Vec<Mat> = py.detach(|| hs.iter().map(|&h| self.0.transition(h)).collect());
         if scalar {
-            return Ok(mat2(py, &ms[0]).into_any());
+            return Ok(mat2(py, &self.0.transition(hs[0])).into_any());
         }
-        Ok(mat3(py, &ms, k, k).into_any())
+        let k = self.0.proportions().len();
+        Ok(stack(py, hs.len(), k, |i| self.0.transition(hs[i]))?.into_any())
     }
     fn to_json(&self) -> PyResult<String> {
         json(&self.0)
@@ -627,6 +652,7 @@ impl PyTransitionModel {
     }
 
     /// ``T(h)`` at lag vectors: ``(3,)`` gives ``(k, k)``, ``(n, 3)`` gives ``(n, k, k)``.
+    /// Raises InvalidInput before allocating a stack larger than the available memory.
     fn transition<'py>(
         &self,
         py: Python<'py>,
@@ -634,12 +660,10 @@ impl PyTransitionModel {
     ) -> PyResult<Bound<'py, PyAny>> {
         let (h, single) = lags3(lags, "lags")?;
         finite_lags(&h.concat())?;
-        let k = self.0.k();
-        let ms: Vec<Mat> = py.detach(|| h.iter().map(|&h| self.0.transition(h)).collect());
         if single {
-            return Ok(mat2(py, &ms[0]).into_any());
+            return Ok(mat2(py, &self.0.transition(h[0])).into_any());
         }
-        Ok(mat3(py, &ms, k, k).into_any())
+        Ok(stack(py, h.len(), self.0.k(), |i| self.0.transition(h[i]))?.into_any())
     }
 
     /// Generator interpolated along a non-zero lag vector.
@@ -655,7 +679,7 @@ impl PyTransitionModel {
     ) -> PyResult<Bound<'py, PyAny>> {
         let (h, single) = lags3(lags, "lags")?;
         finite_lags(&h.concat())?;
-        let c: Vec<f64> = h.iter().map(|&h| self.0.closeness(h)).collect();
+        let c: Vec<f64> = py.detach(|| h.iter().map(|&h| self.0.closeness(h)).collect());
         if single {
             return Ok(pyo3::types::PyFloat::new(py, c[0]).into_any());
         }
