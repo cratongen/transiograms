@@ -38,4 +38,5 @@ the reversal identity `p_i t_ij(h) = p_j t_ji(-h)`, `det T(h) = exp(h tr R)`, th
 ellipsoid, the downhole estimator against exact interval overlaps, the point estimator against the
 grid estimator, and that `fit_markov` recovers a known `R` within 5 percent.
 
-Worked page: [transiograms](../examples/04-transiograms/01-transiograms/README.md).
+Worked pages: [transiograms](../examples/04-transiograms/01-transiograms/README.md) and
+[entrywise transiograms and closeness](../examples/04-transiograms/02-entrywise-and-closeness/README.md).

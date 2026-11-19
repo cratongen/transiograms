@@ -42,6 +42,7 @@ nav:
       - Durations and selection: examples/03-semi-markov-and-selection/01-durations-and-selection/README.md
       - Duration laws: examples/03-semi-markov-and-selection/02-duration-laws/README.md
       - Transiograms: examples/04-transiograms/01-transiograms/README.md
+      - Entrywise and closeness: examples/04-transiograms/02-entrywise-and-closeness/README.md
       - T-PROGS: examples/05-tp-simulation/01-tprogs/README.md
       - MCP and MCRF: examples/06-mcrf-mcp/01-mcp-and-mcrf/README.md
       - boitata integration: examples/07-boitata-integration/01-drillholes-to-grid/README.md
