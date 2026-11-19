@@ -37,4 +37,5 @@ can pick too many states on dense logs; the held-out likelihood is the honest ch
 On `vv.datasets.electrofacies_logs(seed=0)` with `n_init=5` the BIC minimum is K = 3, the number
 of states that generated the data; the suite asserts it.
 
-Worked page: [durations and selection](../examples/03-semi-markov-and-selection/01-durations-and-selection/README.md).
+Worked pages: [durations and selection](../examples/03-semi-markov-and-selection/01-durations-and-selection/README.md)
+and [duration laws](../examples/03-semi-markov-and-selection/02-duration-laws/README.md).

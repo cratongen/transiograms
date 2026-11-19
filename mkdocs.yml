@@ -40,6 +40,7 @@ nav:
       - Tests and simulation: examples/01-markov-chains/02-tests-and-simulation/README.md
       - Electrofacies: examples/02-hidden-markov/01-electrofacies/README.md
       - Durations and selection: examples/03-semi-markov-and-selection/01-durations-and-selection/README.md
+      - Duration laws: examples/03-semi-markov-and-selection/02-duration-laws/README.md
       - Transiograms: examples/04-transiograms/01-transiograms/README.md
       - T-PROGS: examples/05-tp-simulation/01-tprogs/README.md
       - MCP and MCRF: examples/06-mcrf-mcp/01-mcp-and-mcrf/README.md
