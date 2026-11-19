@@ -52,4 +52,5 @@ posteriors and the path entropy with `vv.checks.brute_force_hmm`, an exhaustive 
 `4^8` paths, within `1e-12`. It also asserts that EM never lowers its objective, that fully
 labelled data give the counting MLE in one iteration, and that emission densities match scipy.
 
-Worked page: [electrofacies](../examples/02-hidden-markov/01-electrofacies/README.md).
+Worked pages: [electrofacies](../examples/02-hidden-markov/01-electrofacies/README.md)
+and [counts and mixtures](../examples/02-hidden-markov/02-counts-and-mixtures/README.md).

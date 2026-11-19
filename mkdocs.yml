@@ -39,6 +39,7 @@ nav:
       - Embedded chains: examples/01-markov-chains/01-embedded-chains/README.md
       - Tests and simulation: examples/01-markov-chains/02-tests-and-simulation/README.md
       - Electrofacies: examples/02-hidden-markov/01-electrofacies/README.md
+      - Counts and mixtures: examples/02-hidden-markov/02-counts-and-mixtures/README.md
       - Durations and selection: examples/03-semi-markov-and-selection/01-durations-and-selection/README.md
       - Duration laws: examples/03-semi-markov-and-selection/02-duration-laws/README.md
       - Transiograms: examples/04-transiograms/01-transiograms/README.md

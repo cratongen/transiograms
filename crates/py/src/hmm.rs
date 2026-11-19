@@ -447,6 +447,18 @@ impl PyGaussianMixture {
     fn frozen(&self) -> bool {
         self.0.frozen
     }
+    /// Log mixture density of each row of ``x``.
+    ///
+    /// Parameters
+    /// ----------
+    /// x : array_like
+    ///     ``(n, d)`` observations, or ``(n,)`` when ``d = 1``. NaN channels are marginalised
+    ///     in every component.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     ``(n,)`` values of ``log sum_k w_k N(x; mu_k, Sigma_k)``.
     fn log_density<'py>(
         &self,
         py: Python<'py>,
