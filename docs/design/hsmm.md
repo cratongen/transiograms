@@ -114,4 +114,7 @@ LSE equals `ln L`, max equals Viterbi, run-level marginals equal eta, gamma, xi 
 
 ## Implementer decisions
 
-(empty)
+- `select_states` takes one clamp set for every K, so the Python binding accepts `labels` and
+  `allowed` only with a single entry in `states`, and raises otherwise.
+- Restarts keep the pseudocounts of the template's categorical emissions and durations (they were
+  reset to 0 when a restart reinitialised them).

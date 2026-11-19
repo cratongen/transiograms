@@ -694,7 +694,9 @@ pub(crate) fn input<'py>(
     let listed = map.list.is_some();
     let labels = labels
         .filter(|o| !o.is_none())
-        .map(|o| -> PyResult<Vec<f64>> { floats(&per_row(&column(data, o, "labels")?, listed)?, "labels") })
+        .map(|o| -> PyResult<Vec<f64>> {
+            floats(&per_row(&column(data, o, "labels")?, listed)?, "labels")
+        })
         .transpose()?;
     if let Some(l) = &labels {
         if l.len() != n {

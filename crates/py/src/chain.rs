@@ -113,7 +113,7 @@ impl PyTestResult {
     }
     fn __repr__(&self) -> String {
         format!(
-            "TestResult(name={:?}, method={:?}, statistic={}, df={}, p_value={})",
+            "TestResult(name={:?}, method={:?}, statistic={:.6}, df={}, p_value={:.4e})",
             self.0.name, self.0.method, self.0.statistic, self.0.df, self.0.p_value
         )
     }
@@ -593,7 +593,8 @@ impl PyMarkovChain {
     /// seed : int
     /// hard_from, hard_to, hard_codes : array_like, optional
     ///     Conditioning intervals as lengths along the direction from 0; a point has
-    ///     ``from == to``. Fixed chains freeze the cells whose centres they cover.
+    ///     ``from == to``. Fixed chains freeze the cells whose centres an interval covers, and
+    ///     the cell that contains a point.
     /// start : int or "stationary"
     ///     Category at position 0, or a draw from the stationary law.
     ///
@@ -633,8 +634,15 @@ impl PyMarkovChain {
                 }
                 let (mut from, mut to, mut keep) = (vec![], vec![], vec![]);
                 for i in 0..hard.codes.len() {
-                    let a = (hard.from[i] / step - 0.5).ceil().max(0.0);
-                    let b = (hard.to[i] / step - 0.5).floor().min(steps - 1.0);
+                    let (a, b) = if hard.from[i] == hard.to[i] {
+                        let c = (hard.from[i] / step).floor().clamp(0.0, steps - 1.0);
+                        (c, c)
+                    } else {
+                        (
+                            (hard.from[i] / step - 0.5).ceil().max(0.0),
+                            (hard.to[i] / step - 0.5).floor().min(steps - 1.0),
+                        )
+                    };
                     if a <= b {
                         from.push(a);
                         to.push(b);

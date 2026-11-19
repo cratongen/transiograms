@@ -166,3 +166,7 @@ deleting it and using `A^2` across it.
   `n (t * 4 + 24)` bytes; overflow or excess raises `InvalidInput`.
 - `sample(lengths, seed)` returns `Vec` per the spec signature, so it cannot reject absurd
   lengths; callers must bound them.
+- Restarts that reinitialise categorical emissions keep the template's pseudocount, so the Python
+  `pseudocount=` survives `n_init > 1`.
+- Python binding: per-row `labels` and `allowed` given as lists are concatenated only when
+  `sequences` was itself a list of arrays.

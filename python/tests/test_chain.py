@@ -209,3 +209,9 @@ def test_huge_requests_raise_before_allocating():
         m1_chain().simulate(0.5 * 2**40, n=2**20)
     with pytest.raises(vv.InvalidInput):
         vv.order_test(np.arange(40) % 4, order=33)
+
+
+def test_fixed_hard_points_freeze_the_cell_that_contains_them():
+    c = vv.MarkovChain.from_matrix(np.full((3, 3), 1 / 3), step=0.5)
+    sims = c.simulate(5.0, n=50, seed=1, hard_from=[0.0, 2.5, 4.99], hard_codes=[2, 1, 0])
+    assert np.all(sims[:, 0] == 2) and np.all(sims[:, 5] == 1) and np.all(sims[:, 9] == 0)

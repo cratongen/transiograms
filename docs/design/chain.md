@@ -158,4 +158,10 @@ Bridge marginal check: `P(x_t = j | a, b) = (P^t)_aj (P^(n-t))_jb / (P^n)_ab` (c
 
 ## Implementer decisions
 
-(empty)
+- Python binding: `MarkovChain(kind="fixed")` with `step=None` uses the sampling step of the data
+  (`step=`, inferred from `depth`, or 1 for unit-step codes); intervals without either raise.
+- `MarkovChain.simulate` returns fixed-chain codes along the direction (column 0 is the deepest
+  sample for "up"), as the bed dict gives positions along the direction; reverse the columns for
+  top-down rows.
+- Fixed-chain hard intervals freeze the cells whose centres they cover; a point (`from == to`)
+  freezes the cell that contains it, so a point on a cell boundary is never dropped.
