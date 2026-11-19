@@ -15,14 +15,44 @@ markdown_extensions:
   - toc:
       permalink: true
 
+hooks:
+  - docs/hooks.py
+exclude_docs: |
+  hooks.py
+  __pycache__/
+
 plugins:
   - search
 
 nav:
   - Home: index.md
   - Install: install.md
+  - Guide:
+      - Markov chains: guide/markov-chains.md
+      - Hidden Markov models: guide/hidden-markov.md
+      - Semi-Markov models and selection: guide/semi-markov.md
+      - Transiograms: guide/transiograms.md
+      - T-PROGS simulation: guide/tp-simulation.md
+      - MCP and MCRF: guide/mcrf-mcp.md
+      - Working with boitata: guide/boitata.md
+  - Examples:
+      - Embedded chains: examples/01-markov-chains/01-embedded-chains/README.md
+      - Tests and simulation: examples/01-markov-chains/02-tests-and-simulation/README.md
+      - Electrofacies: examples/02-hidden-markov/01-electrofacies/README.md
+      - Durations and selection: examples/03-semi-markov-and-selection/01-durations-and-selection/README.md
+      - Transiograms: examples/04-transiograms/01-transiograms/README.md
+      - T-PROGS: examples/05-tp-simulation/01-tprogs/README.md
+      - MCP and MCRF: examples/06-mcrf-mcp/01-mcp-and-mcrf/README.md
+      - boitata integration: examples/07-boitata-integration/01-drillholes-to-grid/README.md
   - API:
       - Core: api/core.md
+      - Chain: api/chain.md
+      - HMM: api/hmm.md
+      - HSMM: api/hsmm.md
+      - Transiograms: api/transiogram.md
+      - TP simulation: api/tpsim.md
+      - MCRF and MCP: api/mcrf.md
+      - Plots, datasets, checks: api/extras.md
   - Design:
       - Contract: design/spec.md
       - Core: design/core.md
