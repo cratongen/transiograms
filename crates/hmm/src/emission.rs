@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use varvite_core::nalgebra::Cholesky;
-use varvite_core::numerics::logsumexp;
-use varvite_core::special::ln_gamma;
-use varvite_core::{Mat, ROW_TOL, Result, Stream, invalid};
+use transiograms_core::nalgebra::Cholesky;
+use transiograms_core::numerics::logsumexp;
+use transiograms_core::special::ln_gamma;
+use transiograms_core::{Mat, ROW_TOL, Result, Stream, invalid};
 
 const LN_2PI: f64 = 1.837_877_066_409_345_5;
 
@@ -27,7 +27,7 @@ pub struct Categorical {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Gaussian {
     pub mean: Vec<f64>,
-    #[serde(with = "varvite_core::serde_mat")]
+    #[serde(with = "transiograms_core::serde_mat")]
     pub covariance: Mat,
     pub covariance_type: CovarianceType,
     pub frozen: bool,

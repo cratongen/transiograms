@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use rayon::prelude::*;
-use varvite_core::nalgebra::Cholesky;
-use varvite_core::numerics::{gth_stationary, logsumexp};
-use varvite_core::rng::tag;
-use varvite_core::{Mat, Result, Stream, convergence, invalid};
+use transiograms_core::nalgebra::Cholesky;
+use transiograms_core::numerics::{gth_stationary, logsumexp};
+use transiograms_core::rng::tag;
+use transiograms_core::{Mat, Result, Stream, convergence, invalid};
 
 use crate::emission::{
     Categorical, CovarianceType, Emission, Family, GaussDensity, Gaussian, GaussianMixture,

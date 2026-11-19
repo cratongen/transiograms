@@ -1,11 +1,11 @@
 use std::process::Command;
 
 use proptest::prelude::*;
-use varvite_chain::*;
-use varvite_core::rng::tag;
-use varvite_core::special::chi2_sf;
-use varvite_core::synthetic::{markov_holes, rate_holes};
-use varvite_core::{
+use transiograms_chain::*;
+use transiograms_core::rng::tag;
+use transiograms_core::special::chi2_sf;
+use transiograms_core::synthetic::{markov_holes, rate_holes};
+use transiograms_core::{
     Code, Direction, EmptyRow, MISSING, Mat, RateMatrix, SequenceSet, Stream, TransitionMatrix,
 };
 

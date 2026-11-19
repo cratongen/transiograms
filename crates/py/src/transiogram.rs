@@ -3,8 +3,8 @@
 use numpy::ndarray::Array3;
 use numpy::{IntoPyArray, PyArray1, PyArray2, PyArray3};
 use pyo3::prelude::*;
-use varvite_core::{Mat, RateMatrix, memory};
-use varvite_transiogram::{
+use transiograms_core::{Mat, RateMatrix, memory};
+use transiograms_transiogram::{
     Entry, Experimental, Model1D, PairFilter, PairSpec, Structure, TransitionModel, downhole,
     experimental, on_grid,
 };
@@ -34,7 +34,7 @@ use crate::invalid;
 /// directed : bool
 ///     False when both orientations of each pair were counted.
 #[pyclass(
-    module = "varvite",
+    module = "transiograms",
     name = "ExperimentalTransiogram",
     frozen,
     eq,
@@ -323,7 +323,7 @@ fn stack<'py>(
 /// One-directional transiogram model: a continuous-lag Markov chain (``markov``) or one
 /// analytical curve per entry (``entrywise``, Li 2007).
 #[pyclass(
-    module = "varvite",
+    module = "transiograms",
     name = "TransiogramModel",
     frozen,
     eq,
@@ -534,7 +534,7 @@ fn rate_matrix(obj: &Bound<PyAny>, what: &str) -> PyResult<RateMatrix> {
 /// background : int
 ///     Background category; -1 means the last.
 #[pyclass(
-    module = "varvite",
+    module = "transiograms",
     name = "TransitionModel",
     frozen,
     eq,

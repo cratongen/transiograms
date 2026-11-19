@@ -1,6 +1,6 @@
-use varvite_core::rng::tag;
-use varvite_core::{Code, Grid, MISSING, Result, Stream, invalid};
-use varvite_transiogram::TransitionModel;
+use transiograms_core::rng::tag;
+use transiograms_core::{Code, Grid, MISSING, Result, Stream, invalid};
+use transiograms_transiogram::TransitionModel;
 
 use crate::QuenchOptions;
 
@@ -327,7 +327,7 @@ pub fn quench_lags(model: &TransitionModel, grid: &Grid, limit: f64) -> Vec<[i64
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    use varvite_core::Mat;
+    use transiograms_core::Mat;
 
     fn model() -> TransitionModel {
         let pi = Mat::from_row_slice(3, 3, &[0.0, 0.6, 0.4, 0.7, 0.0, 0.3, 0.2, 0.8, 0.0]);

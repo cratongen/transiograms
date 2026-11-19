@@ -1,7 +1,7 @@
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use varvite_core::rng::tag;
-use varvite_core::{Mat, Result, Stream, invalid, memory};
+use transiograms_core::rng::tag;
+use transiograms_core::{Mat, Result, Stream, invalid, memory};
 
 /// Upper bound on the `t x K` f64 matrices one forward-backward or Viterbi pass holds at once.
 const PASS_MATRICES: usize = 6;
@@ -147,7 +147,7 @@ pub struct FitReport {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Hmm {
     pub start: Vec<f64>,
-    #[serde(with = "varvite_core::serde_mat")]
+    #[serde(with = "transiograms_core::serde_mat")]
     pub transition: Mat,
     pub emissions: Vec<Emission>,
 }

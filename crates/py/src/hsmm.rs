@@ -4,10 +4,10 @@ use numpy::{PyArray1, PyArray2};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 use serde::{Deserialize, Serialize};
-use varvite_core::rng::tag;
-use varvite_core::{Mat, Result as VResult, Stream};
-use varvite_hmm::{Clamp, Emission, Params, Sequence};
-use varvite_hsmm::{
+use transiograms_core::rng::tag;
+use transiograms_core::{Mat, Result as VResult, Stream};
+use transiograms_hmm::{Clamp, Emission, Params, Sequence};
+use transiograms_hsmm::{
     Duration, DurationDist, DurationFamily, Hsmm, ModelKind, SelectionSpec, select_states as select,
 };
 
@@ -50,7 +50,7 @@ fn pmf_of<'py>(
     if max_duration == 0 {
         return Err(invalid("max_duration must be at least 1"));
     }
-    varvite_core::memory::check(
+    transiograms_core::memory::check(
         (max_duration as u64).saturating_mul(24),
         None,
         "duration pmf",
@@ -71,7 +71,7 @@ fn mean_of(d: &DurationDist, max_duration: usize) -> PyResult<f64> {
     if max_duration == 0 {
         return Err(invalid("max_duration must be at least 1"));
     }
-    varvite_core::memory::check(
+    transiograms_core::memory::check(
         (max_duration as u64).saturating_mul(24),
         None,
         "duration mean",
@@ -135,7 +135,13 @@ macro_rules! duration_class {
 ///     ``0 < p <= 1``.
 /// frozen : bool
 ///     Keep the law fixed while fitting.
-#[pyclass(module = "varvite", name = "Geometric", frozen, eq, from_py_object)]
+#[pyclass(
+    module = "transiograms",
+    name = "Geometric",
+    frozen,
+    eq,
+    from_py_object
+)]
 #[derive(Clone, PartialEq)]
 pub struct PyGeometric(DurationDist);
 
@@ -167,7 +173,7 @@ duration_class!(PyGeometric, "Geometric", {
 ///     ``rate >= 0``; the mean is ``1 + rate``.
 /// frozen : bool
 #[pyclass(
-    module = "varvite",
+    module = "transiograms",
     name = "ShiftedPoisson",
     frozen,
     eq,
@@ -206,7 +212,7 @@ duration_class!(PyShiftedPoisson, "ShiftedPoisson", {
 ///     ``0 < p <= 1``.
 /// frozen : bool
 #[pyclass(
-    module = "varvite",
+    module = "transiograms",
     name = "NegativeBinomial",
     frozen,
     eq,
@@ -252,7 +258,7 @@ duration_class!(PyNegativeBinomial, "NegativeBinomial", {
 ///     Added to every duration count in the M-step.
 /// frozen : bool
 #[pyclass(
-    module = "varvite",
+    module = "transiograms",
     name = "EmpiricalDuration",
     frozen,
     eq,
@@ -422,14 +428,19 @@ impl Engine for Engined<'_> {
 /// emission, covariance_type, n_symbols, n_mix, max_iter, tol, n_init, seed, start_prior,
 /// transition_prior, covariance_prior, pseudocount, direction, ordering
 ///     As in ``HiddenMarkovModel``.
-#[pyclass(module = "varvite", name = "HiddenSemiMarkovModel", eq, from_py_object)]
+#[pyclass(
+    module = "transiograms",
+    name = "HiddenSemiMarkovModel",
+    eq,
+    from_py_object
+)]
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct PyHiddenSemiMarkovModel {
     common: Common,
     duration: String,
     max_duration: Option<Vec<usize>>,
     start: Option<Vec<f64>>,
-    #[serde(with = "varvite_core::serde_mat::option")]
+    #[serde(with = "transiograms_core::serde_mat::option")]
     transition: Option<Mat>,
     emissions: Option<Vec<Emission>>,
     durations: Option<Vec<DurationDist>>,
@@ -967,7 +978,7 @@ impl PyHiddenSemiMarkovModel {
     ) -> PyResult<f64> {
         let inp = self.input(sequences, holes, None, None, data)?;
         let (ll, p, _, _) = criteria(py, &Engined(self.fitted()?), &inp, &self.common.params)?;
-        Ok(varvite_hsmm::aic(ll, p))
+        Ok(transiograms_hsmm::aic(ll, p))
     }
 
     /// Bayesian information criterion (lower is better): ``-2 log L + p ln n``.
@@ -998,7 +1009,7 @@ impl PyHiddenSemiMarkovModel {
     ) -> PyResult<f64> {
         let inp = self.input(sequences, holes, None, None, data)?;
         let (ll, p, n, _) = criteria(py, &Engined(self.fitted()?), &inp, &self.common.params)?;
-        Ok(varvite_hsmm::bic(ll, p, n))
+        Ok(transiograms_hsmm::bic(ll, p, n))
     }
 
     /// Integrated completed likelihood (lower is better): ``BIC + 2 H``.
@@ -1028,7 +1039,7 @@ impl PyHiddenSemiMarkovModel {
     ) -> PyResult<f64> {
         let inp = self.input(sequences, holes, None, None, data)?;
         let (ll, p, n, h) = criteria(py, &Engined(self.fitted()?), &inp, &self.common.params)?;
-        Ok(varvite_hsmm::icl(ll, p, n, h))
+        Ok(transiograms_hsmm::icl(ll, p, n, h))
     }
 
     /// Number of hidden states ``K``.

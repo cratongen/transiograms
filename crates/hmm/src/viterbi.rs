@@ -1,4 +1,4 @@
-use varvite_core::{Mat, Result};
+use transiograms_core::{Mat, Result};
 
 use crate::forward_backward::impossible;
 use crate::model::{Decoder, Hmm, Implementation};

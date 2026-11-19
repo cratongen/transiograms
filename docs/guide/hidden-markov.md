@@ -8,18 +8,18 @@ lithologies when no one logged them, or to fill gaps between logged core.
 
 ```python
 import numpy as np
-import varvite as vv
+import transiograms as tg
 
-logs = vv.datasets.electrofacies_logs()
+logs = tg.datasets.electrofacies_logs()
 x = np.column_stack([logs["GR"], logs["RHOB"]])
-hmm = vv.HiddenMarkovModel(3, covariance_type="diag", n_init=5, seed=0, direction="down")
+hmm = tg.HiddenMarkovModel(3, covariance_type="diag", n_init=5, seed=0, direction="down")
 hmm.fit(x, holes=logs["HOLE_ID"])
 states = hmm.predict(x, holes=logs["HOLE_ID"])
 ```
 
 `distributions` is the number of states, or one emission object per state:
-`vv.Gaussian(mean, covariance, covariance_type=)`, `vv.Categorical(probabilities)`,
-`vv.Poisson(rate)` or `vv.GaussianMixture(weights, means, covariances)`. Give `start` and
+`tg.Gaussian(mean, covariance, covariance_type=)`, `tg.Categorical(probabilities)`,
+`tg.Poisson(rate)` or `tg.GaussianMixture(weights, means, covariances)`. Give `start` and
 `transition` as well and the model is ready to use without fitting. `frozen=True` keeps a
 distribution fixed during fitting; `params` and `init_params` choose which parts EM fits and
 which it initialises.
@@ -48,7 +48,7 @@ states, for example logged core. Fitting with labels is semi-supervised Baum-Wel
 ## Theory checks
 
 On a 4-state, 8-step sequence the suite compares Viterbi, the forward log-likelihood, the
-posteriors and the path entropy with `vv.checks.brute_force_hmm`, an exhaustive search over
+posteriors and the path entropy with `tg.checks.brute_force_hmm`, an exhaustive search over
 `4^8` paths, within `1e-12`. It also asserts that EM never lowers its objective, that fully
 labelled data give the counting MLE in one iteration, and that emission densities match scipy.
 

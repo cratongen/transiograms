@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use varvite_core::special::chi2_sf;
-use varvite_core::{Code, Mat, Result, SequenceSet, invalid, numerics::quasi_independence};
+use transiograms_core::special::chi2_sf;
+use transiograms_core::{Code, Mat, Result, SequenceSet, invalid, numerics::quasi_independence};
 
 use crate::fit::{FitOptions, Kind, MarkovChain, embedded_fit, sequences, tally};
 
@@ -25,7 +25,7 @@ pub struct TestResult {
     pub df: usize,
     pub p_value: f64,
     /// Null-hypothesis expected counts when tabular.
-    #[serde(with = "varvite_core::serde_mat::option")]
+    #[serde(with = "transiograms_core::serde_mat::option")]
     pub expected: Option<Mat>,
     /// Fraction of allowed cells with expected < 5.
     pub small_expected: f64,
@@ -35,12 +35,12 @@ pub struct TestResult {
 #[serde(deny_unknown_fields)]
 pub struct OrderTable {
     pub orders: Vec<usize>,
-    #[serde(with = "varvite_core::serde_mat::values")]
+    #[serde(with = "transiograms_core::serde_mat::values")]
     pub log_likelihood: Vec<f64>,
     pub n_params: Vec<usize>,
-    #[serde(with = "varvite_core::serde_mat::values")]
+    #[serde(with = "transiograms_core::serde_mat::values")]
     pub aic: Vec<f64>,
-    #[serde(with = "varvite_core::serde_mat::values")]
+    #[serde(with = "transiograms_core::serde_mat::values")]
     pub bic: Vec<f64>,
     pub n_transitions: usize,
 }
@@ -308,7 +308,7 @@ fn check_histories(
         .and_then(|p| p.checked_mul(positions))
         .and_then(|b| b.checked_mul(copies)?.checked_add(extra))
     {
-        Some(b) => varvite_core::memory::check(b, None, "order test history tables"),
+        Some(b) => transiograms_core::memory::check(b, None, "order test history tables"),
         None => invalid(format!(
             "order {order} with {m} categories overflows the address space"
         )),

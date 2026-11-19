@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use varvite_core::{
+use transiograms_core::{
     Code, Direction, EmptyRow, Mat, Projection, RateMatrix, Result, SequenceSet, TransitionMatrix,
     invalid,
     numerics::{components, gth_stationary},
@@ -45,7 +45,7 @@ pub struct MarkovChain {
     pub kind: Kind,
     pub direction: Direction,
     /// Embedded: bed transitions; Fixed: step transitions.
-    #[serde(with = "varvite_core::serde_mat::option")]
+    #[serde(with = "transiograms_core::serde_mat::option")]
     pub counts: Option<Mat>,
     /// Total thickness `T_j` of each category (Embedded).
     pub exposure: Option<Vec<f64>>,
@@ -472,7 +472,7 @@ impl MarkovChain {
             return invalid("n_steps must be at least 1");
         }
         let pi = stationary(&self.transition)?;
-        let z = varvite_core::numerics::fundamental_matrix(self.transition.matrix(), &pi)?;
+        let z = transiograms_core::numerics::fundamental_matrix(self.transition.matrix(), &pi)?;
         Ok((0..self.k())
             .map(|k| {
                 (pi[k] * (2.0 * z[(k, k)] - 1.0 - pi[k]) / n_steps as f64)

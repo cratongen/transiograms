@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
-use varvite_core::{Error, Mat, RateMatrix, Result, invalid};
+use transiograms_core::{Error, Mat, RateMatrix, Result, invalid};
 
 use crate::model1d::check_proportions;
-use varvite_core::numerics::expm_rate;
+use transiograms_core::numerics::expm_rate;
 
 const AXES: [&str; 3] = ["x'", "y'", "z'"];
 

@@ -6,9 +6,9 @@ use pyo3::prelude::*;
 use pyo3::types::{PyList, PyTuple};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use varvite_core::rng::tag;
-use varvite_core::{Direction, Error, Mat, Result as VResult, Stream};
-use varvite_hmm::{
+use transiograms_core::rng::tag;
+use transiograms_core::{Direction, Error, Mat, Result as VResult, Stream};
+use transiograms_hmm::{
     Categorical, Clamp, CovarianceType, Decoder, Emission, Family, FitOptions, Gaussian,
     GaussianMixture, Hmm, Implementation, Ordering, Params, Poisson, Priors, Sequence, n_observed,
 };
@@ -49,7 +49,7 @@ fn covariance(obj: &Bound<PyAny>, d: usize, ct: CovarianceType) -> PyResult<Mat>
         .call_method1("ndim", (obj,))?
         .extract()?;
     let m = match ndim {
-        1 => Mat::from_diagonal(&varvite_core::nalgebra::DVector::from_vec(floats(
+        1 => Mat::from_diagonal(&transiograms_core::nalgebra::DVector::from_vec(floats(
             obj,
             "covariance",
         )?)),
@@ -137,7 +137,7 @@ fn sample<'py>(py: Python<'py>, e: &Emission, n: usize, seed: u64) -> PyResult<B
     let d = e.dim();
     let categorical = matches!(e, Emission::Categorical(_));
     let need = (n as u64).checked_mul(d as u64 * 8 * (1 + categorical as u64));
-    varvite_core::memory::check(need.unwrap_or(u64::MAX), None, "samples").map_err(to_rust)?;
+    transiograms_core::memory::check(need.unwrap_or(u64::MAX), None, "samples").map_err(to_rust)?;
     let mut s = Stream::new(seed, &[tag::SAMPLE, 0]);
     let mut v: Vec<f64> = Vec::with_capacity(n * d);
     for _ in 0..n {
@@ -159,7 +159,13 @@ fn sample<'py>(py: Python<'py>, e: &Emission, n: usize, seed: u64) -> PyResult<B
 ///     Added to every symbol count in the M-step.
 /// frozen : bool
 ///     Keep the parameters fixed while fitting.
-#[pyclass(module = "varvite", name = "Categorical", frozen, eq, from_py_object)]
+#[pyclass(
+    module = "transiograms",
+    name = "Categorical",
+    frozen,
+    eq,
+    from_py_object
+)]
 #[derive(Clone, PartialEq)]
 pub struct PyCategorical(pub Categorical);
 
@@ -226,7 +232,7 @@ impl PyCategorical {
 /// covariance_type : {"full", "diag", "spherical"}
 /// frozen : bool
 ///     Keep the parameters fixed while fitting.
-#[pyclass(module = "varvite", name = "Gaussian", frozen, eq, from_py_object)]
+#[pyclass(module = "transiograms", name = "Gaussian", frozen, eq, from_py_object)]
 #[derive(Clone, PartialEq)]
 pub struct PyGaussian(pub Gaussian);
 
@@ -305,7 +311,7 @@ impl PyGaussian {
 /// rate : array_like
 ///     ``(d,)`` rates.
 /// frozen : bool
-#[pyclass(module = "varvite", name = "Poisson", frozen, eq, from_py_object)]
+#[pyclass(module = "transiograms", name = "Poisson", frozen, eq, from_py_object)]
 #[derive(Clone, PartialEq)]
 pub struct PyPoisson(pub Poisson);
 
@@ -367,7 +373,7 @@ impl PyPoisson {
 /// covariance_type : {"full", "diag", "spherical"}
 /// frozen : bool
 #[pyclass(
-    module = "varvite",
+    module = "transiograms",
     name = "GaussianMixture",
     frozen,
     eq,
@@ -938,7 +944,7 @@ pub(crate) fn sample_posterior_of<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let rows = inp.map.n_rows;
     let need = (n as u64).checked_mul(rows as u64 * 8);
-    varvite_core::memory::check(need.unwrap_or(u64::MAX), None, "posterior samples")
+    transiograms_core::memory::check(need.unwrap_or(u64::MAX), None, "posterior samples")
         .map_err(to_rust)?;
     let draws = py.detach(|| each(inp, |i, s, c| e.sample_posterior(s, c, n, seed, i as u64)))?;
     let mut out = vec![-1i64; n * rows];
@@ -967,7 +973,7 @@ pub(crate) fn sample_of<'py>(
     };
     let d = e.emissions()[0].dim();
     let total: u64 = lengths.iter().map(|&l| l as u64).sum();
-    varvite_core::memory::check(total.saturating_mul(8 * (d as u64 + 1)), None, "samples")
+    transiograms_core::memory::check(total.saturating_mul(8 * (d as u64 + 1)), None, "samples")
         .map_err(to_rust)?;
     let out = py.detach(|| e.sample(&lengths, seed));
     let categorical = matches!(e.emissions()[0], Emission::Categorical(_));
@@ -1094,13 +1100,18 @@ impl Engine for Engined<'_> {
 ///     Forward-backward arithmetic used while fitting.
 /// ordering : {"none", "mean", "occupancy"}
 ///     Relabel the fitted states by first-channel mean or by stationary occupancy.
-#[pyclass(module = "varvite", name = "HiddenMarkovModel", eq, from_py_object)]
+#[pyclass(
+    module = "transiograms",
+    name = "HiddenMarkovModel",
+    eq,
+    from_py_object
+)]
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct PyHiddenMarkovModel {
     common: Common,
     implementation: String,
     start: Option<Vec<f64>>,
-    #[serde(with = "varvite_core::serde_mat::option")]
+    #[serde(with = "transiograms_core::serde_mat::option")]
     transition: Option<Mat>,
     emissions: Option<Vec<Emission>>,
     model: Option<Hmm>,
@@ -1479,7 +1490,7 @@ impl PyHiddenMarkovModel {
     ) -> PyResult<f64> {
         let inp = self.input(sequences, holes, None, None, data)?;
         let (ll, p, _, _) = criteria(py, &Engined(self.fitted()?), &inp, &self.common.params)?;
-        Ok(varvite_hsmm::aic(ll, p))
+        Ok(transiograms_hsmm::aic(ll, p))
     }
 
     /// Bayesian information criterion (lower is better). Depth samples are autocorrelated, so
@@ -1494,7 +1505,7 @@ impl PyHiddenMarkovModel {
     ) -> PyResult<f64> {
         let inp = self.input(sequences, holes, None, None, data)?;
         let (ll, p, n, _) = criteria(py, &Engined(self.fitted()?), &inp, &self.common.params)?;
-        Ok(varvite_hsmm::bic(ll, p, n))
+        Ok(transiograms_hsmm::bic(ll, p, n))
     }
 
     /// Integrated completed likelihood: BIC plus twice the path entropy (lower is better).
@@ -1508,7 +1519,7 @@ impl PyHiddenMarkovModel {
     ) -> PyResult<f64> {
         let inp = self.input(sequences, holes, None, None, data)?;
         let (ll, p, n, h) = criteria(py, &Engined(self.fitted()?), &inp, &self.common.params)?;
-        Ok(varvite_hsmm::icl(ll, p, n, h))
+        Ok(transiograms_hsmm::icl(ll, p, n, h))
     }
 
     #[getter]

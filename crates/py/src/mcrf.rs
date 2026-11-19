@@ -1,7 +1,7 @@
 //! `mcp_predict` and `mcrf_simulate`.
 
 use pyo3::prelude::*;
-use varvite_mcrf::{Neighbourhood, Options};
+use transiograms_mcrf::{Neighbourhood, Options};
 
 use crate::args::to_rust;
 use crate::core::PyGrid;
@@ -82,7 +82,7 @@ fn mcp_predict<'py>(
 ) -> PyResult<PyPrediction> {
     let (h, m) = hard(&model.0, &grid.0, coords, codes, mask, data)?;
     let opts = options(neighbours, closeness_limit, 1, 0, memory)?;
-    py.detach(|| varvite_mcrf::predict(&model.0, &grid.0, m.as_deref(), &h, &opts))
+    py.detach(|| transiograms_mcrf::predict(&model.0, &grid.0, m.as_deref(), &h, &opts))
         .map(PyPrediction)
         .map_err(to_rust)
 }
@@ -121,7 +121,7 @@ fn mcrf_simulate<'py>(
     let (h, m) = hard(&model.0, &grid.0, coords, codes, mask, data)?;
     let opts = options(neighbours, closeness_limit, n, seed, memory)?;
     let r = py
-        .detach(|| varvite_mcrf::simulate(&model.0, &grid.0, m.as_deref(), &h, &opts))
+        .detach(|| transiograms_mcrf::simulate(&model.0, &grid.0, m.as_deref(), &h, &opts))
         .map_err(to_rust)?;
     Ok(PyRealizations { r, memory })
 }

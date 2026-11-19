@@ -1,4 +1,4 @@
-# varvite-tpsim: algorithms
+# transiograms-tpsim: algorithms
 
 Signatures are in [spec.md](spec.md) section 4.6. T-PROGS TSIM (Carle 1999) with the choices
 below. All lag lookups go through `TransitionModel::table`.
@@ -36,7 +36,7 @@ Realizations run in parallel (rayon over r) and collect in index order. Memory c
 allocating: `n * n_cells * 4` bytes of codes plus the table, plus `n * n_cells * 8` for the
 Python int64 output in the binding.
 
-`predict` (`vv.tp_cokriging`): the same cokriging at every active non-hard cell with hard data
+`predict` (`tg.tp_cokriging`): the same cokriging at every active non-hard cell with hard data
 only; hard cells get the one-hot probability of their code.
 
 ## 4. Simulated quenching (TSIM step 2, zero temperature)

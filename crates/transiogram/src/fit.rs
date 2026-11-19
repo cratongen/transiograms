@@ -1,5 +1,5 @@
-use varvite_core::numerics::{golden_section, nelder_mead};
-use varvite_core::{Mat, RateMatrix, Result, TransitionMatrix, convergence, invalid};
+use transiograms_core::numerics::{golden_section, nelder_mead};
+use transiograms_core::{Mat, RateMatrix, Result, TransitionMatrix, convergence, invalid};
 
 use crate::experimental::Experimental;
 use crate::model1d::{Entry, Model1D, Structure, check_proportions};

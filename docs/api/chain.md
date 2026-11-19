@@ -1,6 +1,6 @@
 # Chain
 
-Markov chains, statistical tests, sojourns and 1D simulation. Docstrings in Python (`help(vv.MarkovChain.fit)`) hold the details; the [guide](../guide/markov-chains.md) explains the methods.
+Markov chains, statistical tests, sojourns and 1D simulation. Docstrings in Python (`help(tg.MarkovChain.fit)`) hold the details; the [guide](../guide/markov-chains.md) explains the methods.
 
 ```python
 class TestResult:
@@ -22,6 +22,7 @@ class TestResult:
     @staticmethod
     def from_json(text: str) -> TestResult: ...
 
+
 class Entropy:
     @property
     def post(self) -> NDArray[np.float64]: ...
@@ -35,6 +36,7 @@ class Entropy:
     def chain(self) -> float: ...
     @property
     def max(self) -> float: ...
+
 
 class MarkovChain:
     def __init__(
@@ -136,6 +138,7 @@ class MarkovChain:
     @staticmethod
     def from_json(text: str) -> MarkovChain: ...
 
+
 class Sojourn:
     @property
     def n_beds(self) -> NDArray[np.int64]: ...
@@ -148,6 +151,7 @@ class Sojourn:
     def thickness(self, code: int) -> tuple[NDArray[np.float64], NDArray[np.bool_]]: ...
     def survival(self, code: int) -> tuple[NDArray[np.float64], NDArray[np.float64]]: ...
     def exponential_test(self, code: int, *, n_bootstrap: int = 999, seed: int = 0) -> TestResult: ...
+
 
 def order_test(
     codes: ArrayLike | str,

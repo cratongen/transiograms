@@ -1,9 +1,9 @@
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use varvite_core::*;
-use varvite_tpsim::*;
-use varvite_transiogram::TransitionModel;
+use transiograms_core::*;
+use transiograms_tpsim::*;
+use transiograms_transiogram::TransitionModel;
 
 struct Counting;
 

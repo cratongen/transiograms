@@ -1,5 +1,5 @@
 [package]
-name = "varvite-mcrf"
+name = "transiograms-mcrf"
 description = "Markov chain random field simulation and Markov-type categorical prediction"
 version.workspace = true
 edition.workspace = true
@@ -11,8 +11,8 @@ publish.workspace = true
 nalgebra.workspace = true
 rayon.workspace = true
 serde.workspace = true
-varvite-core.workspace = true
-varvite-transiogram.workspace = true
+transiograms-core.workspace = true
+transiograms-transiogram.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

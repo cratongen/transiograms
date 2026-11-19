@@ -19,13 +19,13 @@ pyo3 = { version = "0.29", features = ["abi3-py311"] }
 numpy = "0.29"
 proptest = "1"
 criterion = "0.8"
-varvite-core = { path = "crates/core" }
-varvite-chain = { path = "crates/chain" }
-varvite-hmm = { path = "crates/hmm" }
-varvite-hsmm = { path = "crates/hsmm" }
-varvite-transiogram = { path = "crates/transiogram" }
-varvite-tpsim = { path = "crates/tpsim" }
-varvite-mcrf = { path = "crates/mcrf" }
+transiograms-core = { path = "crates/core" }
+transiograms-chain = { path = "crates/chain" }
+transiograms-hmm = { path = "crates/hmm" }
+transiograms-hsmm = { path = "crates/hsmm" }
+transiograms-transiogram = { path = "crates/transiogram" }
+transiograms-tpsim = { path = "crates/tpsim" }
+transiograms-mcrf = { path = "crates/mcrf" }
 
 [workspace.lints.clippy]
 needless_range_loop = "allow"

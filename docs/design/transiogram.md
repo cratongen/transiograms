@@ -1,4 +1,4 @@
-# varvite-transiogram: algorithms
+# transiograms-transiogram: algorithms
 
 Signatures are in [spec.md](spec.md) section 4.5. Categories 0..K-1, proportions p, D = diag(p).
 `t_ij(h) = P(Z(x + h) = j | Z(x) = i)`: tail at x, head at x + h, lag = head - tail.

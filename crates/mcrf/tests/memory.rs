@@ -3,9 +3,9 @@ use std::cell::Cell;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicI64, Ordering};
 
-use varvite_core::{Grid, Mat, RateMatrix, Snapped};
-use varvite_mcrf::{Neighbourhood, Options, predict, simulate};
-use varvite_transiogram::TransitionModel;
+use transiograms_core::{Grid, Mat, RateMatrix, Snapped};
+use transiograms_mcrf::{Neighbourhood, Options, predict, simulate};
+use transiograms_transiogram::TransitionModel;
 
 struct Counting;
 

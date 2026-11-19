@@ -2,18 +2,18 @@
 
 Transition-probability cokriging (Carle and Fogg) estimates the probability of each category at
 a cell from the nearest hard data, with the transition model in place of the covariances.
-`vv.tp_cokriging` returns those probabilities without simulating; `vv.tprogs_simulate` draws
+`tg.tp_cokriging` returns those probabilities without simulating; `tg.tprogs_simulate` draws
 realizations by sequential indicator simulation and then quenches each one towards the model
 transiograms.
 
 ```python
 import numpy as np
-import varvite as vv
+import transiograms as tg
 
-d = vv.datasets.layered_drillholes()
-grid, model = vv.Grid.from_json(d["grid"]), vv.TransitionModel.from_json(d["model"])
+d = tg.datasets.layered_drillholes()
+grid, model = tg.Grid.from_json(d["grid"]), tg.TransitionModel.from_json(d["model"])
 xyz = np.column_stack([d["X"], d["Y"], d["Z"]])
-real = vv.tprogs_simulate(model, grid, xyz, d["CODE"], n=20, seed=0)
+real = tg.tprogs_simulate(model, grid, xyz, d["CODE"], n=20, seed=0)
 real.realizations, real.proportions, real.probabilities
 ```
 
@@ -34,7 +34,7 @@ fraction of cells whose probabilities needed clipping. `Realizations` holds `rea
 ## Memory
 
 Simulation memory is sized from the available memory (`MemAvailable` on Linux), or from
-`memory=` in bytes. A request that does not fit raises `vv.InvalidInput` naming the bytes it
+`memory=` in bytes. A request that does not fit raises `tg.InvalidInput` naming the bytes it
 needs before anything is allocated.
 
 ## Theory checks

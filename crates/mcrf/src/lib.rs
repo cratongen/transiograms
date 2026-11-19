@@ -10,8 +10,8 @@ pub use conditional::{conditional, conditional_eq13};
 pub use predict::predict;
 pub use simulate::simulate;
 
-use varvite_core::{Code, Grid, MISSING, Result, Snapped, invalid};
-use varvite_transiogram::TransitionModel;
+use transiograms_core::{Code, Grid, MISSING, Result, Snapped, invalid};
+use transiograms_transiogram::TransitionModel;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Neighbourhood {

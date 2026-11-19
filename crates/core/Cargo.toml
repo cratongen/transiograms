@@ -1,5 +1,5 @@
 [package]
-name = "varvite-core"
+name = "transiograms-core"
 description = "Category codes, sequences, transition and rate matrices, grids, seeded streams and numerics"
 version.workspace = true
 edition.workspace = true

@@ -4,7 +4,7 @@ use numpy::ndarray::Array2;
 use numpy::{IntoPyArray, PyArray1, PyArray2};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyString};
-use varvite_core::{Categories, Grid, MISSING};
+use transiograms_core::{Categories, Grid, MISSING};
 
 use crate::args::{codes, coords, to_rust};
 use crate::invalid;
@@ -59,7 +59,13 @@ fn labels(obj: &Bound<PyAny>) -> PyResult<Vec<Option<String>>> {
 ///     Category names in code order, unique and non-empty.
 /// colors : sequence of str, optional
 ///     One matplotlib color per name.
-#[pyclass(module = "varvite", name = "Categories", frozen, eq, from_py_object)]
+#[pyclass(
+    module = "transiograms",
+    name = "Categories",
+    frozen,
+    eq,
+    from_py_object
+)]
 #[derive(Clone, PartialEq)]
 pub struct PyCategories(pub Categories);
 
@@ -118,7 +124,7 @@ impl PyCategories {
         codes: &Bound<'py, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let codes = self::codes(codes, "codes")?;
-        varvite_core::codes::check_codes(&codes, self.0.len()).map_err(to_rust)?;
+        transiograms_core::codes::check_codes(&codes, self.0.len()).map_err(to_rust)?;
         let names: Vec<Option<&str>> = codes.iter().map(|&c| self.0.name(c)).collect();
         py.import("numpy")?.call_method1("array", (names, "object"))
     }
@@ -154,7 +160,7 @@ impl PyCategories {
 ///     Cell size along x, y and z.
 /// count : sequence of 3 ints
 ///     Number of cells along x, y and z; 1 along z for a 2D grid.
-#[pyclass(module = "varvite", name = "Grid", frozen, eq, from_py_object)]
+#[pyclass(module = "transiograms", name = "Grid", frozen, eq, from_py_object)]
 #[derive(Clone, PartialEq)]
 pub struct PyGrid(pub Grid);
 
@@ -200,7 +206,7 @@ impl PyGrid {
     fn coords<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {
         let n = self.0.n_cells();
         let need = (n as u64).saturating_mul(24);
-        varvite_core::memory::check(need, None, "Grid.coords").map_err(to_rust)?;
+        transiograms_core::memory::check(need, None, "Grid.coords").map_err(to_rust)?;
         let flat: Vec<f64> = (0..n).flat_map(|i| self.0.centroid(i)).collect();
         Ok(Array2::from_shape_vec((n, 3), flat)
             .unwrap()

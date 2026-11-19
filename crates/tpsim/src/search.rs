@@ -3,8 +3,8 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use varvite_core::{Code, Grid, MISSING, Mat};
-use varvite_transiogram::{Table, TransitionModel};
+use transiograms_core::{Code, Grid, MISSING, Mat};
+use transiograms_transiogram::{Table, TransitionModel};
 
 /// The offset table with an index for pair lookups; lags outside it fall back to the model.
 pub(crate) struct Neighbourhood<'a> {

@@ -1,5 +1,5 @@
-use varvite_core::{Mat, Result};
-use varvite_hmm::{Clamp, Sequence};
+use transiograms_core::{Mat, Result};
+use transiograms_hmm::{Clamp, Sequence};
 
 use crate::forward_backward::{impossible, log_b};
 use crate::model::{Hsmm, Tables};

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use varvite_core::{Mat, Result};
+use transiograms_core::{Mat, Result};
 
 use crate::fit::MarkovChain;
 
@@ -7,13 +7,13 @@ use crate::fit::MarkovChain;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Entropy {
-    #[serde(with = "varvite_core::serde_mat::values")]
+    #[serde(with = "transiograms_core::serde_mat::values")]
     pub post: Vec<f64>,
-    #[serde(with = "varvite_core::serde_mat::values")]
+    #[serde(with = "transiograms_core::serde_mat::values")]
     pub pre: Vec<f64>,
-    #[serde(with = "varvite_core::serde_mat::values")]
+    #[serde(with = "transiograms_core::serde_mat::values")]
     pub post_normalized: Vec<f64>,
-    #[serde(with = "varvite_core::serde_mat::values")]
+    #[serde(with = "transiograms_core::serde_mat::values")]
     pub pre_normalized: Vec<f64>,
     pub chain: f64,
     pub max: f64,

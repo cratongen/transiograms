@@ -1,8 +1,8 @@
 use std::mem::size_of;
 
 use rayon::prelude::*;
-use varvite_core::{Code, Grid, MISSING, Mat, Prediction, Result, Snapped, invalid, memory};
-use varvite_transiogram::TransitionModel;
+use transiograms_core::{Code, Grid, MISSING, Mat, Prediction, Result, Snapped, invalid, memory};
+use transiograms_transiogram::TransitionModel;
 
 use crate::conditional::resolve;
 use crate::search::Search;

@@ -1,5 +1,5 @@
-use varvite_core::{Code, Mat};
-use varvite_transiogram::TransitionModel;
+use transiograms_core::{Code, Mat};
+use transiograms_transiogram::TransitionModel;
 
 /// Eq. 14 into `out` from `(T(h_g), c_g)` pairs, each `T` a column-major K x K slice; false
 /// when every candidate has zero likelihood.

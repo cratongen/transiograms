@@ -1,5 +1,5 @@
 [package]
-name = "varvite-hsmm"
+name = "transiograms-hsmm"
 description = "Hidden semi-Markov models and state-count selection"
 version.workspace = true
 edition.workspace = true
@@ -11,8 +11,8 @@ publish.workspace = true
 nalgebra.workspace = true
 rayon.workspace = true
 serde.workspace = true
-varvite-core.workspace = true
-varvite-hmm.workspace = true
+transiograms-core.workspace = true
+transiograms-hmm.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

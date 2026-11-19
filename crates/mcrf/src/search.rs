@@ -1,6 +1,6 @@
 //! Sector (quadrant or octant) and nearest-neighbour search over the offset table.
 
-use varvite_core::{Code, Grid, MISSING};
+use transiograms_core::{Code, Grid, MISSING};
 
 use crate::Neighbourhood;
 

@@ -1,7 +1,7 @@
 use proptest::prelude::*;
-use varvite_core::numerics::*;
-use varvite_core::synthetic::*;
-use varvite_core::*;
+use transiograms_core::numerics::*;
+use transiograms_core::synthetic::*;
+use transiograms_core::*;
 
 fn golden_q() -> Mat {
     Mat::from_row_slice(

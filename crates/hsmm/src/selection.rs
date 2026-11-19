@@ -1,12 +1,12 @@
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use varvite_core::rng::tag;
-use varvite_core::{Result, Stream, invalid};
-use varvite_hmm::{Clamp, Family, FitOptions, Hmm, Implementation, Params, Sequence};
+use transiograms_core::rng::tag;
+use transiograms_core::{Result, Stream, invalid};
+use transiograms_hmm::{Clamp, Family, FitOptions, Hmm, Implementation, Params, Sequence};
 
 use crate::duration::DurationFamily;
 use crate::model::Hsmm;
-use varvite_hmm::n_observed;
+use transiograms_hmm::n_observed;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Model {
@@ -39,19 +39,19 @@ pub struct SelectionSpec {
 #[serde(deny_unknown_fields)]
 pub struct SelectionTable {
     pub states: Vec<usize>,
-    #[serde(with = "varvite_core::serde_mat::values")]
+    #[serde(with = "transiograms_core::serde_mat::values")]
     pub log_likelihood: Vec<f64>,
     pub n_params: Vec<usize>,
     pub n_observations: usize,
-    #[serde(with = "varvite_core::serde_mat::values")]
+    #[serde(with = "transiograms_core::serde_mat::values")]
     pub aic: Vec<f64>,
-    #[serde(with = "varvite_core::serde_mat::values")]
+    #[serde(with = "transiograms_core::serde_mat::values")]
     pub bic: Vec<f64>,
-    #[serde(with = "varvite_core::serde_mat::values")]
+    #[serde(with = "transiograms_core::serde_mat::values")]
     pub icl: Vec<f64>,
-    #[serde(with = "varvite_core::serde_mat::values")]
+    #[serde(with = "transiograms_core::serde_mat::values")]
     pub cv_log_likelihood: Vec<f64>,
-    #[serde(with = "varvite_core::serde_mat::values")]
+    #[serde(with = "transiograms_core::serde_mat::values")]
     pub cv_per_step: Vec<f64>,
 }
 
@@ -74,7 +74,7 @@ impl Model {
             Model::Hsmm(m) => m.log_likelihood_or_neg_inf(seq, None),
             Model::Hmm(m) => match m.log_likelihood(seq, None, Implementation::Log) {
                 Ok(v) => Ok(v),
-                Err(varvite_core::Error::InvalidInput(msg)) if msg.contains("impossible") => {
+                Err(transiograms_core::Error::InvalidInput(msg)) if msg.contains("impossible") => {
                     Ok(f64::NEG_INFINITY)
                 }
                 Err(e) => Err(e),

@@ -15,6 +15,7 @@ class Geometric:
     @staticmethod
     def from_json(text: str) -> Geometric: ...
 
+
 class ShiftedPoisson:
     def __init__(self, rate: float, *, frozen: bool = False) -> None: ...
     @property
@@ -26,6 +27,7 @@ class ShiftedPoisson:
     def to_json(self) -> str: ...
     @staticmethod
     def from_json(text: str) -> ShiftedPoisson: ...
+
 
 class NegativeBinomial:
     def __init__(self, r: float, p: float, *, frozen: bool = False) -> None: ...
@@ -41,6 +43,7 @@ class NegativeBinomial:
     @staticmethod
     def from_json(text: str) -> NegativeBinomial: ...
 
+
 class EmpiricalDuration:
     def __init__(self, pmf: ArrayLike, *, pseudocount: float = 0.0, frozen: bool = False) -> None: ...
     @property
@@ -53,7 +56,9 @@ class EmpiricalDuration:
     @staticmethod
     def from_json(text: str) -> EmpiricalDuration: ...
 
+
 DurationLaw: TypeAlias = Geometric | ShiftedPoisson | NegativeBinomial | EmpiricalDuration
+
 
 class HiddenSemiMarkovModel:
     def __init__(
@@ -193,6 +198,7 @@ class HiddenSemiMarkovModel:
     def to_json(self) -> str: ...
     @staticmethod
     def from_json(text: str) -> HiddenSemiMarkovModel: ...
+
 
 def select_states(
     sequences: Sequences,

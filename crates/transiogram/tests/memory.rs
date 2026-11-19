@@ -2,8 +2,10 @@ use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use varvite_core::{Error, Grid, RateMatrix, SequenceSet};
-use varvite_transiogram::{PairFilter, PairSpec, TransitionModel, downhole, experimental, on_grid};
+use transiograms_core::{Error, Grid, RateMatrix, SequenceSet};
+use transiograms_transiogram::{
+    PairFilter, PairSpec, TransitionModel, downhole, experimental, on_grid,
+};
 
 /// Tracks the live heap and its peak, and refuses any allocation that would take the live heap
 /// past 1.5 GB, so an absurd request aborts this test binary instead of exhausting the machine.
@@ -82,7 +84,7 @@ fn spec(n_lags: usize) -> PairSpec {
     }
 }
 
-fn rejected<T: std::fmt::Debug>(r: varvite_core::Result<T>, what: &str) {
+fn rejected<T: std::fmt::Debug>(r: transiograms_core::Result<T>, what: &str) {
     match r {
         Err(Error::InvalidInput(m)) => assert!(m.contains(what), "{m}"),
         other => panic!("expected InvalidInput naming {what}, got {other:?}"),
@@ -118,7 +120,7 @@ fn downhole_estimator_rejects_an_absurd_category_count_before_allocating() {
     let _g = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
     let k = 1 << 20;
     let seqs = SequenceSet::from_regular(&[vec![0, 1]], k).unwrap();
-    let r = downhole(&seqs, varvite_core::Direction::Up, &[1.0], 0.0);
+    let r = downhole(&seqs, transiograms_core::Direction::Up, &[1.0], 0.0);
     rejected(r, "downhole transiogram");
 }
 
@@ -135,7 +137,7 @@ fn point_estimator_peak_does_not_grow_with_the_number_of_blocks() {
     let used = PEAK.load(Ordering::SeqCst) - base;
     assert_eq!(e.counts[999].sum(), 2.0 * (n - 1) as f64);
     assert_eq!(e.counts[1999].sum(), 2.0 * (n - 2) as f64);
-    let per_set = n_lags * (size_of::<varvite_core::Mat>() + 9 * 8 + 8);
+    let per_set = n_lags * (size_of::<transiograms_core::Mat>() + 9 * 8 + 8);
     let blocks = n / 1024;
     let threads = rayon::current_num_threads();
     assert!(

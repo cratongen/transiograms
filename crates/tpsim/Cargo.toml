@@ -1,5 +1,5 @@
 [package]
-name = "varvite-tpsim"
+name = "transiograms-tpsim"
 description = "Transition-probability cokriging, sequential indicator simulation and quenching"
 version.workspace = true
 edition.workspace = true
@@ -11,8 +11,8 @@ publish.workspace = true
 nalgebra.workspace = true
 rayon.workspace = true
 serde.workspace = true
-varvite-core.workspace = true
-varvite-transiogram.workspace = true
+transiograms-core.workspace = true
+transiograms-transiogram.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

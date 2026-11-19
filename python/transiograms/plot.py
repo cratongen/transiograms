@@ -1,4 +1,4 @@
-"""Figures for varvite results (`vv.plot`). Every function takes `ax=None` and returns `(fig, ax)`."""
+"""Figures for transiograms results (`tg.plot`). Every function takes `ax=None` and returns `(fig, ax)`."""
 
 
 def _pyplot():
@@ -6,7 +6,7 @@ def _pyplot():
         import matplotlib.pyplot as plt
     except ImportError as e:
         raise ImportError(
-            "vv.plot needs matplotlib: pip install 'varvite[plot]' or conda install -c conda-forge matplotlib"
+            "tg.plot needs matplotlib: pip install 'transiograms[plot]' or conda install -c conda-forge matplotlib"
         ) from e
     return plt
 

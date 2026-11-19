@@ -22,11 +22,11 @@ mod tpsim;
 mod mcrf;
 // <<< mcrf
 
-/// Raises `varvite.errors.<kind>`, a subclass of both `VarviteError` and a builtin.
+/// Raises `transiograms.errors.<kind>`, a subclass of both `TransiogramsError` and a builtin.
 pub(crate) fn error(kind: &str, message: impl ToString) -> PyErr {
     Python::attach(|py| {
         match py
-            .import("varvite.errors")
+            .import("transiograms.errors")
             .and_then(|m| m.getattr(kind))
             .and_then(|c| Ok(c.cast_into::<PyType>()?))
         {
@@ -45,7 +45,7 @@ pub(crate) fn convergence(message: impl ToString) -> PyErr {
 }
 
 #[pymodule]
-fn _varvite(m: &Bound<PyModule>) -> PyResult<()> {
+fn _transiograms(m: &Bound<PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     core::register(m)?;
     // >>> chain

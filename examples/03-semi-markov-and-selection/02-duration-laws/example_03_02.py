@@ -18,12 +18,12 @@ sys.path.insert(0, str(HERE.parents[1]))
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
-import varvite as vv
+import transiograms as tg
 from common import ACCENT, GRAY, HIGHLIGHT, save
 
-truth = vv.HiddenSemiMarkovModel(
-    [vv.Gaussian([0.0], 1.0), vv.Gaussian([3.0], 1.0)],
-    [vv.Geometric(0.25), vv.EmpiricalDuration([0.0, 0.1, 0.2, 0.4, 0.2, 0.1])],
+truth = tg.HiddenSemiMarkovModel(
+    [tg.Gaussian([0.0], 1.0), tg.Gaussian([3.0], 1.0)],
+    [tg.Geometric(0.25), tg.EmpiricalDuration([0.0, 0.1, 0.2, 0.4, 0.2, 0.1])],
     start=[0.5, 0.5],
     transition=[[0.0, 1.0], [1.0, 0.0]],
     max_duration=[30, 6],
@@ -40,7 +40,7 @@ print(len(obs), "logs of", obs[0].shape[0], "steps")
 # %%
 fits = {}
 for family in ("geometric", "poisson", "negative_binomial", "empirical"):
-    fits[family] = vv.HiddenSemiMarkovModel(
+    fits[family] = tg.HiddenSemiMarkovModel(
         2, duration=family, max_duration=30, seed=0, direction="down", ordering="mean"
     ).fit(obs)
 for family, m in fits.items():
@@ -71,7 +71,7 @@ axes[0].legend()
 save(fig, "laws")
 
 # %% [markdown]
-# Theory check: on eight steps there are 2^8 = 256 state paths. `vv.checks.brute_force_hsmm`
+# Theory check: on eight steps there are 2^8 = 256 state paths. `tg.checks.brute_force_hsmm`
 # scores every one of them, with runs longer than `max_duration` excluded and the last run
 # right-censored, and must agree with the forward-backward and Viterbi recursions.
 
@@ -82,7 +82,7 @@ with np.errstate(divide="ignore"):
     log_d = [np.log(p) for p in d]
     log_survivor = [np.log(np.cumsum(p[::-1])[::-1]) for p in d]
 log_b = np.column_stack([g.log_density(x) for g in truth.distributions])
-lnl, best, _, gamma, _ = vv.checks.brute_force_hsmm(truth.start, truth.transition, log_d, log_survivor, log_b)
+lnl, best, _, gamma, _ = tg.checks.brute_force_hsmm(truth.start, truth.transition, log_d, log_survivor, log_b)
 path, _ = truth.viterbi(x)
 print("log-likelihood gap:", abs(truth.score(x) - lnl))
 print("same Viterbi path:", np.array_equal(path, best))

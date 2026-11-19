@@ -1,26 +1,26 @@
 import numpy as np
 import pytest
-import varvite as vv
+import transiograms as tg
 
 
 @pytest.fixture(scope="module")
 def pipeline():
-    source = vv.datasets.layered_drillholes(seed=0)
+    source = tg.datasets.layered_drillholes(seed=0)
     rng = np.random.default_rng(7)
     composites = {k: source[k] for k in ("HOLE_ID", "FROM", "TO", "X", "Y", "Z")}
     composites["GR"] = np.array([30.0, 75.0, 120.0])[source["CODE"]] + rng.normal(
         0.0, 12.0, len(source["CODE"])
     )
-    hmm = vv.HiddenMarkovModel(3, n_init=5, seed=0, direction="down", ordering="mean")
+    hmm = tg.HiddenMarkovModel(3, n_init=5, seed=0, direction="down", ordering="mean")
     hmm.fit("GR", holes="HOLE_ID", data=composites)
     composites["FACIES"] = hmm.predict("GR", holes="HOLE_ID", data=composites)
     p = np.bincount(composites["FACIES"], minlength=3) / len(composites["FACIES"])
-    e = vv.downhole_transiogram(
+    e = tg.downhole_transiogram(
         "FACIES", holes="HOLE_ID", from_="FROM", to="TO", lags=np.arange(1.0, 9.0), data=composites
     )
-    vertical = vv.TransiogramModel.fit_markov(e, proportions=p)
-    model = vv.TransitionModel(p, 0.1 * vertical.rates, 0.1 * vertical.rates, vertical.rates)
-    grid = vv.Grid.from_json(source["grid"])
+    vertical = tg.TransiogramModel.fit_markov(e, proportions=p)
+    model = tg.TransitionModel(p, 0.1 * vertical.rates, 0.1 * vertical.rates, vertical.rates)
+    grid = tg.Grid.from_json(source["grid"])
     xyz = np.column_stack([composites["X"], composites["Y"], composites["Z"]])
     return source, composites, p, model, grid, xyz
 
@@ -33,7 +33,7 @@ def test_m7_hmm_segmentation_recovers_the_logged_facies(pipeline):
     assert np.abs(p - truth).max() <= 0.02
 
 
-@pytest.mark.parametrize("simulate", [vv.tprogs_simulate, vv.mcrf_simulate], ids=["tprogs", "mcrf"])
+@pytest.mark.parametrize("simulate", [tg.tprogs_simulate, tg.mcrf_simulate], ids=["tprogs", "mcrf"])
 def test_m7_drillhole_arrays_in_categorical_grid_out(pipeline, simulate):
     _, composites, p, model, grid, xyz = pipeline
     n = 20
@@ -44,7 +44,7 @@ def test_m7_drillhole_arrays_in_categorical_grid_out(pipeline, simulate):
     assert len(cells) == len(composites["FACIES"])
     assert np.all(r.realizations[:, cells] == codes)
     np.testing.assert_allclose(r.probabilities.sum(axis=1), 1.0, atol=1e-12)
-    if simulate is vv.tprogs_simulate:
+    if simulate is tg.tprogs_simulate:
         three_sigma = 3 * r.proportions.std(axis=0, ddof=1).max() / np.sqrt(n)
         assert three_sigma < 0.02
         assert np.abs(r.proportions.mean(axis=0) - p).max() <= 0.02

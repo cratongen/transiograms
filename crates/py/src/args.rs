@@ -4,8 +4,8 @@ use numpy::ndarray::{Array2, Array3};
 use numpy::{IntoPyArray, PyArray1, PyArray2, PyArray3, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyString};
-use varvite_core::{Code, Direction, MISSING, Mat, SequenceSet};
-use varvite_hmm::Sequence;
+use transiograms_core::{Code, Direction, MISSING, Mat, SequenceSet};
+use transiograms_hmm::Sequence;
 
 use crate::core::PyCategories;
 use crate::{convergence, invalid};
@@ -62,8 +62,8 @@ pub fn codes(obj: &Bound<PyAny>, what: &str) -> PyResult<Vec<Code>> {
 /// `k` from `categories` (an int or a Categories), else `max(code) + 1`; codes are checked.
 pub fn categories_k(obj: Option<&Bound<PyAny>>, codes: &[Code]) -> PyResult<usize> {
     let k = match obj {
-        None => varvite_core::codes::n_categories(codes),
-        Some(o) if o.is_none() => varvite_core::codes::n_categories(codes),
+        None => transiograms_core::codes::n_categories(codes),
+        Some(o) if o.is_none() => transiograms_core::codes::n_categories(codes),
         Some(o) => match o.cast::<PyCategories>() {
             Ok(c) => c.get().0.len(),
             Err(_) => o
@@ -71,7 +71,7 @@ pub fn categories_k(obj: Option<&Bound<PyAny>>, codes: &[Code]) -> PyResult<usiz
                 .map_err(|_| invalid("categories must be an int or a Categories"))?,
         },
     };
-    varvite_core::codes::check_codes(codes, k).map_err(to_rust)?;
+    transiograms_core::codes::check_codes(codes, k).map_err(to_rust)?;
     Ok(k)
 }
 
@@ -344,10 +344,10 @@ pub fn coords(obj: &Bound<PyAny>, what: &str) -> PyResult<Vec<[f64; 3]>> {
     }
 }
 
-pub fn to_rust(e: varvite_core::Error) -> PyErr {
+pub fn to_rust(e: transiograms_core::Error) -> PyErr {
     match e {
-        varvite_core::Error::InvalidInput(m) => invalid(m),
-        varvite_core::Error::Convergence(m) => convergence(m),
+        transiograms_core::Error::InvalidInput(m) => invalid(m),
+        transiograms_core::Error::Convergence(m) => convergence(m),
     }
 }
 

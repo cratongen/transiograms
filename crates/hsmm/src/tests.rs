@@ -1,5 +1,5 @@
-use varvite_core::numerics::logsumexp;
-use varvite_core::{Mat, Stream};
+use transiograms_core::numerics::logsumexp;
+use transiograms_core::{Mat, Stream};
 
 use crate::duration::{Duration, DurationDist};
 use crate::forward_backward::{backward, forward, posterior_core, sample_posterior_core};

@@ -1,16 +1,16 @@
 use rayon::prelude::*;
-use varvite_core::numerics::gth_stationary;
-use varvite_core::rng::tag;
-use varvite_core::{Mat, Result, Stream, convergence, invalid};
-use varvite_hmm::{Clamp, Emission, Family, FitOptions, FitReport, Ordering, Sequence};
+use transiograms_core::numerics::gth_stationary;
+use transiograms_core::rng::tag;
+use transiograms_core::{Mat, Result, Stream, convergence, invalid};
+use transiograms_hmm::{Clamp, Emission, Family, FitOptions, FitReport, Ordering, Sequence};
 
 use crate::duration::{Duration, DurationFamily};
 use crate::forward_backward::{SegmentPosterior, log_b, posterior_core};
 use crate::model::Hsmm;
-use varvite_hmm::em::update_emission;
-use varvite_hmm::model::emission_log_prior;
-use varvite_hmm::n_observed;
-use varvite_hmm::sequence::pooled_moments;
+use transiograms_hmm::em::update_emission;
+use transiograms_hmm::model::emission_log_prior;
+use transiograms_hmm::n_observed;
+use transiograms_hmm::sequence::pooled_moments;
 
 fn sum_xlogy(xs: impl Iterator<Item = f64>, a: f64) -> f64 {
     if a == 0.0 {

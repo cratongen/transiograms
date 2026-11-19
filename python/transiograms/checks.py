@@ -1,4 +1,4 @@
-"""Pure NumPy reference implementations (`vv.checks`) used by tests and examples as oracles."""
+"""Pure NumPy reference implementations (`tg.checks`) used by tests and examples as oracles."""
 
 import itertools
 

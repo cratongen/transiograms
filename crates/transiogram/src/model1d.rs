@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use varvite_core::{Mat, RateMatrix, Result, invalid};
+use transiograms_core::{Mat, RateMatrix, Result, invalid};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -205,7 +205,9 @@ impl Model1D {
             return reverse(&self.transition(-h), self.proportions());
         }
         match self {
-            Model1D::Markov { rates, .. } => varvite_core::numerics::expm_rate(rates.matrix(), h),
+            Model1D::Markov { rates, .. } => {
+                transiograms_core::numerics::expm_rate(rates.matrix(), h)
+            }
             Model1D::Entrywise {
                 proportions,
                 entries,

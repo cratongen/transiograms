@@ -1,8 +1,8 @@
-use varvite_core::rng::tag;
-use varvite_core::synthetic::markov_codes;
-use varvite_core::*;
-use varvite_tpsim::*;
-use varvite_transiogram::TransitionModel;
+use transiograms_core::rng::tag;
+use transiograms_core::synthetic::markov_codes;
+use transiograms_core::*;
+use transiograms_tpsim::*;
+use transiograms_transiogram::TransitionModel;
 
 fn carle_embedded() -> Mat {
     Mat::from_row_slice(

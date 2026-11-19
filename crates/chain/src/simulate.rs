@@ -1,6 +1,6 @@
 use rayon::prelude::*;
-use varvite_core::special::ln_gamma;
-use varvite_core::{Code, Mat, RateMatrix, Result, Stream, TransitionMatrix, invalid, memory};
+use transiograms_core::special::ln_gamma;
+use transiograms_core::{Code, Mat, RateMatrix, Result, Stream, TransitionMatrix, invalid, memory};
 
 use crate::fit::{Kind, MarkovChain, stochastic};
 

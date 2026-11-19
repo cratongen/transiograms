@@ -1,6 +1,6 @@
-site_name: varvite
+site_name: transiograms
 site_description: Markov models for geostatistics.
-repo_name: varvite
+repo_name: transiograms
 edit_uri: ""
 
 theme:

@@ -18,14 +18,14 @@ sys.path.insert(0, str(HERE.parents[1]))
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
-import varvite as vv
+import transiograms as tg
 from common import save
 
-d = vv.datasets.layered_drillholes(seed=0)
-names = vv.Categories(["mud", "sand", "gravel"], colors=["#8c8c8c", "#e69f00", "#0072b2"])
+d = tg.datasets.layered_drillholes(seed=0)
+names = tg.Categories(["mud", "sand", "gravel"], colors=["#8c8c8c", "#e69f00", "#0072b2"])
 p = np.bincount(d["CODE"], minlength=3) / len(d["CODE"])
 lags = np.arange(0.5, 12.5, 0.5)
-exp = vv.downhole_transiogram("CODE", holes="HOLE_ID", from_="FROM", to="TO", lags=lags, data=d)
+exp = tg.downhole_transiogram("CODE", holes="HOLE_ID", from_="FROM", to="TO", lags=lags, data=d)
 
 # %% [markdown]
 # `fit_entrywise` fits a range per off-complement entry by golden-section search. By default the
@@ -33,14 +33,14 @@ exp = vv.downhole_transiogram("CODE", holes="HOLE_ID", from_="FROM", to="TO", la
 # leave. `entrywise` builds the same kind of model from ranges chosen by hand.
 
 # %%
-fitted = vv.TransiogramModel.fit_entrywise(exp, p, structures="exponential")
-markov = vv.TransiogramModel.fit_markov(exp, proportions=p)
-by_hand = vv.TransiogramModel.entrywise(p, "spherical", np.full((3, 3), 6.0), max_lag=50.0)
+fitted = tg.TransiogramModel.fit_entrywise(exp, p, structures="exponential")
+markov = tg.TransiogramModel.fit_markov(exp, proportions=p)
+by_hand = tg.TransiogramModel.entrywise(p, "spherical", np.full((3, 3), 6.0), max_lag=50.0)
 h = np.linspace(0.0, 12.0, 200)
 for label, m in (("entrywise fit", fitted), ("Markov fit", markov), ("spherical by hand", by_hand)):
     t = m.transition(h)
     print(f"{label:18s} kind={m.kind:9s} rows sum to 1: {bool(np.allclose(t.sum(axis=2), 1.0))}")
-fig, axes = vv.plot.transiogram(exp, fitted, h=h, categories=names)
+fig, axes = tg.plot.transiogram(exp, fitted, h=h, categories=names)
 fig.suptitle("Vertical transiograms: data (points) and entrywise model (lines)")
 save(fig, "entrywise")
 
@@ -50,7 +50,7 @@ save(fig, "entrywise")
 # `exp(-(1/L_0 + 1/L_1) h)` along each axis, which the model reproduces.
 
 # %%
-two = vv.TransitionModel.from_geology([0.4, 0.6], [[20.0, 30.0], [10.0, 15.0], [2.0, 3.0]])
+two = tg.TransitionModel.from_geology([0.4, 0.6], [[20.0, 30.0], [10.0, 15.0], [2.0, 3.0]])
 hz = np.linspace(0.0, 6.0, 5)
 print("closeness along z: ", two.closeness(np.outer(hz, [0.0, 0.0, 1.0])).round(6))
 print("closed form:       ", np.exp(-(1 / 2.0 + 1 / 3.0) * hz).round(6))
@@ -62,7 +62,7 @@ print("closed form:       ", np.exp(-(1 / 2.0 + 1 / 3.0) * hz).round(6))
 
 # %%
 vertical = -1 / np.diag(markov.rates)
-model = vv.TransitionModel.from_geology(p, [10 * vertical, 4 * vertical, vertical], rotation=(30.0, 0.0, 0.0))
+model = tg.TransitionModel.from_geology(p, [10 * vertical, 4 * vertical, vertical], rotation=(30.0, 0.0, 0.0))
 x = np.linspace(-60.0, 60.0, 121)
 xx, yy = np.meshgrid(x, x)
 c = model.closeness(np.column_stack([xx.ravel(), yy.ravel(), np.zeros(xx.size)])).reshape(xx.shape)

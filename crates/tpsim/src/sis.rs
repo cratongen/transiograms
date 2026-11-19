@@ -1,7 +1,9 @@
 use rayon::prelude::*;
-use varvite_core::rng::tag;
-use varvite_core::{Code, Grid, MISSING, Realizations, Result, Snapped, Stream, invalid, memory};
-use varvite_transiogram::TransitionModel;
+use transiograms_core::rng::tag;
+use transiograms_core::{
+    Code, Grid, MISSING, Realizations, Result, Snapped, Stream, invalid, memory,
+};
+use transiograms_transiogram::TransitionModel;
 
 use crate::Options;
 use crate::cokriging::{cokrige_offsets, correct};

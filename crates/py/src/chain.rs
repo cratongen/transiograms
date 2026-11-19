@@ -5,10 +5,10 @@ use numpy::{PyArray1, PyArray2, PyArrayMethods};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use serde::{Deserialize, Serialize};
-use varvite_chain::{
+use transiograms_chain::{
     FitOptions, Hard, Kind, MarkovChain, Method, Simulated, Start, Target, TestResult,
 };
-use varvite_core::{Code, Direction, EmptyRow, RateMatrix, SequenceSet, TransitionMatrix};
+use transiograms_core::{Code, Direction, EmptyRow, RateMatrix, SequenceSet, TransitionMatrix};
 
 use crate::args::{
     SequenceArgs, codes, direction, floats, hole_ids, mat, mat2, scalar_or_floats,
@@ -70,7 +70,13 @@ fn kind_of(kind: &str, step: Option<f64>, sampled: Option<f64>) -> PyResult<Kind
 ///     Expected counts under the null hypothesis when the test is tabular.
 /// small_expected : float
 ///     Fraction of allowed cells whose expected count is below 5.
-#[pyclass(module = "varvite", name = "TestResult", frozen, eq, from_py_object)]
+#[pyclass(
+    module = "transiograms",
+    name = "TestResult",
+    frozen,
+    eq,
+    from_py_object
+)]
 #[derive(Clone, PartialEq)]
 pub struct PyTestResult(pub TestResult);
 
@@ -131,8 +137,8 @@ impl PyTestResult {
 ///     Entropy rate of the whole chain.
 /// max : float
 ///     Its maximum for this number of categories.
-#[pyclass(module = "varvite", name = "Entropy", frozen)]
-pub struct PyEntropy(varvite_chain::Entropy);
+#[pyclass(module = "transiograms", name = "Entropy", frozen)]
+pub struct PyEntropy(transiograms_chain::Entropy);
 
 #[pymethods]
 impl PyEntropy {
@@ -165,7 +171,7 @@ impl PyEntropy {
     }
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
-        let e: varvite_chain::Entropy = unjson(text, "Entropy")?;
+        let e: transiograms_chain::Entropy = unjson(text, "Entropy")?;
         let m = e.post.len();
         if [&e.pre, &e.post_normalized, &e.pre_normalized]
             .iter()
@@ -214,7 +220,7 @@ struct Settings {
 ///     Added to every allowed count.
 /// on_empty_row : {"raise", "uniform"}
 ///     What a category with no transition out gives when ``pseudocount`` is 0.
-#[pyclass(module = "varvite", name = "MarkovChain", eq, from_py_object)]
+#[pyclass(module = "transiograms", name = "MarkovChain", eq, from_py_object)]
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct PyMarkovChain {
     settings: Settings,
@@ -261,7 +267,7 @@ impl PyMarkovChain {
                     None => from.clone(),
                 };
                 let codes = codes(&c, "hard_codes")?;
-                if codes.contains(&varvite_core::MISSING) {
+                if codes.contains(&transiograms_core::MISSING) {
                     return Err(invalid("hard_codes must not be missing"));
                 }
                 Ok(Hard { from, to, codes })
@@ -550,7 +556,7 @@ impl PyMarkovChain {
         }
         let k = c.k();
         let need = (hs.len() as u64).saturating_mul((k * k * 8) as u64);
-        varvite_core::memory::check(need, None, "transition_at output").map_err(to_rust)?;
+        transiograms_core::memory::check(need, None, "transition_at output").map_err(to_rust)?;
         let mut out = numpy::ndarray::Array3::<f64>::zeros((hs.len(), k, k));
         for (n, &h) in hs.iter().enumerate() {
             let t = c.transition_at(h).map_err(to_rust)?;
@@ -813,8 +819,8 @@ pub fn background_index(background: i64, k: usize) -> PyResult<usize> {
 ///     Beds per category, and how many of them are cut by the end of a run (censored).
 /// total, mean_length : numpy.ndarray
 ///     Total thickness, and thickness over closed beds (the censored exponential MLE).
-#[pyclass(module = "varvite", name = "Sojourn", frozen)]
-pub struct PySojourn(pub varvite_chain::Sojourn);
+#[pyclass(module = "transiograms", name = "Sojourn", frozen)]
+pub struct PySojourn(pub transiograms_chain::Sojourn);
 
 #[pymethods]
 impl PySojourn {
@@ -881,7 +887,7 @@ impl PySojourn {
     }
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
-        let s: varvite_chain::Sojourn = unjson(text, "Sojourn")?;
+        let s: transiograms_chain::Sojourn = unjson(text, "Sojourn")?;
         let m = s.n_beds.len();
         let lengths = [
             s.n_open.len(),
@@ -981,7 +987,7 @@ fn order_test<'py>(
     })?;
     let opts = options(kind, direction, gap, sampled)?;
     let m = self::method(method)?;
-    py.detach(|| varvite_chain::order_test(&seqs, &opts, order, m))
+    py.detach(|| transiograms_chain::order_test(&seqs, &opts, order, m))
         .map(PyTestResult)
         .map_err(to_rust)
 }
@@ -1034,7 +1040,7 @@ fn select_order<'py>(
     })?;
     let opts = options("fixed", direction, gap, sampled)?;
     let t = py
-        .detach(|| varvite_chain::select_order(&seqs, &opts, max_order))
+        .detach(|| transiograms_chain::select_order(&seqs, &opts, max_order))
         .map_err(to_rust)?;
     let ints = |v: &[usize]| PyArray1::from_vec(py, v.iter().map(|&x| x as i64).collect());
     let d = PyDict::new(py);
@@ -1125,7 +1131,7 @@ fn homogeneity_test<'py>(
     }
     let opts = options(kind, direction, gap, sampled)?;
     let m = self::method(method)?;
-    py.detach(|| varvite_chain::homogeneity_test(&sets, &opts, m))
+    py.detach(|| transiograms_chain::homogeneity_test(&sets, &opts, m))
         .map(PyTestResult)
         .map_err(to_rust)
 }
@@ -1168,7 +1174,7 @@ fn sojourn<'py>(
         categories,
         data,
     })?;
-    Ok(PySojourn(varvite_chain::sojourn(
+    Ok(PySojourn(transiograms_chain::sojourn(
         &seqs,
         self::direction(direction)?,
         gap,

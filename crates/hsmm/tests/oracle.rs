@@ -1,6 +1,6 @@
-use varvite_core::{Error, Mat};
-use varvite_hmm::{CovarianceType, Emission, Gaussian, Sequence};
-use varvite_hsmm::{Duration, DurationDist, Hsmm};
+use transiograms_core::{Error, Mat};
+use transiograms_hmm::{CovarianceType, Emission, Gaussian, Sequence};
+use transiograms_hsmm::{Duration, DurationDist, Hsmm};
 
 fn gaussian(mean: f64, sd: f64) -> Emission {
     Emission::Gaussian(Gaussian {

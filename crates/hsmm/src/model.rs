@@ -1,8 +1,8 @@
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use varvite_core::rng::tag;
-use varvite_core::{Mat, Result, Stream, invalid, memory};
-use varvite_hmm::{Clamp, Emission, Family, Hmm, Params, Priors, Sequence};
+use transiograms_core::rng::tag;
+use transiograms_core::{Mat, Result, Stream, invalid, memory};
+use transiograms_hmm::{Clamp, Emission, Family, Hmm, Params, Priors, Sequence};
 
 use crate::duration::{Duration, DurationDist, DurationFamily};
 use crate::forward_backward::log_b;
@@ -11,7 +11,7 @@ use crate::forward_backward::log_b;
 pub struct Hsmm {
     pub start: Vec<f64>,
     /// Zero diagonal; K = 1 allowed (`[[0]]`).
-    #[serde(with = "varvite_core::serde_mat")]
+    #[serde(with = "transiograms_core::serde_mat")]
     pub transition: Mat,
     pub durations: Vec<DurationDist>,
     pub emissions: Vec<Emission>,

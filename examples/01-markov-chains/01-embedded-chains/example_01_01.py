@@ -16,12 +16,12 @@ sys.path.insert(0, str(HERE.parents[1]))
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
-import varvite as vv
+import transiograms as tg
 from common import GRAY, save
 
-d = vv.datasets.varved_sequence(seed=0)
-names = vv.Categories(d["names"], colors=["#e69f00", "#56b4e9", "#0072b2"])
-truth = vv.MarkovChain.from_json(d["generator"])
+d = tg.datasets.varved_sequence(seed=0)
+names = tg.Categories(d["names"], colors=["#e69f00", "#56b4e9", "#0072b2"])
+truth = tg.MarkovChain.from_json(d["generator"])
 print(f"{len(np.unique(d['HOLE_ID']))} holes, {len(d['CODE'])} beds")
 
 # %% [markdown]
@@ -29,7 +29,7 @@ print(f"{len(np.unique(d['HOLE_ID']))} holes, {len(d['CODE'])} beds")
 # older to younger, so a transition sand to silt means silt lies on sand.
 
 # %%
-chain = vv.MarkovChain("embedded").fit("CODE", holes="HOLE_ID", from_="FROM", to="TO", data=d)
+chain = tg.MarkovChain("embedded").fit("CODE", holes="HOLE_ID", from_="FROM", to="TO", data=d)
 print(chain.transition_matrix.round(3))
 print("mean thickness (m):", chain.mean_lengths.round(2), "true:", truth.mean_lengths)
 print("volume proportions:", chain.proportions.round(3))
@@ -51,9 +51,9 @@ print("post-entropy (bits):", entropy.post.round(3), "of at most 1 for three cat
 
 # %%
 fig, axes = plt.subplots(1, 3, figsize=(12, 3.6), layout="constrained")
-vv.plot.transition_matrix(chain, categories=names, ax=axes[0])
+tg.plot.transition_matrix(chain, categories=names, ax=axes[0])
 axes[0].set_title("Fitted embedded matrix")
-vv.plot.transition_matrix(truth, categories=names, ax=axes[1])
+tg.plot.transition_matrix(truth, categories=names, ax=axes[1])
 axes[1].set_title("True embedded matrix")
 h = np.linspace(0, 6, 120)
 fitted, exact = chain.transition_at(h), truth.transition_at(h)

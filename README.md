@@ -1,16 +1,16 @@
-# varvite
+# transiograms
 
-`varvite` is a Rust-core, Python-exposed library for Markov modelling in geostatistics (`import varvite as vv`).
+`transiograms` is a Rust-core, Python-exposed library for Markov modelling in geostatistics (`import transiograms as tg`).
 
-Varvite is a sedimentary rock formed in proglacial lakes, where alternating summer and winter deposition creates rhythmic pairs of coarse and fine laminae (varves). The library takes its name from those layered sequences and focuses on transition-based models of geological categories along drillholes and across 3D grids.
+Transiograms is a sedimentary rock formed in proglacial lakes, where alternating summer and winter deposition creates rhythmic pairs of coarse and fine laminae (varves). The library takes its name from those layered sequences and focuses on transition-based models of geological categories along drillholes and across 3D grids.
 
-The API draws inspiration from the compositional design of the original `pomegranate` library (explicit distributions, transition graphs, fit/predict/sample methods) while staying scoped to geostatistical sequences and spatial facies modelling. `varvite` is standalone and has zero dependency on `boitata`. The two libraries exchange drillhole intervals, category codes, coordinates, and block-model grids through NumPy arrays, and `varvite` follows `boitata`'s Python conventions (flat namespace, Rust-backed value types with JSON and pickle serialization, `.pyi` stubs, `vv.plot`, and `vv.datasets`).
+The API draws inspiration from the compositional design of the original `pomegranate` library (explicit distributions, transition graphs, fit/predict/sample methods) while staying scoped to geostatistical sequences and spatial facies modelling. `transiograms` is standalone and has zero dependency on `boitata`. The two libraries exchange drillhole intervals, category codes, coordinates, and block-model grids through NumPy arrays, and `transiograms` follows `boitata`'s Python conventions (flat namespace, Rust-backed value types with JSON and pickle serialization, `.pyi` stubs, `tg.plot`, and `tg.datasets`).
 
 ## Stack
 
 - **Core**: Rust workspace, `rayon` for thread-count-independent parallelism, `proptest` for property tests, `criterion` for benchmarks.
 - **Python bindings**: `pyo3` (`abi3-py311`) built with `maturin`.
-- **Runtime dependencies**: `numpy` as the sole required runtime dependency; `matplotlib` as the optional `plot` extra (`pip install "varvite[plot]"`).
+- **Runtime dependencies**: `numpy` as the sole required runtime dependency; `matplotlib` as the optional `plot` extra (`pip install "transiograms[plot]"`).
 - **Tooling**: `mise` for task running and tool pinning, `uv` for Python environments, `mkdocs` for documentation.
 
 ## Scope
@@ -63,38 +63,38 @@ Status as of 2026-11-18 (`mise run verify` passes; each milestone's acceptance t
 
 ### M1: Markov chains on sequences
 
-- **Scope**: Rust workspace and `pyo3` skeleton (`crates/core`, `crates/chain`, `crates/py`), `vv.MarkovChain` (embedded and fixed-step transition counting, smoothing, generator matrix fitting, stationary distribution, chi-square and G-test for Markov order and stationarity, seeded 1D simulation), `.pyi` stubs, and `vv.plot.transition_matrix`.
+- **Scope**: Rust workspace and `pyo3` skeleton (`crates/core`, `crates/chain`, `crates/py`), `tg.MarkovChain` (embedded and fixed-step transition counting, smoothing, generator matrix fitting, stationary distribution, chi-square and G-test for Markov order and stationarity, seeded 1D simulation), `.pyi` stubs, and `tg.plot.transition_matrix`.
 - **Acceptance check**: For any fitted `MarkovChain`, every row of the transition matrix sums to 1 within `1e-12`, and a seeded simulated chain of $10^5$ steps reproduces the input transition matrix and stationary proportions within a three-sigma binomial tolerance.
 
 ### M2: Hidden Markov models (HMM)
 
-- **Scope**: `crates/hmm` and `vv.HiddenMarkovModel` with Gaussian (diagonal and full covariance) and categorical emissions, log-domain forward-backward, Viterbi decoding, Baum-Welch fitting with optional clamped states on logged intervals, and `vv.plot.strip_log`.
+- **Scope**: `crates/hmm` and `tg.HiddenMarkovModel` with Gaussian (diagonal and full covariance) and categorical emissions, log-domain forward-backward, Viterbi decoding, Baum-Welch fitting with optional clamped states on logged intervals, and `tg.plot.strip_log`.
 - **Acceptance check**: On a 4-state, 8-step test sequence, `hmm.viterbi(obs)` matches an exhaustive brute-force enumeration of all $4^8$ state paths in both path and log-probability (`atol=1e-12`), forward-backward state posteriors sum to 1 at every depth step, and log-likelihood is non-decreasing at every Baum-Welch iteration.
 
 ### M3: Hidden semi-Markov models and model selection
 
-- **Scope**: `vv.HiddenSemiMarkovModel` with explicit dwell-time distributions (geometric, Poisson, negative binomial, empirical), forward-backward and Viterbi duration decoding, EM fitting, and `vv.select_order` / `vv.select_states` returning AIC, BIC, and leave-one-hole-out log-likelihood tables.
+- **Scope**: `tg.HiddenSemiMarkovModel` with explicit dwell-time distributions (geometric, Poisson, negative binomial, empirical), forward-backward and Viterbi duration decoding, EM fitting, and `tg.select_order` / `tg.select_states` returning AIC, BIC, and leave-one-hole-out log-likelihood tables.
 - **Acceptance check**: An HSMM configured with geometric dwell-time distributions produces the same log-likelihood (`atol=1e-10`) and Viterbi state sequence as the equivalent standard HMM on the same observations, and BIC recovers the true number of states $K=3$ on a seeded synthetic drillhole dataset.
 
 ### M4: Transiograms
 
-- **Scope**: `crates/transiogram`, `vv.experimental_transiogram` (1D downhole and 3D directional lag tolerances), `vv.TransiogramModel` (matrix-exponential and coupled analytical models with row-sum-to-one projection), and `vv.plot.transiogram`.
+- **Scope**: `crates/transiogram`, `tg.experimental_transiogram` (1D downhole and 3D directional lag tolerances), `tg.TransiogramModel` (matrix-exponential and coupled analytical models with row-sum-to-one projection), and `tg.plot.transiogram`.
 - **Acceptance check**: At every lag $h \ge 0$ and for every source category $i$, the modelled transition probabilities satisfy $p_{ij}(h) \ge 0$ and $\sum_j p_{ij}(h) = 1$ within `1e-12`, equal the Kronecker delta $\delta_{ij}$ at $h = 0$, and converge to the target category proportions as $h \to \infty$.
 
 ### M5: Transition-probability simulation on grids
 
-- **Scope**: `crates/tpsim` T-PROGS engine (`vv.tprogs_simulate`), 3D anisotropy from principal Markov rates or mean lens dimensions, sequential transition-probability indicator simulation, and simulated annealing quenching on 2D/3D grids conditioned to point or interval samples.
+- **Scope**: `crates/tpsim` T-PROGS engine (`tg.tprogs_simulate`), 3D anisotropy from principal Markov rates or mean lens dimensions, sequential transition-probability indicator simulation, and simulated annealing quenching on 2D/3D grids conditioned to point or interval samples.
 - **Acceptance check**: Every realization reproduces all hard conditioning grid nodes without exception, and the ensemble average over 20 seeded realizations reproduces input category proportions within `0.02` and input directional auto-transiograms within `0.05` RMSE up to two correlation lengths.
 
 ### M6: MCRF and MCP on grids
 
-- **Scope**: `vv.mcp_predict` (deterministic conditional probability cubes, most-probable category, and Shannon entropy) and `vv.mcrf_simulate` (sequential Markov chain random field realizations on 2D/3D grids conditioned to drillholes).
+- **Scope**: `tg.mcp_predict` (deterministic conditional probability cubes, most-probable category, and Shannon entropy) and `tg.mcrf_simulate` (sequential Markov chain random field realizations on 2D/3D grids conditioned to drillholes).
 - **Acceptance check**: Predicted MCP probabilities at every grid node are non-negative and sum to 1 across categories within `1e-12`, hard conditioning nodes return a degenerate probability of 1 on the observed category, and seeded MCRF realizations reproduce target category proportions within `0.02`.
 
 ### M7: `boitata` integration example
 
-- **Scope**: Worked end-to-end documentation example (`examples/07-boitata-integration/`) and test showing how `boitata` desurveyed/composited drillhole intervals pass as NumPy arrays into `varvite` for HMM lithology segmentation, 3D transiogram fitting, and MCRF/T-PROGS categorical grid simulation, and how the resulting categorical array feeds back into `boitata` for domain-controlled kriging.
-- **Acceptance check**: The standalone integration check passes NumPy drillhole arrays into `varvite` and returns a 3D integer category grid matching the target grid shape, with 100% hard-data agreement at conditioning cells and category proportions within `0.02` of target proportions.
+- **Scope**: Worked end-to-end documentation example (`examples/07-boitata-integration/`) and test showing how `boitata` desurveyed/composited drillhole intervals pass as NumPy arrays into `transiograms` for HMM lithology segmentation, 3D transiogram fitting, and MCRF/T-PROGS categorical grid simulation, and how the resulting categorical array feeds back into `boitata` for domain-controlled kriging.
+- **Acceptance check**: The standalone integration check passes NumPy drillhole arrays into `transiograms` and returns a 3D integer category grid matching the target grid shape, with 100% hard-data agreement at conditioning cells and category proportions within `0.02` of target proportions.
 
 ## Performance
 
@@ -102,7 +102,7 @@ Every performance number in this repository comes from a reproducible benchmark 
 
 We have not run benchmarks yet:
 
-| Workload | `varvite` | `hmmlearn` | `pomegranate` |
+| Workload | `transiograms` | `hmmlearn` | `pomegranate` |
 | --- | --- | --- | --- |
 | Markov chain transition tally ($10^6$ samples, 8 categories) | not measured | not measured | not measured |
 | HMM forward-backward ($10^4$ steps, 6 states, 4 Gaussian channels) | not measured | not measured | not measured |

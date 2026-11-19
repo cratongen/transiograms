@@ -1,9 +1,9 @@
 use std::sync::mpsc;
 use std::time::Duration;
 
-use varvite_core::synthetic::{drillholes, layered_field, rate_holes};
-use varvite_core::{Direction, Error, Grid, MISSING, Mat, RateMatrix, SequenceSet, Stream};
-use varvite_transiogram::{
+use transiograms_core::synthetic::{drillholes, layered_field, rate_holes};
+use transiograms_core::{Direction, Error, Grid, MISSING, Mat, RateMatrix, SequenceSet, Stream};
+use transiograms_transiogram::{
     Entry, Experimental, Model1D, PairFilter, PairSpec, Structure, TransitionModel, downhole,
     experimental, on_grid,
 };
@@ -876,7 +876,7 @@ fn fit_markov_with_an_absent_category_and_a_start() {
         }
         t[1] = 0.0;
     }
-    let exp = varvite_transiogram::Experimental {
+    let exp = transiograms_transiogram::Experimental {
         lags: lags.clone(),
         mean_lags: lags.clone(),
         counts: exact,

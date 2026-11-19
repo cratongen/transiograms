@@ -1,5 +1,5 @@
 [package]
-name = "varvite-py"
+name = "transiograms-py"
 description = "Python bindings"
 version.workspace = true
 edition.workspace = true
@@ -8,7 +8,7 @@ license.workspace = true
 publish.workspace = true
 
 [lib]
-name = "_varvite"
+name = "_transiograms"
 crate-type = ["cdylib"]
 
 [dependencies]
@@ -18,13 +18,13 @@ pyo3.workspace = true
 rayon.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-varvite-core.workspace = true
-varvite-chain.workspace = true
-varvite-hmm.workspace = true
-varvite-hsmm.workspace = true
-varvite-transiogram.workspace = true
-varvite-tpsim.workspace = true
-varvite-mcrf.workspace = true
+transiograms-core.workspace = true
+transiograms-chain.workspace = true
+transiograms-hmm.workspace = true
+transiograms-hsmm.workspace = true
+transiograms-transiogram.workspace = true
+transiograms-tpsim.workspace = true
+transiograms-mcrf.workspace = true
 
 [lints]
 workspace = true

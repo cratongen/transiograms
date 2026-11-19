@@ -1,12 +1,12 @@
 # Plots, datasets, checks
 
-These submodules are not star-exported: write `vv.plot.transiogram(...)`.
+These submodules are not star-exported: write `tg.plot.transiogram(...)`.
 
-## vv.plot
+## tg.plot
 
 Every function takes `ax=None` (or `axes=None`), returns `(fig, ax)` or `(fig, axes)`, forwards
 `**kwargs` to its main matplotlib call and imports matplotlib only when called
-(`pip install 'varvite[plot]'`).
+(`pip install 'transiograms[plot]'`).
 
 | Function | Draws |
 | --- | --- |
@@ -17,7 +17,7 @@ Every function takes `ax=None` (or `axes=None`), returns `(fig, ax)` or `(fig, a
 | `transiogram(experimental=None, model=None, *, h=None, categories=None)` | the `k x k` grid of transiograms |
 | `grid_slice(values, grid, *, axis="z", index=0, categories=None)` | one slice of a grid property |
 
-## vv.datasets
+## tg.datasets
 
 Seeded synthetic data with known parameters; each takes `seed=0` and returns a dict.
 
@@ -27,7 +27,7 @@ Seeded synthetic data with known parameters; each takes `seed=0` and returns a d
 | `electrofacies_logs()` | 20 wells x 300 samples from a 3-state Gaussian HMM: `HOLE_ID`, `DEPTH`, `GR`, `RHOB`, `STATE`, `model` |
 | `layered_drillholes()` | 25 vertical holes through an MCRF field: `X`, `Y`, `Z`, `FROM`, `TO`, `HOLE_ID`, `CODE`, `field`, `model`, `grid` |
 
-## vv.checks
+## tg.checks
 
 Pure NumPy reference implementations the tests compare against.
 

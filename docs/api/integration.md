@@ -1,11 +1,11 @@
 # boitata integration
 
-varvite imports nothing from boitata. You pass boitata tables and grids in as NumPy arrays and take
+transiograms imports nothing from boitata. You pass boitata tables and grids in as NumPy arrays and take
 int64 codes and probability rows back out. The [guide](../guide/boitata.md) lists each exchange and
 the [integration page](../examples/07-boitata-integration/01-drillholes-to-grid/README.md) runs the
 whole path.
 
-| Step | varvite call | Input | Output |
+| Step | transiograms call | Input | Output |
 | --- | --- | --- | --- |
 | Segment logs | `HiddenMarkovModel.fit` and `predict` with `holes=`, `data=` | composite columns | int64 facies per composite |
 | Vertical transiograms | `downhole_transiogram` with `from_=`, `to=` | facies intervals | `ExperimentalTransiogram` |
@@ -15,7 +15,7 @@ whole path.
 
 ## M7 check
 
-`python/tests/test_integration.py` runs this path on `vv.datasets.layered_drillholes(seed=0)`
+`python/tests/test_integration.py` runs this path on `tg.datasets.layered_drillholes(seed=0)`
 with a seeded gamma-ray log:
 
 - the HMM recovers at least 97 percent of the true facies and their proportions within 0.02;

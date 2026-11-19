@@ -1,4 +1,4 @@
-"""Install the varvite wheel into fresh environments and run a smoke check in each.
+"""Install the transiograms wheel into fresh environments and run a smoke check in each.
 
 Usage: python ci/compat.py [all|venv|uv|pixi|conda]
 
@@ -16,17 +16,17 @@ MODES = ("venv", "uv", "pixi", "conda")
 SMOKE = """
 import pickle
 import numpy as np
-import varvite as vv
-c = vv.MarkovChain.from_matrix([[0.9, 0.1], [0.2, 0.8]])
+import transiograms as tg
+c = tg.MarkovChain.from_matrix([[0.9, 0.1], [0.2, 0.8]])
 assert np.allclose(c.transition_matrix.sum(axis=1), 1.0)
 assert np.allclose(c.proportions, [2 / 3, 1 / 3])
 assert pickle.loads(pickle.dumps(c)) == c
 try:
-    vv.MarkovChain.from_matrix([[0.5, 0.6], [0.5, 0.5]])
+    tg.MarkovChain.from_matrix([[0.5, 0.6], [0.5, 0.5]])
     raise SystemExit("bad matrix accepted")
-except vv.InvalidInput:
+except tg.InvalidInput:
     pass
-print("varvite", vv.__version__, "ok")
+print("transiograms", tg.__version__, "ok")
 """
 
 
@@ -37,7 +37,7 @@ def run(*cmd, cwd=None):
 
 def build(out):
     run(sys.executable, "-m", "maturin", "build", "--release", "-q", "-o", out, cwd=ROOT)
-    return next(Path(out).glob("varvite-*.whl"))
+    return next(Path(out).glob("transiograms-*.whl"))
 
 
 def venv(tmp, wheel):
@@ -73,7 +73,7 @@ def main(argv):
     mode = argv[1] if len(argv) > 1 else "all"
     if mode not in ("all", *MODES):
         raise SystemExit(f"mode must be one of all, {', '.join(MODES)}; got {mode!r}")
-    with tempfile.TemporaryDirectory(prefix="varvite-compat-") as d:
+    with tempfile.TemporaryDirectory(prefix="transiograms-compat-") as d:
         tmp = Path(d)
         wheel = build(tmp / "wheel")
         failed = []

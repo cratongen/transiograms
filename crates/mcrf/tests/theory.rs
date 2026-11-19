@@ -1,8 +1,8 @@
-use varvite_core::rng::tag;
-use varvite_core::synthetic::layered_field;
-use varvite_core::{Code, Grid, MISSING, Mat, RateMatrix, Snapped, Stream};
-use varvite_mcrf::{Neighbourhood, Options, conditional, conditional_eq13, predict, simulate};
-use varvite_transiogram::TransitionModel;
+use transiograms_core::rng::tag;
+use transiograms_core::synthetic::layered_field;
+use transiograms_core::{Code, Grid, MISSING, Mat, RateMatrix, Snapped, Stream};
+use transiograms_mcrf::{Neighbourhood, Options, conditional, conditional_eq13, predict, simulate};
+use transiograms_transiogram::TransitionModel;
 
 const P: [f64; 3] = [0.5, 0.3, 0.2];
 

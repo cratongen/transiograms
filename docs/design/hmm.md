@@ -1,4 +1,4 @@
-# varvite-hmm: algorithms
+# transiograms-hmm: algorithms
 
 Signatures are in [spec.md](spec.md) section 4.3. K states, sequences n = 1..N of length T_n,
 start pi, transition A, `lb_j(x_t) = log b_j(x_t)`. Formulas follow Rabiner (1989), checked by

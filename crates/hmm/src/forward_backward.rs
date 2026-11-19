@@ -1,6 +1,6 @@
-use varvite_core::numerics::logsumexp;
-use varvite_core::rng::tag;
-use varvite_core::{Error, Mat, Result, Stream, invalid, memory};
+use transiograms_core::numerics::logsumexp;
+use transiograms_core::rng::tag;
+use transiograms_core::{Error, Mat, Result, Stream, invalid, memory};
 
 use crate::emission::Density;
 use crate::model::{Hmm, Implementation};

@@ -1,7 +1,7 @@
 use std::mem::size_of;
 
 use rayon::prelude::*;
-use varvite_core::{Grid, Mat, Result, invalid, memory};
+use transiograms_core::{Grid, Mat, Result, invalid, memory};
 
 use crate::model1d::reverse;
 use crate::model3d::TransitionModel;

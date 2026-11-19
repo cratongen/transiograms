@@ -10,8 +10,8 @@ pub use cokriging::{cokrige, correct, predict};
 pub use quench::{objective, quench, quench_lags};
 pub use sis::simulate;
 
-use varvite_core::{Code, Grid, Mat, Result, Snapped, invalid, memory};
-use varvite_transiogram::{Table, TransitionModel};
+use transiograms_core::{Code, Grid, Mat, Result, Snapped, invalid, memory};
+use transiograms_transiogram::{Table, TransitionModel};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct QuenchOptions {

@@ -2,9 +2,9 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::mpsc;
 use std::time::Duration;
 
-use varvite_core::numerics::logsumexp;
-use varvite_core::{Error, Mat, Stream};
-use varvite_hmm::{
+use transiograms_core::numerics::logsumexp;
+use transiograms_core::{Error, Mat, Stream};
+use transiograms_hmm::{
     Categorical, Clamp, CovarianceType, Decoder, Emission, Family, FitOptions, Gaussian,
     GaussianMixture, Hmm, Implementation, Ordering, Params, Poisson, Priors, Sequence, kmeans,
     n_observed,
@@ -66,7 +66,9 @@ fn categorical_model(k: usize, m: usize, seed: u64) -> Hmm {
 fn diag(mean: &[f64], var: &[f64]) -> Emission {
     Emission::Gaussian(Gaussian {
         mean: mean.to_vec(),
-        covariance: Mat::from_diagonal(&varvite_core::nalgebra::DVector::from_vec(var.to_vec())),
+        covariance: Mat::from_diagonal(&transiograms_core::nalgebra::DVector::from_vec(
+            var.to_vec(),
+        )),
         covariance_type: CovarianceType::Diag,
         frozen: false,
     })
@@ -1330,7 +1332,7 @@ fn poisson_rejection_sampler_matches_the_pmf() {
         .map(|(o, e)| (o - n as f64 * e).powi(2) / (n as f64 * e))
         .sum();
     let df = (counts.len() - 1) as f64;
-    let pv = varvite_core::special::chi2_sf(chi2, df);
+    let pv = transiograms_core::special::chi2_sf(chi2, df);
     assert!(pv > 1e-4, "chi-square {chi2} on {df} df, p = {pv}");
 
     let (lam, n) = (1e12f64, 20_000usize);

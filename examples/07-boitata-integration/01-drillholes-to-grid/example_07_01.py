@@ -1,11 +1,11 @@
 """
 # From boitata drillholes to categorical grids
 
-boitata desurveys and composites drillholes; varvite segments the logs into facies, fits
+boitata desurveys and composites drillholes; transiograms segments the logs into facies, fits
 transiograms and simulates facies on a grid; the realizations go back to boitata as block-model
 columns for domain-controlled kriging. The two libraries share no code: they meet at NumPy arrays.
 
-This page runs on varvite's own seeded data, so it needs no boitata install. Each step names the
+This page runs on transiograms's own seeded data, so it needs no boitata install. Each step names the
 boitata call whose output or input the arrays stand for.
 """
 
@@ -21,16 +21,16 @@ sys.path.insert(0, str(HERE.parents[1]))
 #
 # A boitata composite table converts to a plain mapping with
 # `{c: table[c] for c in table.column_names}`: hole ids, `FROM` and `TO` in depth, midpoint
-# coordinates and a gamma-ray log. Here the mapping comes from `vv.datasets.layered_drillholes`,
+# coordinates and a gamma-ray log. Here the mapping comes from `tg.datasets.layered_drillholes`,
 # with a gamma-ray reading drawn from each composite's facies.
 
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
-import varvite as vv
+import transiograms as tg
 from common import ACCENT, GRAY, save
 
-source = vv.datasets.layered_drillholes(seed=0)
+source = tg.datasets.layered_drillholes(seed=0)
 rng = np.random.default_rng(7)
 composites = {
     "HOLE_ID": source["HOLE_ID"],
@@ -50,7 +50,7 @@ print({k: v.dtype for k, v in composites.items()})
 # decoded codes play the role of logged lithology.
 
 # %%
-hmm = vv.HiddenMarkovModel(3, n_init=5, seed=0, direction="down", ordering="mean")
+hmm = tg.HiddenMarkovModel(3, n_init=5, seed=0, direction="down", ordering="mean")
 hmm.fit("GR", holes="HOLE_ID", data=composites)
 composites["FACIES"] = hmm.predict("GR", holes="HOLE_ID", data=composites)
 agreement = np.mean(composites["FACIES"] == source["CODE"])
@@ -64,24 +64,24 @@ print(f"decoded facies agree with the truth at {agreement:.1%} of composites")
 
 # %%
 p = np.bincount(composites["FACIES"], minlength=3) / len(composites["FACIES"])
-exp = vv.downhole_transiogram(
+exp = tg.downhole_transiogram(
     "FACIES", holes="HOLE_ID", from_="FROM", to="TO", lags=np.arange(1.0, 9.0), data=composites
 )
-vertical = vv.TransiogramModel.fit_markov(exp, proportions=p)
-model = vv.TransitionModel(p, 0.1 * vertical.rates, 0.1 * vertical.rates, vertical.rates)
+vertical = tg.TransiogramModel.fit_markov(exp, proportions=p)
+model = tg.TransitionModel(p, 0.1 * vertical.rates, 0.1 * vertical.rates, vertical.rates)
 print(model)
 
 # %% [markdown]
 # ## Categorical grids out
 #
-# `vv.Grid(origin, size, count)` is a boitata `Geometry` with zero rotation, cells x fastest.
+# `tg.Grid(origin, size, count)` is a boitata `Geometry` with zero rotation, cells x fastest.
 # T-PROGS and MCRF both take the composite midpoints as hard data.
 
 # %%
-grid = vv.Grid.from_json(source["grid"])
+grid = tg.Grid.from_json(source["grid"])
 xyz = np.column_stack([composites["X"], composites["Y"], composites["Z"]])
-tprogs = vv.tprogs_simulate(model, grid, xyz, "FACIES", n=10, seed=0, data=composites)
-mcrf = vv.mcrf_simulate(model, grid, xyz, "FACIES", n=10, seed=0, data=composites)
+tprogs = tg.tprogs_simulate(model, grid, xyz, "FACIES", n=10, seed=0, data=composites)
+mcrf = tg.mcrf_simulate(model, grid, xyz, "FACIES", n=10, seed=0, data=composites)
 cells, codes = grid.snap(xyz, composites["FACIES"])
 for name, r in (("T-PROGS", tprogs), ("MCRF", mcrf)):
     honoured = np.all(r.realizations[:, cells] == codes)
@@ -98,10 +98,10 @@ print("realization as a 3D array:", tprogs.realizations[0].reshape(grid.shape).s
 
 # %%
 fig, axes = plt.subplots(1, 3, figsize=(13, 3.6), layout="constrained")
-names = vv.Categories(["mud", "sand", "gravel"], colors=["#8c8c8c", "#e69f00", "#0072b2"])
-vv.plot.grid_slice(source["field"], grid, axis="y", index=15, categories=names, ax=axes[0])
+names = tg.Categories(["mud", "sand", "gravel"], colors=["#8c8c8c", "#e69f00", "#0072b2"])
+tg.plot.grid_slice(source["field"], grid, axis="y", index=15, categories=names, ax=axes[0])
 axes[0].set_title("True field, y = 155 m")
-vv.plot.grid_slice(tprogs.realizations[0], grid, axis="y", index=15, categories=names, ax=axes[1])
+tg.plot.grid_slice(tprogs.realizations[0], grid, axis="y", index=15, categories=names, ax=axes[1])
 axes[1].set_title("T-PROGS realization 1")
 width = 0.35
 axes[2].bar(np.arange(3) - width / 2, tprogs.proportions.mean(axis=0), width, color=ACCENT, label="T-PROGS")

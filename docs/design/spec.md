@@ -1,4 +1,4 @@
-# varvite API contract
+# transiograms API contract
 
 This file is the single source that every implementer follows. Names, signatures, defaults,
 array shapes and error behaviour written here are binding. Algorithms, formulas and golden
@@ -23,7 +23,7 @@ Each line: the decision, then why.
 1. Crates follow the fixed eight-crate architecture (core, chain, hmm, hsmm, transiogram, tpsim,
    mcrf, py), not the six crates in the README layout: the split lets seven implementers work in
    parallel without sharing a crate. The core owner updates the README "Layout" section.
-2. Directories are `crates/<short>` and packages are `varvite-<short>` (as boitata does with
+2. Directories are `crates/<short>` and packages are `transiograms-<short>` (as boitata does with
    `crates/core` and `boitata-core`): short paths, unique package names.
 3. "Continuous-lag" means the Carle and Fogg generator chain `T(h) = exp(Qh)`; the step-`dz`
    chain is called "fixed". The README glossary uses "continuous-lag" for the step chain; Carle
@@ -79,7 +79,7 @@ Each line: the decision, then why.
 25. All tests run in `mise run test`; there is no `slow` marker. `[profile.test]` uses
     `opt-level = 3` so the acceptance runs fit in normal test time.
 26. Experimental transiograms are returned as plain arrays in a value type, with the counts.
-    No Arrow, no `Table` type: varvite's only runtime dependency is NumPy.
+    No Arrow, no `Table` type: transiograms's only runtime dependency is NumPy.
 27. `direction` defaults to `"up"` (older to younger, +z up, T-PROGS usage) in every sequence
     model, HMM and HSMM included. Inputs are always given top-down by depth; outputs are always
     returned aligned with input rows.
@@ -90,14 +90,14 @@ Each line: the decision, then why.
 
 | Directory | Package | Lib name | Depends on (path) |
 | --- | --- | --- | --- |
-| `crates/core` | `varvite-core` | `varvite_core` | none |
-| `crates/chain` | `varvite-chain` | `varvite_chain` | core |
-| `crates/hmm` | `varvite-hmm` | `varvite_hmm` | core |
-| `crates/hsmm` | `varvite-hsmm` | `varvite_hsmm` | core, hmm |
-| `crates/transiogram` | `varvite-transiogram` | `varvite_transiogram` | core |
-| `crates/tpsim` | `varvite-tpsim` | `varvite_tpsim` | core, transiogram |
-| `crates/mcrf` | `varvite-mcrf` | `varvite_mcrf` | core, transiogram |
-| `crates/py` | `varvite-py` | `_varvite` (cdylib) | all of the above |
+| `crates/core` | `transiograms-core` | `transiograms_core` | none |
+| `crates/chain` | `transiograms-chain` | `transiograms_chain` | core |
+| `crates/hmm` | `transiograms-hmm` | `transiograms_hmm` | core |
+| `crates/hsmm` | `transiograms-hsmm` | `transiograms_hsmm` | core, hmm |
+| `crates/transiogram` | `transiograms-transiogram` | `transiograms_transiogram` | core |
+| `crates/tpsim` | `transiograms-tpsim` | `transiograms_tpsim` | core, transiogram |
+| `crates/mcrf` | `transiograms-mcrf` | `transiograms_mcrf` | core, transiogram |
+| `crates/py` | `transiograms-py` | `_transiograms` (cdylib) | all of the above |
 
 ### 2.2 Root `Cargo.toml`
 
@@ -123,13 +123,13 @@ pyo3 = { version = "0.29", features = ["abi3-py311"] }
 numpy = "0.29"
 proptest = "1"
 criterion = "0.8"
-varvite-core = { path = "crates/core" }
-varvite-chain = { path = "crates/chain" }
-varvite-hmm = { path = "crates/hmm" }
-varvite-hsmm = { path = "crates/hsmm" }
-varvite-transiogram = { path = "crates/transiogram" }
-varvite-tpsim = { path = "crates/tpsim" }
-varvite-mcrf = { path = "crates/mcrf" }
+transiograms-core = { path = "crates/core" }
+transiograms-chain = { path = "crates/chain" }
+transiograms-hmm = { path = "crates/hmm" }
+transiograms-hsmm = { path = "crates/hsmm" }
+transiograms-transiogram = { path = "crates/transiogram" }
+transiograms-tpsim = { path = "crates/tpsim" }
+transiograms-mcrf = { path = "crates/mcrf" }
 
 [workspace.lints.clippy]
 needless_range_loop = "allow"
@@ -143,7 +143,7 @@ opt-level = 3
 ```
 
 No other dependency may be added without changing this file. Every algorithm crate uses
-`varvite-core`, `nalgebra`, `serde`, `rayon` as needed, `thiserror` only in core, and `proptest`
+`transiograms-core`, `nalgebra`, `serde`, `rayon` as needed, `thiserror` only in core, and `proptest`
 plus `criterion` as dev-dependencies. `serde_json` is used by core (JSON helpers) and py.
 
 ### 2.3 Toolchain and tasks
@@ -159,21 +159,21 @@ plus `criterion` as dev-dependencies. `serde_json` is used by core (JSON helpers
 | `build` | `cargo build --workspace` |
 | `py:sync` | `uv sync -q --inexact` |
 | `py:build` (depends `py:sync`) | `uv run --no-sync maturin develop -q --uv --release` |
-| `test` (depends `py:build`) | `cargo test --workspace --exclude varvite-py`, then `uv run --no-sync pytest -q` |
+| `test` (depends `py:build`) | `cargo test --workspace --exclude transiograms-py`, then `uv run --no-sync pytest -q` |
 | `lint` (depends `py:sync`) | `cargo fmt --all --check`; `cargo clippy --workspace --all-targets -- -D warnings`; `uv run --no-sync ruff check python examples ci`; `uv run --no-sync ruff format --check python examples ci` |
 | `verify` | depends `lint`, `test` |
-| `bench` | `cargo bench --workspace --exclude varvite-py` |
+| `bench` | `cargo bench --workspace --exclude transiograms-py` |
 | `examples` (depends `py:build`) | `uv run --no-sync python examples/render.py` |
 | `docs` / `docs-build` (depend `py:build`) | `mkdocs serve` / `mkdocs build --strict` via `uv run --no-sync` |
 | `changelog` | `git-cliff -o CHANGELOG.md` |
 | `compat` | `uv run --no-sync python ci/compat.py {{mode}}` (all, venv, uv, pixi, conda) |
 
-A single crate is tested with `mise exec -- cargo test -p varvite-<short>`.
+A single crate is tested with `mise exec -- cargo test -p transiograms-<short>`.
 
 ### 2.4 `pyproject.toml`
 
 maturin `>=1.10,<2` backend; `[tool.maturin] manifest-path = "crates/py/Cargo.toml"`,
-`module-name = "varvite._varvite"`, `python-source = "python"`, `locked = true`.
+`module-name = "transiograms._transiograms"`, `python-source = "python"`, `locked = true`.
 `requires-python = ">=3.11"`, `dependencies = ["numpy>=1.26"]`, extras `plot = ["matplotlib>=3.8"]`,
 `all = ["matplotlib>=3.8"]`. Dev group: `maturin>=1.10,<2`, `pytest>=8`, `ruff>=0.6`, `scipy>=1.13`
 (tests only), `matplotlib>=3.8`, `mkdocs-material`, `mkdocstrings[python]`, `mkdocs-gallery`.
@@ -184,8 +184,8 @@ maturin `>=1.10,<2` backend; `[tool.maturin] manifest-path = "crates/py/Cargo.to
 
 ### 3.1 Codes, missing values, categories
 
-- A category code is `u32` in Rust (`varvite_core::Code`), `0..k-1`. Missing is
-  `varvite_core::MISSING = u32::MAX`.
+- A category code is `u32` in Rust (`transiograms_core::Code`), `0..k-1`. Missing is
+  `transiograms_core::MISSING = u32::MAX`.
 - Python gives and receives codes as `int64` with `-1` for missing. Float input is accepted when
   every finite value is an integer; `NaN` means missing (boitata's `Categories.encode` output).
   Any other value raises `InvalidInput` ("codes must be integers in 0..k-1 or -1 for missing").
@@ -213,7 +213,7 @@ maturin `>=1.10,<2` backend; `[tool.maturin] manifest-path = "crates/py/Cargo.to
 ### 3.3 Seeds, streams and determinism
 
 - Every stochastic routine takes `seed: u64` (Python `seed: int = 0`, `0 <= seed < 2**64`).
-- `varvite_core::rng::realization_seed(seed, k) = splitmix(splitmix(seed) ^ k)`, identical to
+- `transiograms_core::rng::realization_seed(seed, k) = splitmix(splitmix(seed) ^ k)`, identical to
   boitata. A stream is `Stream::new(seed, &[k1, k2, ...])`, whose key is
   `keys.fold(seed, realization_seed)`.
 - Key layouts are fixed per routine (core.md section 3 lists them). No routine draws from a
@@ -226,7 +226,7 @@ maturin `>=1.10,<2` backend; `[tool.maturin] manifest-path = "crates/py/Cargo.to
 
 ### 3.4 Memory
 
-- `varvite_core::memory::check(needed: u64, memory: Option<u64>, what: &str) -> Result<()>`.
+- `transiograms_core::memory::check(needed: u64, memory: Option<u64>, what: &str) -> Result<()>`.
   The budget is `memory` when given, else `MemAvailable` on Linux, else no check. A request above
   the budget raises `InvalidInput` before allocating, naming `what`, the bytes needed and the
   budget.
@@ -235,7 +235,7 @@ maturin `>=1.10,<2` backend; `[tool.maturin] manifest-path = "crates/py/Cargo.to
 
 ### 3.5 Errors
 
-Rust (`varvite_core::error`):
+Rust (`transiograms_core::error`):
 
 ```rust
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
@@ -250,12 +250,16 @@ pub fn invalid<T>(message: impl Into<String>) -> Result<T>;
 pub fn convergence<T>(message: impl Into<String>) -> Result<T>;
 ```
 
-Python (`python/varvite/errors.py`):
+Python (`python/transiograms/errors.py`):
 
 ```python
-class VarviteError(Exception): ...
-class InvalidInput(VarviteError, ValueError): ...
-class ConvergenceError(VarviteError, RuntimeError): ...
+class TransiogramsError(Exception): ...
+
+
+class InvalidInput(TransiogramsError, ValueError): ...
+
+
+class ConvergenceError(TransiogramsError, RuntimeError): ...
 ```
 
 `Error::InvalidInput` maps to `InvalidInput` and `Error::Convergence` to `ConvergenceError`
@@ -265,7 +269,7 @@ entry `(i, j)`, state, iteration), and never end with a period.
 
 ### 3.6 Numerical contract
 
-- `varvite_core::ROW_TOL = 1e-12`. Every transition matrix has entries in `[0, 1]` and row sums
+- `transiograms_core::ROW_TOL = 1e-12`. Every transition matrix has entries in `[0, 1]` and row sums
   within `ROW_TOL` of 1. Every generator has off-diagonals `>= 0`, diagonals `< 0` and row sums
   within `ROW_TOL * max|q|` of 0. Constructors validate and raise `InvalidInput`.
 - Probabilities in log space use `-inf` for zero; `logsumexp` of all `-inf` is `-inf`, never NaN.
@@ -274,17 +278,17 @@ entry `(i, j)`, state, iteration), and never end with a period.
 ### 3.7 Serialisation
 
 - Every public value type derives `serde::Serialize` and `Deserialize`. Matrices serialise as
-  row-major nested lists through `varvite_core::serde_mat` (`#[serde(with = "...")]`).
+  row-major nested lists through `transiograms_core::serde_mat` (`#[serde(with = "...")]`).
 - Python classes have `to_json() -> str`, `from_json(text) -> Self` (staticmethod), `__eq__`, a
   one-line `__repr__`, and pickle through `copyreg` registered in `__init__.py` on
   `to_json` / `from_json`.
 
 ## 4. Rust API
 
-`Mat` is `nalgebra::DMatrix<f64>`, re-exported as `varvite_core::Mat`. Vectors are `Vec<f64>` or
+`Mat` is `nalgebra::DMatrix<f64>`, re-exported as `transiograms_core::Mat`. Vectors are `Vec<f64>` or
 slices. All functions return `Result<T>` from core unless the signature says otherwise.
 
-### 4.1 varvite-core
+### 4.1 transiograms-core
 
 Modules: `error.rs`, `codes.rs`, `sequence.rs`, `matrix.rs`, `grid.rs`, `rng.rs`,
 `numerics.rs`, `special.rs`, `memory.rs`, `serde_mat.rs`, `lib.rs` (re-exports below).
@@ -499,10 +503,10 @@ pub fn nelder_mead(f: impl Fn(&[f64]) -> f64, x0: &[f64], step: f64, tol: f64, m
 `memory.rs`: `available_bytes() -> Option<u64>`, `check(needed, memory, what) -> Result<()>`.
 
 `serde_mat.rs`: `serialize` / `deserialize` for `Mat` as `Vec<Vec<f64>>` (row-major), for
-`#[serde(with = "varvite_core::serde_mat")]`; submodules `option`, `vec` and `values` (`Vec<f64>`).
+`#[serde(with = "transiograms_core::serde_mat")]`; submodules `option`, `vec` and `values` (`Vec<f64>`).
 NaN is written as JSON `null` and read back as NaN.
 
-### 4.2 varvite-chain
+### 4.2 transiograms-chain
 
 Modules: `fit.rs` (tallies and `MarkovChain`), `tests.rs` (statistical tests), `entropy.rs`,
 `sojourn.rs`, `simulate.rs` (1D simulation and bridges), `lib.rs`.
@@ -603,7 +607,7 @@ Fit semantics by kind (details in chain.md):
   `Beds` needs a chain with an embedded `transition` (hard positions are bed indices);
   `Length` needs a `generator` (hard positions are lengths along the direction from 0).
 
-### 4.3 varvite-hmm
+### 4.3 transiograms-hmm
 
 Modules: `sequence.rs` (observations and clamps), `emission.rs` (families, densities, M-step
 accumulators), `forward_backward.rs` (scaled and log), `viterbi.rs`, `em.rs`, `init.rs` (k-means
@@ -674,7 +678,7 @@ pub struct Posterior {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Hmm { pub start: Vec<f64>, #[serde(with = "varvite_core::serde_mat")] pub transition: Mat, pub emissions: Vec<Emission> }
+pub struct Hmm { pub start: Vec<f64>, #[serde(with = "transiograms_core::serde_mat")] pub transition: Mat, pub emissions: Vec<Emission> }
 impl Hmm {
     pub fn new(start: Vec<f64>, transition: Mat, emissions: Vec<Emission>) -> Result<Self>;
     pub fn k(&self) -> usize;
@@ -705,7 +709,7 @@ pub fn kmeans(points: &Mat, k: usize, stream: &mut Stream) -> Vec<usize>;
 step), `Convergence` for a Cholesky failure after one jitter retry (naming the state) and for an
 objective decrease larger than `1e-9 * |objective|` (naming the iteration).
 
-### 4.4 varvite-hsmm
+### 4.4 transiograms-hsmm
 
 Modules: `duration.rs`, `forward_backward.rs`, `viterbi.rs`, `em.rs`, `model.rs` (`Hsmm`),
 `selection.rs`, `lib.rs`.
@@ -737,7 +741,7 @@ pub struct SegmentPosterior { pub log_likelihood: f64, pub gamma: Mat, pub xi_su
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Hsmm {
     pub start: Vec<f64>,
-    #[serde(with = "varvite_core::serde_mat")] pub transition: Mat, // zero diagonal; K = 1 allowed ([[0]])
+    #[serde(with = "transiograms_core::serde_mat")] pub transition: Mat, // zero diagonal; K = 1 allowed ([[0]])
     pub durations: Vec<DurationDist>,
     pub emissions: Vec<Emission>,
     pub max_duration: Vec<usize>,
@@ -770,7 +774,7 @@ pub fn icl(log_likelihood: f64, n_params: usize, n_observations: usize, entropy:
 pub fn select_states(data: &[Sequence], clamps: Option<&[Clamp]>, spec: &SelectionSpec) -> Result<SelectionTable>;
 ```
 
-### 4.5 varvite-transiogram
+### 4.5 transiograms-transiogram
 
 Modules: `experimental.rs` (points, downhole, grid), `model1d.rs`, `model3d.rs`
 (`TransitionModel`, rotation, interpolation, closeness), `table.rs` (offset templates),
@@ -846,7 +850,7 @@ pub struct Table { pub offsets: Vec<[i64; 3]>, pub closeness: Vec<f64>, pub tran
 impl Table { pub fn get(&self, d: [i64; 3]) -> Option<usize>; }
 ```
 
-### 4.6 varvite-tpsim
+### 4.6 transiograms-tpsim
 
 Modules: `cokriging.rs`, `search.rs`, `sis.rs`, `quench.rs`, `lib.rs`.
 
@@ -873,7 +877,7 @@ pub fn objective(codes: &[Code], grid: &Grid, mask: Option<&[bool]>, model: &Tra
 pub fn quench_lags(model: &TransitionModel, grid: &Grid, limit: f64) -> Vec<[i64; 3]>;
 ```
 
-### 4.7 varvite-mcrf
+### 4.7 transiograms-mcrf
 
 Modules: `conditional.rs`, `search.rs`, `predict.rs`, `simulate.rs`, `lib.rs`.
 
@@ -895,7 +899,7 @@ pub fn predict(model: &TransitionModel, grid: &Grid, mask: Option<&[bool]>, hard
 pub fn simulate(model: &TransitionModel, grid: &Grid, mask: Option<&[bool]>, hard: &Snapped, opts: &Options) -> Result<Realizations>;
 ```
 
-### 4.8 varvite-py
+### 4.8 transiograms-py
 
 Modules under `crates/py/src/`: `lib.rs` (module init, `error`, `invalid`, `convergence`),
 `args.rs` (coercion helpers below), `core.rs` (`Categories`, `Grid`), `chain.rs`, `hmm.rs`,
@@ -913,7 +917,7 @@ pub fn direction(s: &str) -> PyResult<Direction>;
 pub fn sequence_set(py_args: SequenceArgs) -> PyResult<SequenceSet>;         // section 5.2
 pub fn sequences(obj, holes, data, direction, d_expected: Option<usize>) -> PyResult<(Vec<Sequence>, RowMap)>; // HMM input
 pub fn coords(obj: &Bound<PyAny>, what: &str) -> PyResult<Vec<[f64; 3]>>;    // (n,3), (n,2) gets z = 0
-pub fn to_rust(e: varvite_core::Error) -> PyErr;
+pub fn to_rust(e: transiograms_core::Error) -> PyErr;
 ```
 
 `RowMap` remembers the hole split, row order and direction so outputs go back in input row order.
@@ -923,16 +927,16 @@ pub fn to_rust(e: varvite_core::Error) -> PyErr;
 ### 5.1 Package layout
 
 ```
-python/varvite/__init__.py     from varvite._varvite import *; errors; copyreg; __all__ from dir()
-python/varvite/_varvite.pyi    one stub file with one section per area (section 8)
-python/varvite/py.typed
-python/varvite/errors.py       VarviteError, InvalidInput, ConvergenceError
-python/varvite/plot.py         vv.plot (not star-exported), lazy matplotlib import
-python/varvite/datasets.py     vv.datasets (not star-exported), seeded synthetic data
-python/varvite/checks.py       vv.checks (not star-exported), NumPy brute-force oracles
+python/transiograms/__init__.py     from transiograms._transiograms import *; errors; copyreg; __all__ from dir()
+python/transiograms/_transiograms.pyi    one stub file with one section per area (section 8)
+python/transiograms/py.typed
+python/transiograms/errors.py       TransiogramsError, InvalidInput, ConvergenceError
+python/transiograms/plot.py         tg.plot (not star-exported), lazy matplotlib import
+python/transiograms/datasets.py     tg.datasets (not star-exported), seeded synthetic data
+python/transiograms/checks.py       tg.checks (not star-exported), NumPy brute-force oracles
 ```
 
-Users write `import varvite as vv`. All options are keyword-only after `*`. Docstrings are NumPy
+Users write `import transiograms as tg`. All options are keyword-only after `*`. Docstrings are NumPy
 style written as Rust `///` comments on pymethods. Outputs are float64 arrays (NaN missing),
 int64 codes and states (-1 missing or inactive), uint64 cell indices. `seed: int = 0`.
 
@@ -942,14 +946,14 @@ Every function that reads categorical drillhole sequences takes `codes` position
 keywords:
 
 ```python
-holes: ArrayLike | str | None = None      # per-row hole id; None = one hole
-from_: ArrayLike | str | None = None      # interval tops (depth)
-to: ArrayLike | str | None = None         # interval bottoms (depth)
-depth: ArrayLike | str | None = None      # regular sample depths
-step: float | None = None                 # sample spacing; inferred from depth when None
-gap: float = 1e-6                         # larger gaps break runs
+holes: ArrayLike | str | None = None  # per-row hole id; None = one hole
+from_: ArrayLike | str | None = None  # interval tops (depth)
+to: ArrayLike | str | None = None  # interval bottoms (depth)
+depth: ArrayLike | str | None = None  # regular sample depths
+step: float | None = None  # sample spacing; inferred from depth when None
+gap: float = 1e-6  # larger gaps break runs
 categories: Categories | int | None = None
-data: Mapping[str, ArrayLike] | None = None # str arguments name its columns
+data: Mapping[str, ArrayLike] | None = None  # str arguments name its columns
 ```
 
 Rules: `from_` and `to` together give intervals; `depth` gives regular samples (step = median
@@ -1176,39 +1180,92 @@ class TransitionModel:                  # 3D
 
 ```python
 class Prediction:
-    probabilities: NDArray      # (n_cells, k); NaN outside the mask
-    most_likely: NDArray[np.int64]; entropy: NDArray   # entropy / ln k, in [0, 1]
-    corrected: float            # fraction of nodes whose probabilities were clipped
+    probabilities: NDArray  # (n_cells, k); NaN outside the mask
+    most_likely: NDArray[np.int64]
+    entropy: NDArray  # entropy / ln k, in [0, 1]
+    corrected: float  # fraction of nodes whose probabilities were clipped
+
 
 class Realizations:
-    realizations: NDArray[np.int64]   # (n, n_cells), -1 outside the mask
-    proportions: NDArray              # (n, k)
-    probabilities: NDArray            # (n_cells, k) frequency over realizations
-    most_likely: NDArray[np.int64]; entropy: NDArray
-    corrected: NDArray                # (n,) fraction clipped during SIS (zeros for MCRF)
-    objective: list[NDArray]          # quench objective per sweep per realization (empty for MCRF)
+    realizations: NDArray[np.int64]  # (n, n_cells), -1 outside the mask
+    proportions: NDArray  # (n, k)
+    probabilities: NDArray  # (n_cells, k) frequency over realizations
+    most_likely: NDArray[np.int64]
+    entropy: NDArray
+    corrected: NDArray  # (n,) fraction clipped during SIS (zeros for MCRF)
+    objective: list[NDArray]  # quench objective per sweep per realization (empty for MCRF)
 
-def tp_cokriging(model: TransitionModel, grid: Grid, coords, codes, *, mask=None, max_data: int = 12,
-                 closeness_limit: float = 0.01, max_per_octant: int = 0, svd_cutoff: float = 1e-8,
-                 memory: int | None = None, data=None) -> Prediction: ...
-def tprogs_simulate(model, grid, coords, codes, *, n: int = 1, seed: int = 0, mask=None, max_data: int = 12,
-                    closeness_limit: float = 0.01, max_per_octant: int = 0, svd_cutoff: float = 1e-8,
-                    quench: bool = True, quench_iterations: int = 3, quench_limit: float = 0.4,
-                    quench_tol: float = 1e-3, proportion_weight: float = 1.0, memory: int | None = None,
-                    data=None) -> Realizations: ...
-def mcp_predict(model, grid, coords, codes, *, mask=None, neighbours: Literal["sectors"] | int = "sectors",
-                closeness_limit: float = 0.01, memory: int | None = None, data=None) -> Prediction: ...
-def mcrf_simulate(model, grid, coords, codes, *, n: int = 1, seed: int = 0, mask=None, neighbours="sectors",
-                  closeness_limit: float = 0.01, memory: int | None = None, data=None) -> Realizations: ...
+
+def tp_cokriging(
+    model: TransitionModel,
+    grid: Grid,
+    coords,
+    codes,
+    *,
+    mask=None,
+    max_data: int = 12,
+    closeness_limit: float = 0.01,
+    max_per_octant: int = 0,
+    svd_cutoff: float = 1e-8,
+    memory: int | None = None,
+    data=None,
+) -> Prediction: ...
+def tprogs_simulate(
+    model,
+    grid,
+    coords,
+    codes,
+    *,
+    n: int = 1,
+    seed: int = 0,
+    mask=None,
+    max_data: int = 12,
+    closeness_limit: float = 0.01,
+    max_per_octant: int = 0,
+    svd_cutoff: float = 1e-8,
+    quench: bool = True,
+    quench_iterations: int = 3,
+    quench_limit: float = 0.4,
+    quench_tol: float = 1e-3,
+    proportion_weight: float = 1.0,
+    memory: int | None = None,
+    data=None,
+) -> Realizations: ...
+def mcp_predict(
+    model,
+    grid,
+    coords,
+    codes,
+    *,
+    mask=None,
+    neighbours: Literal["sectors"] | int = "sectors",
+    closeness_limit: float = 0.01,
+    memory: int | None = None,
+    data=None,
+) -> Prediction: ...
+def mcrf_simulate(
+    model,
+    grid,
+    coords,
+    codes,
+    *,
+    n: int = 1,
+    seed: int = 0,
+    mask=None,
+    neighbours="sectors",
+    closeness_limit: float = 0.01,
+    memory: int | None = None,
+    data=None,
+) -> Realizations: ...
 ```
 
 `coords` and `codes` are the hard data, snapped with `Grid.snap`. `max_data` must be even.
 
 ### 5.9 Plot, datasets, checks
 
-`vv.plot` (every function takes `ax=None`, returns `(fig, ax)` or `(fig, axes)`, forwards
+`tg.plot` (every function takes `ax=None`, returns `(fig, ax)` or `(fig, axes)`, forwards
 `**kwargs` to the main matplotlib call, imports matplotlib lazily with the hint
-`pip install 'varvite[plot]' or conda install -c conda-forge matplotlib`):
+`pip install 'transiograms[plot]' or conda install -c conda-forge matplotlib`):
 
 | Function | Owner |
 | --- | --- |
@@ -1219,7 +1276,7 @@ def mcrf_simulate(model, grid, coords, codes, *, n: int = 1, seed: int = 0, mask
 | `transiogram(experimental=None, model=None, *, h=None, categories=None, axes=None, **kwargs)` | transiogram |
 | `grid_slice(values, grid, *, axis="z", index=0, categories=None, ax=None, **kwargs)` | tpsim |
 
-`vv.datasets` (each `name(seed=0) -> dict` of NumPy arrays and model JSON strings, documented
+`tg.datasets` (each `name(seed=0) -> dict` of NumPy arrays and model JSON strings, documented
 keys):
 
 | Function | Content | Owner |
@@ -1228,7 +1285,7 @@ keys):
 | `electrofacies_logs(seed=0)` | 20 holes x 300 steps, 3-state Gaussian HMM with 2 channels; keys `HOLE_ID`, `DEPTH`, `GR`, `RHOB`, `STATE` | hmm |
 | `layered_drillholes(seed=0)` | vertical holes from a known `TransitionModel` on a grid; keys `X`, `Y`, `Z`, `HOLE_ID`, `CODE`, `model`, `grid` | transiogram |
 
-`vv.checks` (pure NumPy, used by tests and examples): `quasi_independence(counts)` and
+`tg.checks` (pure NumPy, used by tests and examples): `quasi_independence(counts)` and
 `kemeny_snell_std(P, n)` (chain); `brute_force_hmm(start, transition, log_b)` returning
 `(log_likelihood, best_path, best_log_probability, gamma, path_entropy)` (hmm);
 `brute_force_hsmm(start, transition, log_d, log_survivor, log_b)` with the same returns (hsmm);
@@ -1241,11 +1298,11 @@ keys):
 - Intervals: `HOLE_ID`, `FROM`, `TO` and a code column map to `holes`, `from_`, `to`, `codes`
   with `data=` (boitata tables convert with `{c: t[c] for c in t.column_names}` or any mapping).
 - Points: `(n, 3)` coordinates plus codes plus optional holes (composite midpoints).
-- Grids: `vv.Grid(origin, size, count)` equals boitata `Geometry` with zero rotation; cell order
+- Grids: `tg.Grid(origin, size, count)` equals boitata `Geometry` with zero rotation; cell order
   x fastest; `Realizations.realizations` `(n, n_cells)` int64 and `Prediction.probabilities`
   `(n_cells, k)` rows summing to 1 are what boitata's `SIS(proportions=)` and block-model
   `with_column` accept.
-- No boitata import anywhere in varvite, tests included.
+- No boitata import anywhere in transiograms, tests included.
 
 ## 7. Invariants and theory checks
 
@@ -1385,8 +1442,8 @@ and `// <<< <area>` in Rust), with exact-string edits, never rewriting the whole
 
 | Area | Files it may create and edit |
 | --- | --- |
-| core (lands first) | `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `rustfmt.toml`, `mise.toml`, `pyproject.toml`, `uv.lock`, `.gitignore`, `cliff.toml`, `CHANGELOG.md`, `mkdocs.yml`, `pixi.toml`, `environment.yml`, `ci/**`, `.github/**`, `README.md` (Layout section only), `crates/core/**`, every `crates/<c>/Cargo.toml` and `crates/<c>/src/lib.rs` skeleton (before hand-over), `crates/py/Cargo.toml`, `crates/py/src/{lib.rs,args.rs,core.rs}`, `python/varvite/{__init__.py,errors.py,py.typed}`, the skeletons with markers of `python/varvite/{_varvite.pyi,plot.py,datasets.py,checks.py}`, `python/tests/{conftest.py,test_core.py}`, `examples/{render.py,common.py}`, `examples/00-core/**`, `docs/{index.md,install.md}`, `docs/api/core.md` |
-| chain | `crates/chain/**`, `crates/py/src/chain.rs`, chain sections of `_varvite.pyi`, `plot.py`, `datasets.py`, `checks.py`, `python/tests/test_chain.py`, `examples/01-markov-chains/**`, `docs/api/chain.md` |
+| core (lands first) | `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `rustfmt.toml`, `mise.toml`, `pyproject.toml`, `uv.lock`, `.gitignore`, `cliff.toml`, `CHANGELOG.md`, `mkdocs.yml`, `pixi.toml`, `environment.yml`, `ci/**`, `.github/**`, `README.md` (Layout section only), `crates/core/**`, every `crates/<c>/Cargo.toml` and `crates/<c>/src/lib.rs` skeleton (before hand-over), `crates/py/Cargo.toml`, `crates/py/src/{lib.rs,args.rs,core.rs}`, `python/transiograms/{__init__.py,errors.py,py.typed}`, the skeletons with markers of `python/transiograms/{_transiograms.pyi,plot.py,datasets.py,checks.py}`, `python/tests/{conftest.py,test_core.py}`, `examples/{render.py,common.py}`, `examples/00-core/**`, `docs/{index.md,install.md}`, `docs/api/core.md` |
+| chain | `crates/chain/**`, `crates/py/src/chain.rs`, chain sections of `_transiograms.pyi`, `plot.py`, `datasets.py`, `checks.py`, `python/tests/test_chain.py`, `examples/01-markov-chains/**`, `docs/api/chain.md` |
 | hmm | `crates/hmm/**`, `crates/py/src/hmm.rs`, hmm sections, `python/tests/test_hmm.py`, `examples/02-hidden-markov/**`, `docs/api/hmm.md` |
 | hsmm | `crates/hsmm/**`, `crates/py/src/hsmm.rs`, hsmm sections, `python/tests/test_hsmm.py`, `examples/03-semi-markov-and-selection/**`, `docs/api/hsmm.md` |
 | transiogram | `crates/transiogram/**`, `crates/py/src/transiogram.rs`, transiogram sections, `python/tests/test_transiogram.py`, `examples/04-transiograms/**`, `docs/api/transiogram.md` |

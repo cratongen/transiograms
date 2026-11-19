@@ -1,11 +1,11 @@
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
-use varvite_core::{Mat, Stream};
-use varvite_hmm::{
+use transiograms_core::{Mat, Stream};
+use transiograms_hmm::{
     CovarianceType, Emission, Family, FitOptions, Gaussian, Hmm, Implementation, Ordering, Params,
     Priors, Sequence,
 };
-use varvite_hsmm::{
+use transiograms_hsmm::{
     Duration, DurationDist, DurationFamily, Hsmm, ModelKind, SelectionSpec, select_states,
 };
 
@@ -375,9 +375,9 @@ fn clamped_fit_and_impossible_clamp() {
     let model = truth(50);
     let sampled = model.sample(&[60, 60], 5);
     let data: Vec<Sequence> = sampled.iter().map(|(_, s)| s.clone()).collect();
-    let clamps: Vec<varvite_hmm::Clamp> = sampled
+    let clamps: Vec<transiograms_hmm::Clamp> = sampled
         .iter()
-        .map(|(states, s)| varvite_hmm::Clamp {
+        .map(|(states, s)| transiograms_hmm::Clamp {
             k: 3,
             allowed: (0..s.t * 3)
                 .map(|i| i % 3 == states[i / 3] as usize)
@@ -516,7 +516,7 @@ fn small_data() -> Vec<Sequence> {
 }
 
 /// `Ok(true)` when the call returned `Err`, `Ok(false)` when it returned `Ok`, `Err` on a panic.
-fn outcome<T>(f: impl FnOnce() -> varvite_core::Result<T>) -> Result<bool, String> {
+fn outcome<T>(f: impl FnOnce() -> transiograms_core::Result<T>) -> Result<bool, String> {
     match catch_unwind(AssertUnwindSafe(f)) {
         Ok(r) => Ok(r.is_err()),
         Err(p) => Err(p
@@ -527,7 +527,7 @@ fn outcome<T>(f: impl FnOnce() -> varvite_core::Result<T>) -> Result<bool, Strin
     }
 }
 
-fn one_state(m: usize) -> varvite_core::Result<Hsmm> {
+fn one_state(m: usize) -> transiograms_core::Result<Hsmm> {
     Hsmm::new(
         vec![1.0],
         Mat::zeros(1, 1),

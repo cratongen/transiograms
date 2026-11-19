@@ -2,7 +2,7 @@ import pickle
 
 import numpy as np
 import pytest
-import varvite as vv
+import transiograms as tg
 from scipy import stats
 
 START = np.array([0.4, 0.3, 0.2, 0.1])
@@ -17,15 +17,15 @@ A = np.array(
 
 
 def gaussian_model(**kw):
-    dists = [vv.Gaussian([m, -m], [[1.0, 0.3], [0.3, 0.8]]) for m in (0.0, 1.0, 2.0, 3.5)]
-    return vv.HiddenMarkovModel(dists, start=START, transition=A, direction="down", **kw)
+    dists = [tg.Gaussian([m, -m], [[1.0, 0.3], [0.3, 0.8]]) for m in (0.0, 1.0, 2.0, 3.5)]
+    return tg.HiddenMarkovModel(dists, start=START, transition=A, direction="down", **kw)
 
 
 def categorical_model():
     rng = np.random.default_rng(0)
     probs = rng.dirichlet(np.ones(3), size=4)
-    return vv.HiddenMarkovModel(
-        [vv.Categorical(p) for p in probs], start=START, transition=A, direction="down"
+    return tg.HiddenMarkovModel(
+        [tg.Categorical(p) for p in probs], start=START, transition=A, direction="down"
     )
 
 
@@ -38,7 +38,7 @@ def test_m2_brute_force(make):
     m = make()
     _, obs = m.sample(8, seed=11)
     x = obs[0]
-    ll, path, best, gamma, entropy = vv.checks.brute_force_hmm(m.start, m.transition, log_b(m, x))
+    ll, path, best, gamma, entropy = tg.checks.brute_force_hmm(m.start, m.transition, log_b(m, x))
     vpath, vlp = m.viterbi(x)
     np.testing.assert_array_equal(vpath, path)
     assert vlp[0] == pytest.approx(best, abs=1e-12)
@@ -63,7 +63,7 @@ def test_em_is_monotone_and_rows_are_stochastic():
     m = gaussian_model()
     _, obs = m.sample([200] * 5, seed=2)
     for implementation in ("log", "scaled"):
-        f = vv.HiddenMarkovModel(
+        f = tg.HiddenMarkovModel(
             4,
             covariance_type="full",
             n_init=2,
@@ -80,18 +80,18 @@ def test_em_is_monotone_and_rows_are_stochastic():
 def test_scaled_and_log_fits_agree():
     m = gaussian_model()
     _, obs = m.sample([150] * 3, seed=4)
-    a = vv.HiddenMarkovModel(4, covariance_type="full", direction="down", max_iter=20).fit(obs)
-    b = vv.HiddenMarkovModel(
+    a = tg.HiddenMarkovModel(4, covariance_type="full", direction="down", max_iter=20).fit(obs)
+    b = tg.HiddenMarkovModel(
         4, covariance_type="full", direction="down", max_iter=20, implementation="scaled"
     ).fit(obs)
     np.testing.assert_allclose(a.history, b.history, rtol=1e-8)
 
 
 def test_recovery_from_the_truth_within_binomial_tolerance():
-    dists = [vv.Gaussian([4.0 * j], 1.0, covariance_type="spherical") for j in range(4)]
-    truth = vv.HiddenMarkovModel(dists, start=START, transition=A, direction="down")
+    dists = [tg.Gaussian([4.0 * j], 1.0, covariance_type="spherical") for j in range(4)]
+    truth = tg.HiddenMarkovModel(dists, start=START, transition=A, direction="down")
     states, obs = truth.sample([10_000] * 10, seed=5)
-    f = vv.HiddenMarkovModel(
+    f = tg.HiddenMarkovModel(
         truth.distributions, start=truth.start, transition=truth.transition, params="t", direction="down"
     ).fit(obs)
     s = np.concatenate([x[:-1] for x in states])
@@ -103,8 +103,8 @@ def test_recovery_from_the_truth_within_binomial_tolerance():
 def test_fully_labelled_fit_is_the_counting_mle():
     truth = categorical_model()
     states, obs = truth.sample([300, 300], seed=6)
-    f = vv.HiddenMarkovModel(
-        [vv.Categorical(np.full(3, 1 / 3)) for _ in range(4)],
+    f = tg.HiddenMarkovModel(
+        [tg.Categorical(np.full(3, 1 / 3)) for _ in range(4)],
         start=np.full(4, 0.25),
         transition=np.full((4, 4), 0.25),
         direction="down",
@@ -131,7 +131,7 @@ def test_state_permutation_leaves_the_score_unchanged():
     m = gaussian_model()
     _, obs = m.sample(100, seed=8)
     perm = [2, 0, 3, 1]
-    p = vv.HiddenMarkovModel(
+    p = tg.HiddenMarkovModel(
         [m.distributions[i] for i in perm],
         start=START[perm],
         transition=A[np.ix_(perm, perm)],
@@ -142,8 +142,8 @@ def test_state_permutation_leaves_the_score_unchanged():
 
 @pytest.mark.parametrize("direction", ["up", "down"])
 def test_outputs_come_back_in_input_row_order(direction):
-    m = vv.HiddenMarkovModel(
-        [vv.Gaussian([0.0], 1.0), vv.Gaussian([4.0], 1.0)],
+    m = tg.HiddenMarkovModel(
+        [tg.Gaussian([0.0], 1.0), tg.Gaussian([4.0], 1.0)],
         start=[0.5, 0.5],
         transition=[[0.9, 0.1], [0.2, 0.8]],
         direction=direction,
@@ -161,33 +161,33 @@ def test_outputs_come_back_in_input_row_order(direction):
 def test_densities_match_scipy():
     x = np.array([[0.1, -0.2], [1.5, 0.3], [np.nan, 0.4]])
     cov = [[1.0, 0.3], [0.3, 0.8]]
-    g = vv.Gaussian([0.0, 0.1], cov)
+    g = tg.Gaussian([0.0, 0.1], cov)
     want = stats.multivariate_normal([0.0, 0.1], cov).logpdf(x[:2])
     np.testing.assert_allclose(g.log_density(x)[:2], want, rtol=1e-12)
     assert g.log_density(x)[2] == pytest.approx(stats.norm(0.1, np.sqrt(0.8)).logpdf(0.4), rel=1e-12)
-    p = vv.Poisson([2.0, 0.5])
+    p = tg.Poisson([2.0, 0.5])
     k = np.array([[0, 1], [3, 0]])
     np.testing.assert_allclose(p.log_density(k), stats.poisson([2.0, 0.5]).logpmf(k).sum(axis=1), rtol=1e-12)
-    c = vv.Categorical([0.2, 0.5, 0.3])
+    c = tg.Categorical([0.2, 0.5, 0.3])
     np.testing.assert_allclose(c.log_density([0, 2, -1]), [np.log(0.2), np.log(0.3), 0.0], rtol=1e-12)
-    mix = vv.GaussianMixture([0.3, 0.7], [[0.0], [3.0]], [1.0, 2.0], covariance_type="spherical")
+    mix = tg.GaussianMixture([0.3, 0.7], [[0.0], [3.0]], [1.0, 2.0], covariance_type="spherical")
     xs = np.array([[-1.0], [2.0]])
     want = np.log(0.3 * stats.norm(0, 1).pdf(xs[:, 0]) + 0.7 * stats.norm(3, np.sqrt(2)).pdf(xs[:, 0]))
     np.testing.assert_allclose(mix.log_density(xs), want, rtol=1e-12)
 
 
 def test_distribution_samples_are_seeded_and_shaped():
-    g = vv.Gaussian([0.0, 1.0], [1.0, 2.0], covariance_type="diag")
+    g = tg.Gaussian([0.0, 1.0], [1.0, 2.0], covariance_type="diag")
     assert g.sample(10, seed=1).shape == (10, 2)
     np.testing.assert_array_equal(g.sample(10, seed=1), g.sample(10, seed=1))
-    assert vv.Categorical([0.5, 0.5]).sample(7).dtype == np.int64
+    assert tg.Categorical([0.5, 0.5]).sample(7).dtype == np.int64
     np.testing.assert_allclose(g.covariance, [1.0, 2.0])
 
 
 def test_pseudocount_survives_restarts():
     m = categorical_model()
     _, obs = m.sample([100, 100], seed=10)
-    f = vv.HiddenMarkovModel(3, emission="categorical", pseudocount=2.0, n_init=2, direction="down").fit(obs)
+    f = tg.HiddenMarkovModel(3, emission="categorical", pseudocount=2.0, n_init=2, direction="down").fit(obs)
     assert all(d.pseudocount == 2.0 for d in f.distributions)
 
 
@@ -207,18 +207,18 @@ def test_sample_posterior_and_clamps():
 
 def test_json_pickle_and_errors():
     m = gaussian_model()
-    assert vv.HiddenMarkovModel.from_json(m.to_json()) == m
+    assert tg.HiddenMarkovModel.from_json(m.to_json()) == m
     assert pickle.loads(pickle.dumps(m)) == m
-    for d in m.distributions + [vv.Poisson([1.0]), vv.GaussianMixture([1.0], [[0.0]], [[[1.0]]])]:
+    for d in m.distributions + [tg.Poisson([1.0]), tg.GaussianMixture([1.0], [[0.0]], [[[1.0]]])]:
         assert type(d).from_json(d.to_json()) == d
         assert pickle.loads(pickle.dumps(d)) == d
-    with pytest.raises(vv.InvalidInput, match="not fitted"):
-        _ = vv.HiddenMarkovModel(2).transition
-    with pytest.raises(vv.InvalidInput):
-        vv.HiddenMarkovModel(2, emission="laplace")
-    with pytest.raises(vv.InvalidInput):
-        vv.Categorical([0.5, 0.6])
-    with pytest.raises(vv.InvalidInput, match="labels"):
+    with pytest.raises(tg.InvalidInput, match="not fitted"):
+        _ = tg.HiddenMarkovModel(2).transition
+    with pytest.raises(tg.InvalidInput):
+        tg.HiddenMarkovModel(2, emission="laplace")
+    with pytest.raises(tg.InvalidInput):
+        tg.Categorical([0.5, 0.6])
+    with pytest.raises(tg.InvalidInput, match="labels"):
         m.predict(np.zeros((5, 2)), labels=[0, 1, 9, 0, 0])
-    with pytest.raises(vv.InvalidInput):
+    with pytest.raises(tg.InvalidInput):
         m.sample_posterior(np.zeros((5, 2)), n=2**62)

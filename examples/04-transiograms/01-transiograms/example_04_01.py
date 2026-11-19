@@ -16,12 +16,12 @@ sys.path.insert(0, str(HERE.parents[1]))
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
-import varvite as vv
+import transiograms as tg
 from common import save
 
-d = vv.datasets.layered_drillholes(seed=0)
-names = vv.Categories(["mud", "sand", "gravel"], colors=["#8c8c8c", "#e69f00", "#0072b2"])
-truth = vv.TransitionModel.from_json(d["model"])
+d = tg.datasets.layered_drillholes(seed=0)
+names = tg.Categories(["mud", "sand", "gravel"], colors=["#8c8c8c", "#e69f00", "#0072b2"])
+truth = tg.TransitionModel.from_json(d["model"])
 p = np.bincount(d["CODE"], minlength=3) / len(d["CODE"])
 print("sample proportions:", p.round(3), "model:", truth.proportions)
 
@@ -32,11 +32,11 @@ print("sample proportions:", p.round(3), "model:", truth.proportions)
 
 # %%
 lags = np.arange(0.5, 12.5, 0.5)
-exp = vv.downhole_transiogram("CODE", holes="HOLE_ID", from_="FROM", to="TO", lags=lags, data=d)
-vertical = vv.TransiogramModel.fit_markov(exp, proportions=p)
+exp = tg.downhole_transiogram("CODE", holes="HOLE_ID", from_="FROM", to="TO", lags=lags, data=d)
+vertical = tg.TransiogramModel.fit_markov(exp, proportions=p)
 print("fitted vertical mean lengths (m):", (-1 / np.diag(vertical.rates)).round(2))
 print("true:", truth.mean_lengths([0.0, 0.0, 1.0]).round(2))
-fig, axes = vv.plot.transiogram(exp, vertical, h=np.linspace(0, 12, 200), categories=names)
+fig, axes = tg.plot.transiogram(exp, vertical, h=np.linspace(0, 12, 200), categories=names)
 fig.suptitle("Vertical transiograms: data (points) and Markov model (lines)")
 save(fig, "vertical")
 
@@ -47,7 +47,7 @@ save(fig, "vertical")
 
 # %%
 xyz = np.column_stack([d["X"], d["Y"], d["Z"]])
-points = vv.experimental_transiogram(
+points = tg.experimental_transiogram(
     xyz,
     d["CODE"],
     holes=d["HOLE_ID"],
@@ -68,7 +68,7 @@ print("downhole, from mud at 1, 2, 3 m:", exp.probabilities[whole, 0].round(4).t
 # lag direction then interpolates its rates from the three principal axes.
 
 # %%
-model = vv.TransitionModel(p, 0.1 * vertical.rates, 0.1 * vertical.rates, vertical.rates)
+model = tg.TransitionModel(p, 0.1 * vertical.rates, 0.1 * vertical.rates, vertical.rates)
 h = np.linspace(0.0, 150.0, 200)
 fig, ax = plt.subplots(1, 2, figsize=(10, 3.4), layout="constrained", sharey=True)
 for a, axis, label in ((ax[0], [1.0, 0.0, 0.0], "x"), (ax[1], [0.0, 0.0, 0.1], "z")):

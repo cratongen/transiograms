@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
-use varvite_core::numerics::{golden_section, log_add, logsumexp};
-use varvite_core::special::ln_gamma;
-use varvite_core::{Result, Stream, invalid};
+use transiograms_core::numerics::{golden_section, log_add, logsumexp};
+use transiograms_core::special::ln_gamma;
+use transiograms_core::{Result, Stream, invalid};
 
 /// Shifted laws on u = 1, 2, ...; truncated and renormalised on `1..=max_duration`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

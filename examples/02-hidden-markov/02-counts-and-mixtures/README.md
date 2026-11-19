@@ -11,7 +11,7 @@ import math
 
 import matplotlib.pyplot as plt
 import numpy as np
-import varvite as vv
+import transiograms as tg
 from common import ACCENT, GRAY, HIGHLIGHT, save
 ```
 
@@ -21,8 +21,8 @@ A two-state generator: sound rock with 1.5 fractures per metre and fractured zon
 holes of 300 one-metre samples each, all from seed 0.
 
 ```python
-truth = vv.HiddenMarkovModel(
-    [vv.Poisson([1.5]), vv.Poisson([8.0])],
+truth = tg.HiddenMarkovModel(
+    [tg.Poisson([1.5]), tg.Poisson([8.0])],
     start=[0.7, 0.3],
     transition=[[0.95, 0.05], [0.10, 0.90]],
 )
@@ -37,7 +37,7 @@ first counts of hole 0: [ 8  8  2  7  8  8 15  8  9  9  7 11]
 `emission="poisson"` fits one rate per state. `ordering="mean"` puts the sound state first.
 
 ```python
-poisson = vv.HiddenMarkovModel(2, emission="poisson", n_init=3, seed=0, ordering="mean")
+poisson = tg.HiddenMarkovModel(2, emission="poisson", n_init=3, seed=0, ordering="mean")
 poisson.fit(counts)
 print("rates:", [round(float(p.rate[0]), 2) for p in poisson.distributions])
 print(poisson.transition.round(3))
@@ -90,15 +90,15 @@ would put the heterolithic mean between the modes, where almost no readings fall
 model shares one emission family, so the sand is a mixture with a single component.
 
 ```python
-heterolithic = vv.GaussianMixture([0.5, 0.5], [[75.0], [125.0]], [64.0, 64.0], covariance_type="spherical")
-generator = vv.HiddenMarkovModel(
-    [vv.GaussianMixture([1.0], [[20.0]], [25.0], covariance_type="spherical"), heterolithic],
+heterolithic = tg.GaussianMixture([0.5, 0.5], [[75.0], [125.0]], [64.0, 64.0], covariance_type="spherical")
+generator = tg.HiddenMarkovModel(
+    [tg.GaussianMixture([1.0], [[20.0]], [25.0], covariance_type="spherical"), heterolithic],
     start=[0.5, 0.5],
     transition=[[0.97, 0.03], [0.04, 0.96]],
 )
 mix_states, gr = generator.sample([400] * 4, seed=1)
 
-mixture = vv.HiddenMarkovModel(
+mixture = tg.HiddenMarkovModel(
     2, emission="mixture", n_mix=2, covariance_type="spherical", n_init=3, seed=0, ordering="mean"
 )
 mixture.fit(gr)
@@ -141,7 +141,7 @@ better). ICL adds the entropy of the state paths to BIC, so it penalises states 
 ```python
 rows = []
 for n_states in range(1, 5):
-    m = vv.HiddenMarkovModel(
+    m = tg.HiddenMarkovModel(
         n_states, emission="mixture", n_mix=2, covariance_type="spherical", n_init=3, seed=0
     ).fit(gr)
     rows.append((n_states, m.aic(gr), m.bic(gr), m.icl(gr)))
@@ -189,7 +189,7 @@ scores the same data to the same value.
 
 ```python
 text = poisson.to_json()
-again = vv.HiddenMarkovModel.from_json(text)
+again = tg.HiddenMarkovModel.from_json(text)
 print(
     len(text),
     "characters; equal:",

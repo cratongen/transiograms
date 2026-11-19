@@ -1053,6 +1053,118 @@ dependencies = [
 ]
 
 [[package]]
+name = "transiograms-chain"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "nalgebra",
+ "proptest",
+ "rayon",
+ "serde",
+ "serde_json",
+ "transiograms-core",
+]
+
+[[package]]
+name = "transiograms-core"
+version = "0.1.0"
+dependencies = [
+ "nalgebra",
+ "proptest",
+ "rayon",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "transiograms-hmm"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "nalgebra",
+ "proptest",
+ "rayon",
+ "serde",
+ "serde_json",
+ "transiograms-core",
+]
+
+[[package]]
+name = "transiograms-hsmm"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "nalgebra",
+ "proptest",
+ "rayon",
+ "serde",
+ "serde_json",
+ "transiograms-core",
+ "transiograms-hmm",
+]
+
+[[package]]
+name = "transiograms-mcrf"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "nalgebra",
+ "proptest",
+ "rayon",
+ "serde",
+ "serde_json",
+ "transiograms-core",
+ "transiograms-transiogram",
+]
+
+[[package]]
+name = "transiograms-py"
+version = "0.1.0"
+dependencies = [
+ "nalgebra",
+ "numpy",
+ "pyo3",
+ "rayon",
+ "serde",
+ "serde_json",
+ "transiograms-chain",
+ "transiograms-core",
+ "transiograms-hmm",
+ "transiograms-hsmm",
+ "transiograms-mcrf",
+ "transiograms-tpsim",
+ "transiograms-transiogram",
+]
+
+[[package]]
+name = "transiograms-tpsim"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "nalgebra",
+ "proptest",
+ "rayon",
+ "serde",
+ "serde_json",
+ "transiograms-core",
+ "transiograms-transiogram",
+]
+
+[[package]]
+name = "transiograms-transiogram"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "nalgebra",
+ "proptest",
+ "rayon",
+ "serde",
+ "serde_json",
+ "transiograms-core",
+]
+
+[[package]]
 name = "typenum"
 version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1069,118 +1181,6 @@ name = "unicode-ident"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
-
-[[package]]
-name = "varvite-chain"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "nalgebra",
- "proptest",
- "rayon",
- "serde",
- "serde_json",
- "varvite-core",
-]
-
-[[package]]
-name = "varvite-core"
-version = "0.1.0"
-dependencies = [
- "nalgebra",
- "proptest",
- "rayon",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "varvite-hmm"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "nalgebra",
- "proptest",
- "rayon",
- "serde",
- "serde_json",
- "varvite-core",
-]
-
-[[package]]
-name = "varvite-hsmm"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "nalgebra",
- "proptest",
- "rayon",
- "serde",
- "serde_json",
- "varvite-core",
- "varvite-hmm",
-]
-
-[[package]]
-name = "varvite-mcrf"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "nalgebra",
- "proptest",
- "rayon",
- "serde",
- "serde_json",
- "varvite-core",
- "varvite-transiogram",
-]
-
-[[package]]
-name = "varvite-py"
-version = "0.1.0"
-dependencies = [
- "nalgebra",
- "numpy",
- "pyo3",
- "rayon",
- "serde",
- "serde_json",
- "varvite-chain",
- "varvite-core",
- "varvite-hmm",
- "varvite-hsmm",
- "varvite-mcrf",
- "varvite-tpsim",
- "varvite-transiogram",
-]
-
-[[package]]
-name = "varvite-tpsim"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "nalgebra",
- "proptest",
- "rayon",
- "serde",
- "serde_json",
- "varvite-core",
- "varvite-transiogram",
-]
-
-[[package]]
-name = "varvite-transiogram"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "nalgebra",
- "proptest",
- "rayon",
- "serde",
- "serde_json",
- "varvite-core",
-]
 
 [[package]]
 name = "wait-timeout"

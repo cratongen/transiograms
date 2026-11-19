@@ -1,7 +1,7 @@
-use varvite_core::numerics::logsumexp;
-use varvite_core::rng::tag;
-use varvite_core::{Mat, Result, Stream, invalid, memory};
-use varvite_hmm::{Clamp, Emission, Sequence};
+use transiograms_core::numerics::logsumexp;
+use transiograms_core::rng::tag;
+use transiograms_core::{Mat, Result, Stream, invalid, memory};
+use transiograms_hmm::{Clamp, Emission, Sequence};
 
 use crate::model::{Hsmm, Tables};
 

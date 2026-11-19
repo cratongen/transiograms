@@ -1,11 +1,11 @@
 use std::mem::size_of;
 
 use rayon::prelude::*;
-use varvite_core::rng::{splitmix, tag};
-use varvite_core::{
+use transiograms_core::rng::{splitmix, tag};
+use transiograms_core::{
     Code, Grid, MISSING, Mat, Realizations, Result, Snapped, Stream, invalid, memory,
 };
-use varvite_transiogram::{Table, TransitionModel};
+use transiograms_transiogram::{Table, TransitionModel};
 
 use crate::conditional::resolve;
 use crate::search::Search;

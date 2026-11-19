@@ -3,9 +3,9 @@
 use numpy::{PyArray1, PyArray2, PyArrayMethods};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
-use varvite_core::{Grid, MISSING, Prediction, Realizations, Snapped, memory};
-use varvite_tpsim::{Options, QuenchOptions};
-use varvite_transiogram::TransitionModel;
+use transiograms_core::{Grid, MISSING, Prediction, Realizations, Snapped, memory};
+use transiograms_tpsim::{Options, QuenchOptions};
+use transiograms_transiogram::TransitionModel;
 
 use crate::args::{codes, column, coords, mask, to_rust, vec1};
 use crate::core::{PyGrid, json, same_json, unjson};
@@ -75,7 +75,7 @@ fn codes_i64<'py>(py: Python<'py>, c: &[u32]) -> Bound<'py, PyArray1<i64>> {
 ///     Shannon entropy over ``ln k``, in [0, 1].
 /// corrected : float
 ///     Fraction of cells whose probabilities were clipped to [0, 1] and renormalised.
-#[pyclass(module = "varvite", name = "Prediction", frozen)]
+#[pyclass(module = "transiograms", name = "Prediction", frozen)]
 pub struct PyPrediction(pub Prediction);
 
 #[pymethods]
@@ -141,7 +141,7 @@ impl PyPrediction {
 ///     ``(n,)`` fraction of cells clipped during sequential simulation (zeros for MCRF).
 /// objective : list of numpy.ndarray
 ///     Quenching objective after each sweep, per realization (empty for MCRF).
-#[pyclass(module = "varvite", name = "Realizations", frozen)]
+#[pyclass(module = "transiograms", name = "Realizations", frozen)]
 pub struct PyRealizations {
     pub r: Realizations,
     pub memory: Option<u64>,
@@ -311,7 +311,7 @@ fn tp_cokriging<'py>(
         memory,
         ..Options::default()
     };
-    py.detach(|| varvite_tpsim::predict(&model.0, &grid.0, m.as_deref(), &h, &opts))
+    py.detach(|| transiograms_tpsim::predict(&model.0, &grid.0, m.as_deref(), &h, &opts))
         .map(PyPrediction)
         .map_err(to_rust)
 }
@@ -382,7 +382,7 @@ fn tprogs_simulate<'py>(
         memory,
     };
     let r = py
-        .detach(|| varvite_tpsim::simulate(&model.0, &grid.0, m.as_deref(), &h, &opts))
+        .detach(|| transiograms_tpsim::simulate(&model.0, &grid.0, m.as_deref(), &h, &opts))
         .map_err(to_rust)?;
     Ok(PyRealizations { r, memory })
 }

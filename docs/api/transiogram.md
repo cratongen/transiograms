@@ -20,6 +20,7 @@ class ExperimentalTransiogram:
     @staticmethod
     def from_json(text: str) -> ExperimentalTransiogram: ...
 
+
 def experimental_transiogram(
     coords: ArrayLike | str,
     codes: ArrayLike | str,
@@ -61,6 +62,7 @@ def grid_transiogram(
     categories: Categories | int | None = None,
 ) -> ExperimentalTransiogram: ...
 
+
 class TransiogramModel:
     @staticmethod
     def markov(rates: ArrayLike | MarkovChain) -> TransiogramModel: ...
@@ -100,6 +102,7 @@ class TransiogramModel:
     def to_json(self) -> str: ...
     @staticmethod
     def from_json(text: str) -> TransiogramModel: ...
+
 
 class TransitionModel:
     def __init__(

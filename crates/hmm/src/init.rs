@@ -1,4 +1,4 @@
-use varvite_core::{Mat, Result, Stream, invalid};
+use transiograms_core::{Mat, Result, Stream, invalid};
 
 use crate::emission::{
     Categorical, CovarianceType, Density, Emission, Family, Gaussian, GaussianMixture, Poisson,

@@ -1,4 +1,4 @@
-"""Seeded synthetic datasets (`vv.datasets`). Each function takes `seed=0` and returns a dict of NumPy
+"""Seeded synthetic datasets (`tg.datasets`). Each function takes `seed=0` and returns a dict of NumPy
 arrays and model JSON strings."""
 
 import numpy as np
@@ -21,10 +21,10 @@ def varved_sequence(seed=0):
         ``HOLE_ID`` (str), ``FROM`` and ``TO`` (depth, top-down), ``CODE`` (0 sand, 1 silt,
         2 clay), ``names`` and ``generator`` (the true ``MarkovChain`` as JSON).
     """
-    import varvite as vv
+    import transiograms as tg
 
     embedded = np.array([[0.0, 0.85, 0.15], [0.1, 0.0, 0.9], [0.8, 0.2, 0.0]])
-    chain = vv.MarkovChain.from_matrix(embedded, kind="embedded", mean_lengths=[1.2, 0.8, 0.5])
+    chain = tg.MarkovChain.from_matrix(embedded, kind="embedded", mean_lengths=[1.2, 0.8, 0.5])
     length = 30.0
     beds = chain.simulate(length, n=12, seed=seed)
     holes, top, bottom, codes = [], [], [], []
@@ -64,20 +64,20 @@ def electrofacies_logs(seed=0):
         ``HOLE_ID``, ``DEPTH``, ``GR`` (API), ``RHOB`` (g/cm3) and ``STATE`` per row, top-down,
         and ``model``: the true ``HiddenMarkovModel`` (on the scaled channels) as JSON.
     """
-    import varvite as vv
+    import transiograms as tg
 
     scale, shift = np.array([20.0, -0.08]), np.array([40.0, 2.65])
     means = [[0.0, 0.0], [3.0, 2.5], [6.0, 0.0]]
-    truth = vv.HiddenMarkovModel(
-        [vv.Gaussian(m, [0.5, 0.5], covariance_type="diag") for m in means],
+    truth = tg.HiddenMarkovModel(
+        [tg.Gaussian(m, [0.5, 0.5], covariance_type="diag") for m in means],
         start=[0.4, 0.35, 0.25],
         transition=[[0.95, 0.03, 0.02], [0.02, 0.95, 0.03], [0.03, 0.02, 0.95]],
         direction="down",
     )
     states, obs = truth.sample([300] * 20, seed=seed)
     x = np.concatenate(obs) * scale + shift
-    scaled = vv.HiddenMarkovModel(
-        [vv.Gaussian(np.multiply(m, scale) + shift, 0.5 * scale**2, covariance_type="diag") for m in means],
+    scaled = tg.HiddenMarkovModel(
+        [tg.Gaussian(np.multiply(m, scale) + shift, 0.5 * scale**2, covariance_type="diag") for m in means],
         start=truth.start,
         transition=truth.transition,
         direction="down",
@@ -117,13 +117,13 @@ def layered_drillholes(seed=0):
         (depth below the grid top); ``field`` (the realization, one code per cell, x fastest);
         ``model`` (``TransitionModel`` JSON) and ``grid`` (``Grid`` JSON).
     """
-    import varvite as vv
+    import transiograms as tg
 
-    model = vv.TransitionModel.from_geology(
+    model = tg.TransitionModel.from_geology(
         [0.5, 0.3, 0.2], [[60.0, 40.0, 30.0], [60.0, 40.0, 30.0], [6.0, 4.0, 3.0]]
     )
-    grid = vv.Grid((0.0, 0.0, 0.0), (10.0, 10.0, 1.0), (32, 32, 30))
-    field = vv.mcrf_simulate(model, grid, np.empty((0, 3)), np.empty(0), seed=seed).realizations[0]
+    grid = tg.Grid((0.0, 0.0, 0.0), (10.0, 10.0, 1.0), (32, 32, 30))
+    field = tg.mcrf_simulate(model, grid, np.empty((0, 3)), np.empty(0), seed=seed).realizations[0]
     cube = field.reshape(grid.shape)
     columns = [(i, j) for j in range(3, 32, 6) for i in range(3, 32, 6)]
     nz = grid.count[2]

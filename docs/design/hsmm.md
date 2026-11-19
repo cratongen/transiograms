@@ -1,8 +1,8 @@
-# varvite-hsmm: algorithms
+# transiograms-hsmm: algorithms
 
 Signatures are in [spec.md](spec.md) section 4.4. Explicit-duration HSMM (Guedon 2003, Yu 2010)
 with right censoring. Emissions, clamps, priors, restarts, ordering and sampling helpers come
-from varvite-hmm.
+from transiograms-hmm.
 
 ## 1. Model
 

@@ -13,6 +13,7 @@ class Prediction:
     @property
     def corrected(self) -> float: ...
 
+
 class Realizations:
     @property
     def realizations(self) -> NDArray[np.int64]: ...
@@ -29,6 +30,7 @@ class Realizations:
     @property
     def objective(self) -> list[NDArray[np.float64]]: ...
     def __len__(self) -> int: ...
+
 
 def tp_cokriging(
     model: TransitionModel,

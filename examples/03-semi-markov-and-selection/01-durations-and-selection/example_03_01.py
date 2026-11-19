@@ -17,12 +17,12 @@ sys.path.insert(0, str(HERE.parents[1]))
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
-import varvite as vv
+import transiograms as tg
 from common import ACCENT, GRAY, HIGHLIGHT, save
 
-truth = vv.HiddenSemiMarkovModel(
-    [vv.Gaussian([m], 1.0) for m in (0.0, 2.5, 5.0)],
-    [vv.NegativeBinomial(6.0, 0.4), vv.NegativeBinomial(4.0, 0.5), vv.ShiftedPoisson(3.0)],
+truth = tg.HiddenSemiMarkovModel(
+    [tg.Gaussian([m], 1.0) for m in (0.0, 2.5, 5.0)],
+    [tg.NegativeBinomial(6.0, 0.4), tg.NegativeBinomial(4.0, 0.5), tg.ShiftedPoisson(3.0)],
     start=[0.4, 0.3, 0.3],
     transition=[[0.0, 0.6, 0.4], [0.5, 0.0, 0.5], [0.7, 0.3, 0.0]],
     max_duration=40,
@@ -36,8 +36,8 @@ print([o.shape for o in obs[:2]], "...")
 # recovers the bed-thickness law; the HMM can only offer geometric thicknesses.
 
 # %%
-hmm = vv.HiddenMarkovModel(3, n_init=3, seed=0, direction="down", ordering="mean").fit(obs)
-hsmm = vv.HiddenSemiMarkovModel(
+hmm = tg.HiddenMarkovModel(3, n_init=3, seed=0, direction="down", ordering="mean").fit(obs)
+hsmm = tg.HiddenSemiMarkovModel(
     3, duration="negative_binomial", max_duration=40, n_init=3, seed=0, direction="down", ordering="mean"
 ).fit(obs)
 print(f"log-likelihood: HMM {hmm.score(obs):.1f}, HSMM {hsmm.score(obs):.1f}")
@@ -58,7 +58,7 @@ save(fig, "durations")
 # A geometric HSMM built from an HMM reproduces it exactly, which is the M3 equivalence check:
 
 # %%
-same = vv.HiddenSemiMarkovModel.from_hmm(hmm, max_duration=400)
+same = tg.HiddenSemiMarkovModel.from_hmm(hmm, max_duration=400)
 print("log-likelihood gap:", abs(same.score(obs) - hmm.score(obs)))
 print("same Viterbi path:", all(np.array_equal(a, b) for a, b in zip(same.predict(obs), hmm.predict(obs))))
 
@@ -67,13 +67,13 @@ print("same Viterbi path:", all(np.array_equal(a, b) for a, b in zip(same.predic
 # too many states on dense logs; leave-one-hole-out likelihood is the honest check.
 
 # %%
-logs = vv.datasets.electrofacies_logs(seed=0)
+logs = tg.datasets.electrofacies_logs(seed=0)
 x = np.column_stack([logs["GR"], logs["RHOB"]])
-table = vv.select_states(x, holes=logs["HOLE_ID"], states=range(1, 7), n_init=5, seed=0, direction="down")
+table = tg.select_states(x, holes=logs["HOLE_ID"], states=range(1, 7), n_init=5, seed=0, direction="down")
 for k, b, cv in zip(table["states"], table["bic"], table["cv_per_step"]):
     print(f"K = {k}: BIC {b:9.1f}, held-out log-likelihood per step {cv:.3f}")
 fig, (a, b) = plt.subplots(1, 2, figsize=(10, 3.4), layout="constrained")
-vv.plot.selection(table, ax=a)
+tg.plot.selection(table, ax=a)
 b.plot(table["states"], table["cv_per_step"], marker="o", color=ACCENT)
 b.set(xlabel="number of states", ylabel="held-out log-likelihood per step", title="Leave one hole out")
 save(fig, "selection")

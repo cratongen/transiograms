@@ -1,4 +1,4 @@
-# varvite-mcrf: algorithms
+# transiograms-mcrf: algorithms
 
 Signatures are in [spec.md](spec.md) section 4.7. Li (2007), Li and Zhang (2019), Allard, D'Or
 and Froidevaux (2011).

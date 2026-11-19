@@ -6,6 +6,7 @@ Emission distributions and `HiddenMarkovModel`. `Sequences` is a list of arrays 
 Sequences: TypeAlias = ArrayLike | list[ArrayLike] | str
 Rows: TypeAlias = NDArray | list[NDArray]
 
+
 class Categorical:
     def __init__(
         self, probabilities: ArrayLike, *, pseudocount: float = 0.0, frozen: bool = False
@@ -21,6 +22,7 @@ class Categorical:
     def to_json(self) -> str: ...
     @staticmethod
     def from_json(text: str) -> Categorical: ...
+
 
 class Gaussian:
     def __init__(
@@ -45,6 +47,7 @@ class Gaussian:
     @staticmethod
     def from_json(text: str) -> Gaussian: ...
 
+
 class Poisson:
     def __init__(self, rate: ArrayLike | float, *, frozen: bool = False) -> None: ...
     @property
@@ -56,6 +59,7 @@ class Poisson:
     def to_json(self) -> str: ...
     @staticmethod
     def from_json(text: str) -> Poisson: ...
+
 
 class GaussianMixture:
     def __init__(
@@ -83,7 +87,9 @@ class GaussianMixture:
     @staticmethod
     def from_json(text: str) -> GaussianMixture: ...
 
+
 Distribution: TypeAlias = Categorical | Gaussian | Poisson | GaussianMixture
+
 
 class HiddenMarkovModel:
     def __init__(

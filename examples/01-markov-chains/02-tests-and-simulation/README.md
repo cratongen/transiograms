@@ -7,12 +7,12 @@ draws logs that honour logged intervals.
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
-import varvite as vv
+import transiograms as tg
 from common import ACCENT, GRAY, HIGHLIGHT, save
 from matplotlib.colors import ListedColormap
 
-d = vv.datasets.varved_sequence(seed=0)
-names = vv.Categories(d["names"], colors=["#e69f00", "#56b4e9", "#0072b2"])
+d = tg.datasets.varved_sequence(seed=0)
+names = tg.Categories(d["names"], colors=["#e69f00", "#56b4e9", "#0072b2"])
 step = 0.1
 depth, holes, codes = [], [], []
 for h in np.unique(d["HOLE_ID"]):
@@ -23,7 +23,7 @@ for h in np.unique(d["HOLE_ID"]):
     holes.append(np.full(z.size, h))
     codes.append(d["CODE"][at][idx])
 log = {"HOLE_ID": np.concatenate(holes), "DEPTH": np.concatenate(depth), "CODE": np.concatenate(codes)}
-fixed = vv.MarkovChain("fixed").fit("CODE", holes="HOLE_ID", depth="DEPTH", data=log)
+fixed = tg.MarkovChain("fixed").fit("CODE", holes="HOLE_ID", depth="DEPTH", data=log)
 print(f"step {fixed.step:.2f} m")
 print(fixed.transition_matrix.round(3))
 ```
@@ -39,9 +39,9 @@ Order 2 against order 1, and AIC and BIC for orders 0 to 3, all fitted on the sa
 transitions. Bed persistence makes a sampled log strongly first order.
 
 ```python
-t = vv.order_test("CODE", order=2, holes="HOLE_ID", depth="DEPTH", data=log)
+t = tg.order_test("CODE", order=2, holes="HOLE_ID", depth="DEPTH", data=log)
 print(f"order 2 vs 1: G = {t.statistic:.1f}, df = {t.df}, p = {t.p_value:.2f}")
-table = vv.select_order("CODE", max_order=3, holes="HOLE_ID", depth="DEPTH", data=log)
+table = tg.select_order("CODE", max_order=3, holes="HOLE_ID", depth="DEPTH", data=log)
 print("BIC by order:", table["bic"].round(0), "best order:", table["order"][np.argmin(table["bic"])])
 ```
 
@@ -54,10 +54,10 @@ A Markov chain makes bed thickness exponential. The Kaplan-Meier curve treats th
 the top or base of a hole as censored; the bootstrap Kolmogorov-Smirnov test measures the gap.
 
 ```python
-s = vv.sojourn("CODE", holes="HOLE_ID", from_="FROM", to="TO", data=d)
+s = tg.sojourn("CODE", holes="HOLE_ID", from_="FROM", to="TO", data=d)
 fig, axes = plt.subplots(1, 3, figsize=(12, 3.4), layout="constrained", sharey=True)
 for code, ax in enumerate(axes):
-    vv.plot.sojourn(s, code, ax=ax, color=names.colors[code])
+    tg.plot.sojourn(s, code, ax=ax, color=names.colors[code])
     t = s.exponential_test(code, n_bootstrap=199, seed=0)
     ax.set_title(f"{names.names[code]}: KS p = {t.p_value:.2f}")
 save(fig, "sojourns")
@@ -92,14 +92,14 @@ save(fig, "simulations")
 ![simulations](simulations.png)
 
 Between two conditioning samples the sampler draws a Markov bridge. Its marginal at step `t`
-has the closed form `(P^t)_aj (P^(n-t))_jb / (P^n)_ab`, which `vv.checks` computes in NumPy:
+has the closed form `(P^t)_aj (P^(n-t))_jb / (P^n)_ab`, which `tg.checks` computes in NumPy:
 
 ```python
 p = fixed.transition_matrix
 bridge = fixed.simulate(3.0, n=20_000, seed=5, hard_from=[0.0, 2.95], hard_codes=[0, 2])
 t = 10
 got = np.bincount(bridge[:, t], minlength=3) / len(bridge)
-want = vv.checks.markov_bridge_marginal(p, 0, 2, 29, t)
+want = tg.checks.markov_bridge_marginal(p, 0, 2, 29, t)
 print("sampled:", got.round(4))
 print("closed form:", want.round(4))
 fig, ax = plt.subplots(figsize=(5, 3), layout="constrained")

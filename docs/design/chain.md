@@ -1,4 +1,4 @@
-# varvite-chain: algorithms
+# transiograms-chain: algorithms
 
 Signatures are in [spec.md](spec.md) section 4.2. m is the number of categories.
 

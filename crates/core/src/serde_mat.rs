@@ -1,4 +1,4 @@
-//! `Mat` as row-major nested lists, for `#[serde(with = "varvite_core::serde_mat")]`.
+//! `Mat` as row-major nested lists, for `#[serde(with = "transiograms_core::serde_mat")]`.
 //! The `option` and `vec` submodules cover `Option<Mat>` and `Vec<Mat>`, and `values` covers
 //! `Vec<f64>`. NaN is written as JSON `null` and read back as NaN, because serde_json writes
 //! NaN as `null` but cannot read `null` as `f64`.

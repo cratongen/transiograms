@@ -1,11 +1,11 @@
 //! M6: MCP rows are distributions, hard cells one-hot, and an MCRF ensemble reproduces the
 //! proportions and the hard data on the tpsim acceptance model.
 
-use varvite_core::rng::tag;
-use varvite_core::synthetic::markov_codes;
-use varvite_core::{Code, Grid, Mat, Snapped, Stream, TransitionMatrix};
-use varvite_mcrf::{Options, predict, simulate};
-use varvite_transiogram::TransitionModel;
+use transiograms_core::rng::tag;
+use transiograms_core::synthetic::markov_codes;
+use transiograms_core::{Code, Grid, Mat, Snapped, Stream, TransitionMatrix};
+use transiograms_mcrf::{Options, predict, simulate};
+use transiograms_transiogram::TransitionModel;
 
 const P: [f64; 3] = [0.5, 0.3, 0.2];
 const SPEC_SIZE: [f64; 3] = [1.0, 1.0, 0.25];

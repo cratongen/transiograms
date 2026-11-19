@@ -21,7 +21,7 @@ run = "uv run --no-sync maturin develop -q --uv --release"
 
 [tasks.test]
 depends = ["py:build"]
-run = ["cargo test --workspace --exclude varvite-py", "uv run --no-sync pytest -q"]
+run = ["cargo test --workspace --exclude transiograms-py", "uv run --no-sync pytest -q"]
 
 [tasks.lint]
 depends = ["py:sync"]
@@ -36,7 +36,7 @@ run = [
 depends = ["lint", "test"]
 
 [tasks.bench]
-run = "cargo bench --workspace --exclude varvite-py"
+run = "cargo bench --workspace --exclude transiograms-py"
 
 [tasks.examples]
 depends = ["py:build"]

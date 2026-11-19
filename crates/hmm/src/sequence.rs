@@ -1,4 +1,4 @@
-use varvite_core::{Result, invalid};
+use transiograms_core::{Result, invalid};
 
 /// `t x d` row-major; categorical codes stored as f64; NaN marks a missing channel.
 #[derive(Clone, Debug, PartialEq)]

@@ -1,5 +1,5 @@
 [package]
-name = "varvite-chain"
+name = "transiograms-chain"
 description = "Embedded, fixed-step and continuous-lag Markov chains, tests and 1D simulation"
 version.workspace = true
 edition.workspace = true
@@ -11,7 +11,7 @@ publish.workspace = true
 nalgebra.workspace = true
 rayon.workspace = true
 serde.workspace = true
-varvite-core.workspace = true
+transiograms-core.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true

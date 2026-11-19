@@ -1,4 +1,4 @@
-# varvite-core: algorithms
+# transiograms-core: algorithms
 
 Signatures are in [spec.md](spec.md) section 4.1. This file gives the steps.
 

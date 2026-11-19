@@ -8,28 +8,28 @@ conditional along a random path, adding the cells it has already drawn.
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
-import varvite as vv
+import transiograms as tg
 from common import save
 
-d = vv.datasets.layered_drillholes(seed=0)
-names = vv.Categories(["mud", "sand", "gravel"], colors=["#8c8c8c", "#e69f00", "#0072b2"])
-grid = vv.Grid.from_json(d["grid"])
-model = vv.TransitionModel.from_json(d["model"])
+d = tg.datasets.layered_drillholes(seed=0)
+names = tg.Categories(["mud", "sand", "gravel"], colors=["#8c8c8c", "#e69f00", "#0072b2"])
+grid = tg.Grid.from_json(d["grid"])
+model = tg.TransitionModel.from_json(d["model"])
 xyz = np.column_stack([d["X"], d["Y"], d["Z"]])
 ```
 
 The MCP conditional equals the maximum-entropy joint distribution of the cell and its four
-neighbours that honours each pairwise transiogram. `vv.checks.mcp_brute_force` builds that
+neighbours that honours each pairwise transiogram. `tg.checks.mcp_brute_force` builds that
 243-cell table by iterative proportional fitting:
 
 ```python
-small = vv.Grid((0.0, 0.0, 0.0), (10.0, 10.0, 1.0), (21, 21, 1))
+small = tg.Grid((0.0, 0.0, 0.0), (10.0, 10.0, 1.0), (21, 21, 1))
 x0 = np.array([105.0, 105.0, 0.5])
 near = x0 + np.array([[30.0, 10.0, 0.0], [-20.0, 40.0, 0.0], [-30.0, -20.0, 0.0], [10.0, -50.0, 0.0]])
 codes = [0, 2, 1, 2]
 cell = int(np.flatnonzero(np.all(small.coords == x0, axis=1))[0])
-mcp = vv.mcp_predict(model, small, near, codes, closeness_limit=1e-6).probabilities[cell]
-brute = vv.checks.mcp_brute_force(model.proportions, [model.transition(x - x0) for x in near], codes)
+mcp = tg.mcp_predict(model, small, near, codes, closeness_limit=1e-6).probabilities[cell]
+brute = tg.checks.mcp_brute_force(model.proportions, [model.transition(x - x0) for x in near], codes)
 print("MCP:        ", mcp.round(6))
 print("brute force:", brute.round(6))
 ```
@@ -43,7 +43,7 @@ MCP on the full grid: probabilities sum to one at every cell and equal one on th
 facies at conditioning cells.
 
 ```python
-pred = vv.mcp_predict(model, grid, xyz, d["CODE"])
+pred = tg.mcp_predict(model, grid, xyz, d["CODE"])
 cells, hard = grid.snap(xyz, d["CODE"])
 print("rows sum to 1:", bool(np.allclose(pred.probabilities.sum(axis=1), 1.0, atol=1e-12)))
 print("hard cells certain:", bool(np.all(pred.probabilities[cells, hard] == 1.0)))
@@ -57,7 +57,7 @@ hard cells certain: True
 Five MCRF realizations against the field the holes were drilled through.
 
 ```python
-real = vv.mcrf_simulate(model, grid, xyz, d["CODE"], n=5, seed=0)
+real = tg.mcrf_simulate(model, grid, xyz, d["CODE"], n=5, seed=0)
 print("hard data honoured in every realization:", bool(np.all(real.realizations[:, cells] == hard)))
 print("proportions per realization:")
 print(real.proportions.round(3))
@@ -65,7 +65,7 @@ fig, axes = plt.subplots(2, 3, figsize=(13, 6.4), layout="constrained")
 panels = [(d["field"], "True field"), (pred.most_likely, "MCP most likely")]
 panels += [(real.realizations[r], f"MCRF realization {r + 1}") for r in range(4)]
 for ax, (values, title) in zip(axes.flat, panels):
-    vv.plot.grid_slice(values, grid, axis="y", index=15, categories=names, ax=ax)
+    tg.plot.grid_slice(values, grid, axis="y", index=15, categories=names, ax=ax)
     ax.set_title(f"{title}, y = 155 m")
 save(fig, "sections")
 ```

@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-import varvite as vv
+import transiograms as tg
 
 
 @pytest.mark.parametrize(
@@ -12,7 +12,7 @@ import varvite as vv
     ],
 )
 def test_datasets_are_seeded_and_documented(name, keys):
-    f = getattr(vv.datasets, name)
+    f = getattr(tg.datasets, name)
     a, b, c = f(seed=0), f(seed=0), f(seed=1)
     assert keys <= set(a)
     for k in keys:
@@ -22,18 +22,18 @@ def test_datasets_are_seeded_and_documented(name, keys):
 
 
 def test_intervals_are_top_down_and_contiguous():
-    d = vv.datasets.varved_sequence()
+    d = tg.datasets.varved_sequence()
     for h in np.unique(d["HOLE_ID"]):
         at = d["HOLE_ID"] == h
         f, t = d["FROM"][at], d["TO"][at]
         assert f[0] == pytest.approx(0.0, abs=1e-9) and t[-1] == pytest.approx(30.0)
         np.testing.assert_allclose(f[1:], t[:-1])
-    e = vv.datasets.electrofacies_logs()
+    e = tg.datasets.electrofacies_logs()
     assert len(e["GR"]) == 6000 and set(np.unique(e["STATE"])) == {0, 1, 2}
 
 
 def test_layered_holes_sample_the_field():
-    d = vv.datasets.layered_drillholes()
-    grid = vv.Grid.from_json(d["grid"])
+    d = tg.datasets.layered_drillholes()
+    grid = tg.Grid.from_json(d["grid"])
     cells, codes = grid.snap(np.column_stack([d["X"], d["Y"], d["Z"]]), d["CODE"])
     np.testing.assert_array_equal(d["field"][cells], codes)

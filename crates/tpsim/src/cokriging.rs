@@ -1,8 +1,8 @@
 use std::borrow::Borrow;
 
 use rayon::prelude::*;
-use varvite_core::{Code, Grid, MISSING, Mat, Prediction, Result, Snapped, invalid, memory};
-use varvite_transiogram::TransitionModel;
+use transiograms_core::{Code, Grid, MISSING, Mat, Prediction, Result, Snapped, invalid, memory};
+use transiograms_transiogram::TransitionModel;
 
 use crate::Options;
 use crate::search::Neighbourhood;
@@ -72,7 +72,7 @@ where
     let svd = a.clone().svd(true, true);
     let sigma_max = svd.singular_values.iter().copied().fold(0.0, f64::max);
     let eps = svd_cutoff * sigma_max;
-    let failed = || varvite_core::convergence("cokriging system could not be solved by SVD");
+    let failed = || transiograms_core::convergence("cokriging system could not be solved by SVD");
     let mut reduced = svd.solve(&b, eps).or_else(|_| failed())?;
     // nalgebra's SVD left residuals of 1.6e-8 on a well-conditioned system; refinement fixes it.
     for _ in 0..2 {

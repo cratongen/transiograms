@@ -3,8 +3,8 @@ use std::mem::size_of;
 
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use varvite_core::codes::check_codes;
-use varvite_core::{
+use transiograms_core::codes::check_codes;
+use transiograms_core::{
     Code, Direction, Grid, MISSING, Mat, Result, Run, SequenceSet, invalid, memory,
 };
 
@@ -13,13 +13,13 @@ pub struct Experimental {
     /// Nominal lag `l * Delta` (or the given lags).
     pub lags: Vec<f64>,
     /// Mean `|h|` of the pairs (NaN when none).
-    #[serde(with = "varvite_core::serde_mat::values")]
+    #[serde(with = "transiograms_core::serde_mat::values")]
     pub mean_lags: Vec<f64>,
     /// `F_ij` per lag; lengths for the downhole estimator.
-    #[serde(with = "varvite_core::serde_mat::vec")]
+    #[serde(with = "transiograms_core::serde_mat::vec")]
     pub counts: Vec<Mat>,
     /// `F_ij / sum_k F_ik`; NaN row when the tail total is 0.
-    #[serde(with = "varvite_core::serde_mat::vec")]
+    #[serde(with = "transiograms_core::serde_mat::vec")]
     pub probabilities: Vec<Mat>,
     pub tail_totals: Vec<Vec<f64>>,
     pub directed: bool,

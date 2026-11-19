@@ -1,4 +1,4 @@
-//! Shared types and numerics for varvite: category codes, drillhole sequences, transition and
+//! Shared types and numerics for transiograms: category codes, drillhole sequences, transition and
 //! rate matrices, grids, seeded random streams, special functions and the memory budget.
 
 pub mod codes;

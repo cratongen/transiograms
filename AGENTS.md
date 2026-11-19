@@ -1,8 +1,8 @@
-# varvite
+# transiograms
 
 ## Purpose
 
-varvite is a Rust-core, Python-exposed library (`import varvite as vv`) for
+transiograms is a Rust-core, Python-exposed library (`import transiograms as tg`) for
 Markov modelling in geostatistics: 1D sequence models along drillholes and
 logs (Markov chains, hidden Markov models, hidden semi-Markov models) and 3D
 spatial categorical models on grids (transiograms, transition-probability
@@ -29,13 +29,13 @@ mise run changelog  # git-cliff -o CHANGELOG.md
 mise run compat     # install the wheel via pip, uv, pixi and conda (mode: all, venv, uv, pixi, conda)
 ```
 
-A single crate: `mise exec -- cargo test -p varvite-<short>`.
+A single crate: `mise exec -- cargo test -p transiograms-<short>`.
 
 ## Layout
 
 The API contract is `docs/design/spec.md`, with one algorithm file per crate beside it.
 
-- `crates/` - Rust workspace, directory `crates/<short>`, package `varvite-<short>`:
+- `crates/` - Rust workspace, directory `crates/<short>`, package `transiograms-<short>`:
   - `core` - category codes, sequences and beds, transition and rate matrices, grids, seeded
     streams, numerics (GTH, matrix exponential and logarithm, IPF), special functions, memory
     budget, and `synthetic` (seeded test data with known parameters)
@@ -45,14 +45,14 @@ The API contract is `docs/design/spec.md`, with one algorithm file per crate bes
   - `transiogram` - experimental transiograms, 1D models and the 3D `TransitionModel`
   - `tpsim` - T-PROGS cokriging, sequential simulation and quenching (depends on `transiogram`)
   - `mcrf` - MCRF simulation and MCP prediction (depends on `transiogram`)
-  - `py` - pyo3 (`abi3-py311`) binding crate `_varvite`, one module per area
-- `python/varvite/` - Python package (`__init__.py`, `_varvite.pyi` stub, `plot.py`, `datasets.py`, `checks.py`, `errors.py`).
+  - `py` - pyo3 (`abi3-py311`) binding crate `_transiograms`, one module per area
+- `python/transiograms/` - Python package (`__init__.py`, `_transiograms.pyi` stub, `plot.py`, `datasets.py`, `checks.py`, `errors.py`).
 - `python/tests/` - pytest suite (`test_<area>.py`).
 - `examples/` - numbered narrative scripts rendered into docs (`mise run examples`).
 - `docs/` - mkdocs site (`index.md`, `install.md`, `api/`, `design/`).
 
 New Rust algorithms go into the matching `crates/` subdomain, their pyo3 bindings
-go into `crates/py/src/<area>.rs`, and the Python wrapper and `.pyi` stub go into `python/varvite/`.
+go into `crates/py/src/<area>.rs`, and the Python wrapper and `.pyi` stub go into `python/transiograms/`.
 Shared files carry `// >>> <area>` / `# >>> <area>` markers; edit only inside your area's markers.
 
 ## Conventions
@@ -62,10 +62,10 @@ Shared files carry `// >>> <area>` / `# >>> <area>` markers; edit only inside yo
   NumPy-style docstring, runnable example, and a rerunnable theory check (for example:
   transition matrix rows sum to 1, Viterbi matches brute-force search on a small
   sequence, simulated grids reproduce input proportions and transiograms within tolerance).
-- Follow boitata's Python API style: flat top-level namespace (`import varvite as vv`),
+- Follow boitata's Python API style: flat top-level namespace (`import transiograms as tg`),
   keyword-only optional arguments, `to_json` / `from_json` and `copyreg` pickle support on
-  Rust types, error hierarchy rooted at `VarviteError` (`InvalidInput`, `ConvergenceError`),
-  NumPy arrays as the universal exchange format, and `vv.plot` / `vv.datasets` submodules.
+  Rust types, error hierarchy rooted at `TransiogramsError` (`InvalidInput`, `ConvergenceError`),
+  NumPy arrays as the universal exchange format, and `tg.plot` / `tg.datasets` submodules.
 - Seeded, reproducible randomness everywhere: every stochastic routine takes an explicit
   integer `seed` and produces bit-identical output across runs.
 - Results must not depend on Rayon thread count. Partition per-node or per-sequence RNG
@@ -92,7 +92,7 @@ Shared files carry `// >>> <area>` / `# >>> <area>` markers; edit only inside yo
 
 - Never add AI attribution or co-author trailers (`Co-Authored-By`, "Generated with Claude Code") to commits or PRs.
 - Never add `boitata` as a build or runtime dependency; exchange data through NumPy arrays.
-- Never commit proprietary data, client drillholes, or files over 1 MB; use `vv.datasets` or seeded synthetic sequences and grids.
+- Never commit proprietary data, client drillholes, or files over 1 MB; use `tg.datasets` or seeded synthetic sequences and grids.
 - Never introduce thread-count-dependent outputs or unseeded randomness.
 - Never hardcode fixed RAM ceilings (such as a static 1 GiB or 8 GiB limit) on simulation grids.
 - Never estimate or invent benchmark numbers; write "not measured" until measured.
