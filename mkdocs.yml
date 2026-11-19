@@ -55,6 +55,7 @@ nav:
       - Transiograms: api/transiogram.md
       - TP simulation: api/tpsim.md
       - MCRF and MCP: api/mcrf.md
+      - boitata integration: api/integration.md
       - Plots, datasets, checks: api/extras.md
   - Design:
       - Contract: design/spec.md
