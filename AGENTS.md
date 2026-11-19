@@ -26,7 +26,7 @@ mise run examples   # rerun examples/*/*/example_*.py and rewrite their README.m
 mise run docs       # mkdocs serve
 mise run docs-build # mkdocs build --strict
 mise run changelog  # git-cliff -o CHANGELOG.md
-mise run compat     # [planned] install via pip, uv, pixi, and conda
+mise run compat     # install the wheel via pip, uv, pixi and conda (mode: all, venv, uv, pixi, conda)
 ```
 
 A single crate: `mise exec -- cargo test -p varvite-<short>`.

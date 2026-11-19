@@ -214,4 +214,10 @@ uses for lateral directions.
   `#![allow(dead_code)]`; owners remove them once their bodies are filled. `Hsmm::initialize` and
   `tpsim::quench` carry `#[allow(clippy::too_many_arguments)]` because the contract fixes eight
   arguments.
-- The `lint` task checks `python examples` only: there is no `ci/` folder yet.
+- The `lint` task checks `python examples ci`. `ci/compat.py` builds the wheel once and installs it
+  with pip (venv), uv (Python 3.11), pixi and micromamba (conda-forge), running a smoke check in each.
+- `available_bytes` also takes the smallest headroom of the cgroup v2 `memory.max` chain and of the
+  process's own `ulimit -d` (`VmData`) and `ulimit -v` (`VmSize`) limits, so a capped process
+  raises `InvalidInput` instead of being killed. pytest (`python/tests/conftest.py`) and the cargo
+  test runner (`.cargo/config.toml`) set a 4 GiB data limit on test processes only; the library
+  itself has no fixed cap.
