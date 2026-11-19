@@ -155,7 +155,7 @@ def strip_log(codes, *, depth=None, from_=None, to=None, posterior=None, categor
     first.set_xticks([])
     first.set_ylim(bottom.max(), top.min())
     first.set_ylabel("depth")
-    first.legend(loc="lower left", bbox_to_anchor=(0, 1.0), fontsize="small")
+    first.legend(loc="upper left", bbox_to_anchor=(0, -0.02), fontsize="small", frameon=False)
     if posterior is not None:
         p = np.asarray(posterior, float)
         mid = (top + bottom) / 2
