@@ -192,12 +192,14 @@ impl PyGrid {
 
     /// Cell centroids, shape `(n_cells, 3)`.
     #[getter]
-    fn coords<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f64>> {
+    fn coords<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {
         let n = self.0.n_cells();
+        let need = (n as u64).saturating_mul(24);
+        varvite_core::memory::check(need, None, "Grid.coords").map_err(to_rust)?;
         let flat: Vec<f64> = (0..n).flat_map(|i| self.0.centroid(i)).collect();
-        Array2::from_shape_vec((n, 3), flat)
+        Ok(Array2::from_shape_vec((n, 3), flat)
             .unwrap()
-            .into_pyarray(py)
+            .into_pyarray(py))
     }
 
     /// Cell index (uint64, ascending) and code (int64) of each snapped cell. Points outside the

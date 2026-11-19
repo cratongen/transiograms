@@ -135,11 +135,15 @@ fn log_density<'py>(
 
 fn sample<'py>(py: Python<'py>, e: &Emission, n: usize, seed: u64) -> PyResult<Bound<'py, PyAny>> {
     let d = e.dim();
-    let need = (n as u64).checked_mul(d as u64 * 8);
+    let categorical = matches!(e, Emission::Categorical(_));
+    let need = (n as u64).checked_mul(d as u64 * 8 * (1 + categorical as u64));
     varvite_core::memory::check(need.unwrap_or(u64::MAX), None, "samples").map_err(to_rust)?;
     let mut s = Stream::new(seed, &[tag::SAMPLE, 0]);
-    let v: Vec<f64> = (0..n).flat_map(|_| e.sample(&mut s)).collect();
-    if matches!(e, Emission::Categorical(_)) {
+    let mut v: Vec<f64> = Vec::with_capacity(n * d);
+    for _ in 0..n {
+        v.extend(e.sample(&mut s));
+    }
+    if categorical {
         return Ok(PyArray1::from_vec(py, v.iter().map(|&x| x as i64).collect()).into_any());
     }
     Ok(PyArray1::from_vec(py, v).reshape([n, d])?.into_any())

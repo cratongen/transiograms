@@ -1,7 +1,8 @@
 use crate::error::{Result, invalid};
 
 /// `MemAvailable` from `/proc/meminfo` on Linux, lowered to the headroom of the tightest cgroup v2
-/// `memory.max` above this process; `None` elsewhere or on any failure.
+/// `memory.max` above this process and of its own data and address-space limits (`ulimit -d`,
+/// `ulimit -v`); `None` elsewhere or on any failure.
 pub fn available_bytes() -> Option<u64> {
     if !cfg!(target_os = "linux") {
         return None;
@@ -10,7 +11,35 @@ pub fn available_bytes() -> Option<u64> {
     let line = text.lines().find(|l| l.starts_with("MemAvailable:"))?;
     let kb: u64 = line.split_whitespace().nth(1)?.parse().ok()?;
     let system = kb.checked_mul(1024)?;
-    Some(cgroup_headroom().map_or(system, |c| c.min(system)))
+    Some(
+        [cgroup_headroom(), rlimit_headroom()]
+            .into_iter()
+            .flatten()
+            .fold(system, u64::min),
+    )
+}
+
+fn rlimit_headroom() -> Option<u64> {
+    let limits = std::fs::read_to_string("/proc/self/limits").ok()?;
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    let soft = |name: &str| -> Option<u64> {
+        let rest = limits.lines().find_map(|l| l.strip_prefix(name))?;
+        rest.split_whitespace().next()?.parse().ok()
+    };
+    let used = |key: &str| -> u64 {
+        status
+            .lines()
+            .find_map(|l| l.strip_prefix(key))
+            .and_then(|r| r.split_whitespace().next()?.parse::<u64>().ok())
+            .map_or(0, |kb| kb.saturating_mul(1024))
+    };
+    [
+        soft("Max data size").map(|l| l.saturating_sub(used("VmData:"))),
+        soft("Max address space").map(|l| l.saturating_sub(used("VmSize:"))),
+    ]
+    .into_iter()
+    .flatten()
+    .min()
 }
 
 fn cgroup_headroom() -> Option<u64> {
@@ -62,8 +91,13 @@ mod tests {
             assert!(available > 0);
             assert!(check(u64::MAX, None, "grid").is_err());
             assert!(check(1, None, "grid").is_ok());
+            // Other test threads allocate and free between the two reads.
+            let slack = 256 << 20;
             if let Some(cgroup) = cgroup_headroom() {
-                assert!(available <= cgroup);
+                assert!(available <= cgroup + slack, "{available} > {cgroup}");
+            }
+            if let Some(rlimit) = rlimit_headroom() {
+                assert!(available <= rlimit + slack, "{available} > {rlimit}");
             }
         }
     }
