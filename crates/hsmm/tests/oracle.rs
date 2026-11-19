@@ -206,34 +206,34 @@ fn check(
     let post = model.posterior(&seq, None).unwrap();
     let tol = |a: f64, b: f64, e: f64| (a - b).abs() <= e * (1.0 + b.abs());
     assert!(
-        tol(post.log_likelihood, o.lnl, 1e-11),
+        tol(post.log_likelihood, o.lnl, 1e-12),
         "lnl {} vs {}",
         post.log_likelihood,
         o.lnl
     );
-    assert!(tol(model.log_likelihood(&seq, None).unwrap(), o.lnl, 1e-11));
+    assert!(tol(model.log_likelihood(&seq, None).unwrap(), o.lnl, 1e-12));
     let (path, score) = model.viterbi(&seq, None).unwrap();
     assert_eq!(path, o.best);
-    assert!(tol(score, o.best_score, 1e-11));
+    assert!(tol(score, o.best_score, 1e-12));
     for t in 0..x.len() {
         for j in 0..k {
             assert!(
-                (post.gamma[(t, j)] - o.gamma[t][j]).abs() < 1e-10,
+                (post.gamma[(t, j)] - o.gamma[t][j]).abs() < 1e-12,
                 "gamma {t} {j}"
             );
         }
     }
     for i in 0..k {
-        assert!((post.start[i] - o.start[i]).abs() < 1e-11);
+        assert!((post.start[i] - o.start[i]).abs() < 1e-12);
         for j in 0..k {
-            assert!((post.xi_sum[(i, j)] - o.xi[i][j]).abs() < 1e-11);
+            assert!((post.xi_sum[(i, j)] - o.xi[i][j]).abs() < 1e-12);
         }
         for (a, b) in post.durations[i].iter().zip(&o.durations[i]) {
-            assert!((a - b).abs() < 1e-11, "durations {i}: {a} {b}");
+            assert!((a - b).abs() < 1e-12, "durations {i}: {a} {b}");
         }
     }
     assert!(
-        tol(post.entropy, o.entropy, 1e-9),
+        tol(post.entropy, o.entropy, 1e-10),
         "entropy {} vs {}",
         post.entropy,
         o.entropy

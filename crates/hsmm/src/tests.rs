@@ -164,10 +164,10 @@ fn check_against_brute(tab: &Tables, lb: &Mat, free: &Mat) {
     assert!(close(score, b.best_score, 1e-12));
     for t in 0..lb.nrows() {
         let row: f64 = post.gamma.row(t).sum();
-        assert!((row - 1.0).abs() < 1e-10);
+        assert!((row - 1.0).abs() < 1e-12, "row {t} sums to {row}");
         for j in 0..tab.k {
             assert!(
-                (post.gamma[(t, j)] - b.gamma[(t, j)]).abs() < 1e-10,
+                (post.gamma[(t, j)] - b.gamma[(t, j)]).abs() < 1e-12,
                 "gamma {t} {j}"
             );
         }
@@ -216,7 +216,42 @@ fn forward_and_backward_agree() {
     assert!(close(logsumexp(&terms), fw.log_likelihood, 1e-12));
     let post = posterior_core(&tab, &lb, &lb, None).unwrap();
     for t in 0..lb.nrows() {
-        assert!((post.gamma.row(t).sum() - 1.0).abs() < 1e-10);
+        let row = post.gamma.row(t).sum();
+        assert!((row - 1.0).abs() < 1e-12, "row {t} sums to {row}");
+    }
+}
+
+#[test]
+fn gamma_from_starts_and_ends_equals_segment_sums() {
+    for (seed, t_len) in [(5, 120), (9, 40)] {
+        let (tab, lb) = case(seed, t_len);
+        let fw = forward(&tab, &lb);
+        let (g, _) = backward(&tab, &lb);
+        let mut gamma = Mat::zeros(t_len, tab.k);
+        for end in 1..=t_len {
+            for j in 0..tab.k {
+                let mut e = 0.0;
+                for u in 1..=end.min(tab.m(j)) {
+                    e += lb[(end - u, j)];
+                    let lw = if end == t_len {
+                        tab.log_dd[j][u - 1]
+                    } else {
+                        tab.log_d[j][u - 1]
+                    };
+                    let eta = (fw.s[(end - u, j)] + lw + e + g[(end, j)] - fw.log_likelihood).exp();
+                    for t in end - u..end {
+                        gamma[(t, j)] += eta;
+                    }
+                }
+            }
+        }
+        let post = posterior_core(&tab, &lb, &lb, None).unwrap();
+        for t in 0..t_len {
+            for j in 0..tab.k {
+                let (a, b) = (post.gamma[(t, j)], gamma[(t, j)]);
+                assert!((a - b).abs() < 1e-10, "seed {seed} t {t} j {j}: {a} vs {b}");
+            }
+        }
     }
 }
 
