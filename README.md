@@ -49,6 +49,18 @@ The API draws inspiration from the compositional design of the original `pomegra
 
 ## Roadmap
 
+Status as of 2026-11-18 (`mise run verify` passes; each milestone's acceptance test is named below):
+
+| Milestone | Status | Acceptance test | Missing |
+| --- | --- | --- | --- |
+| M1 | done | `crates/chain/tests/theory.rs::m1_acceptance_fixed_recovery` | example pages for `from_matrix`, `from_rates`, `from_geology`, `symmetry_test`, `asymmetry`, `proportion_std`, `simulate_beds`, `homogeneity_test`, `Sojourn.survival`; `Sojourn.exponential_test` does not bound `n_bootstrap` (runtime only, memory is constant) |
+| M2 | done | `crates/hmm/tests/theory.rs::m2_gaussian_k4_t8_matches_brute_force` | none known |
+| M3 | done | `crates/hsmm/tests/model.rs::m3_bic_selects_three_states_hmm` | `HiddenSemiMarkovModel.fit` stores `n_init` but runs a single initialisation |
+| M4 | done | `crates/transiogram/tests/theory.rs::m4_lag_grid_validity` | none known |
+| M5 | done, with a size change | `crates/tpsim/tests/theory.rs::m5_acceptance`, `m5_spec_cell_reproduces_hard_data_and_auto_transiograms` | the proportion check runs at cell 6 x 6 x 1 because 3 sigma is 0.194 at the spec cell; spec.md does not record this yet; the x RMSE at the spec cell is three times the y RMSE (within 0.05, cause not investigated) |
+| M6 | done, with a size change | `crates/mcrf/tests/acceptance.rs::m6_acceptance`, `m6_acceptance_spec_grid` | the proportion check runs on 96 x 96 x 32 with 4 x 4 x 1 cells because 3 sigma is 0.118 to 0.180 on the spec grid |
+| M7 | partial | `python/tests/test_integration.py` | T-PROGS meets every check; MCRF on the 32 x 32 x 30 integration grid honours every hard datum but misses the 0.02 proportion bound (largest gap about 0.04 over 20 realizations, 3 sigma 0.013), so the test asserts proportions for T-PROGS only |
+
 ### M1: Markov chains on sequences
 
 - **Scope**: Rust workspace and `pyo3` skeleton (`crates/core`, `crates/chain`, `crates/py`), `vv.MarkovChain` (embedded and fixed-step transition counting, smoothing, generator matrix fitting, stationary distribution, chi-square and G-test for Markov order and stationarity, seeded 1D simulation), `.pyi` stubs, and `vv.plot.transition_matrix`.
@@ -88,7 +100,7 @@ The API draws inspiration from the compositional design of the original `pomegra
 
 Every performance number in this repository comes from a reproducible benchmark we run on the same machine and in the same session, using interleaved rounds and reporting medians alongside machine load. We benchmark Rust kernels with `criterion` and compare end-to-end Python calls against `hmmlearn` and `pomegranate`.
 
-We have not run benchmarks yet (this repository holds the charter and roadmap only):
+We have not run benchmarks yet:
 
 | Workload | `varvite` | `hmmlearn` | `pomegranate` |
 | --- | --- | --- | --- |
