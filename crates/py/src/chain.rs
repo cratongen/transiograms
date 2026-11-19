@@ -14,7 +14,7 @@ use crate::args::{
     SequenceArgs, codes, direction, floats, hole_ids, mat, mat2, scalar_or_floats,
     sequence_set_step, to_rust, vec1,
 };
-use crate::core::{json, unjson};
+use crate::core::{json, same_json, unjson};
 use crate::invalid;
 
 fn method(s: &str) -> PyResult<Method> {
@@ -159,6 +159,26 @@ impl PyEntropy {
     #[getter]
     fn max(&self) -> f64 {
         self.0.max
+    }
+    fn to_json(&self) -> PyResult<String> {
+        json(&self.0)
+    }
+    #[staticmethod]
+    fn from_json(text: &str) -> PyResult<Self> {
+        let e: varvite_chain::Entropy = unjson(text, "Entropy")?;
+        let m = e.post.len();
+        if [&e.pre, &e.post_normalized, &e.pre_normalized]
+            .iter()
+            .any(|v| v.len() != m)
+        {
+            return Err(invalid(format!(
+                "Entropy JSON needs {m} values in pre, post_normalized and pre_normalized, as in post"
+            )));
+        }
+        Ok(Self(e))
+    }
+    fn __eq__(&self, other: PyRef<Self>) -> PyResult<bool> {
+        same_json(&self.0, &other.0)
     }
     fn __repr__(&self) -> String {
         format!("Entropy(chain={}, max={})", self.0.chain, self.0.max)
@@ -856,6 +876,37 @@ impl PySojourn {
             .map_err(to_rust)
     }
 
+    fn to_json(&self) -> PyResult<String> {
+        json(&self.0)
+    }
+    #[staticmethod]
+    fn from_json(text: &str) -> PyResult<Self> {
+        let s: varvite_chain::Sojourn = unjson(text, "Sojourn")?;
+        let m = s.n_beds.len();
+        let lengths = [
+            s.n_open.len(),
+            s.total.len(),
+            s.mean_length.len(),
+            s.thickness.len(),
+            s.open.len(),
+        ];
+        if lengths.iter().any(|&l| l != m) {
+            return Err(invalid(format!(
+                "Sojourn JSON needs {m} entries in every field, as in n_beds"
+            )));
+        }
+        if let Some(i) = (0..m).find(|&i| s.thickness[i].len() != s.open[i].len()) {
+            return Err(invalid(format!(
+                "Sojourn JSON category {i} has {} thicknesses but {} open flags",
+                s.thickness[i].len(),
+                s.open[i].len()
+            )));
+        }
+        Ok(Self(s))
+    }
+    fn __eq__(&self, other: PyRef<Self>) -> PyResult<bool> {
+        same_json(&self.0, &other.0)
+    }
     fn __repr__(&self) -> String {
         format!("Sojourn(n_beds={:?})", self.0.n_beds)
     }

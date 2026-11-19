@@ -167,17 +167,21 @@ pub struct Snapped {
 }
 
 /// Per-cell probabilities (n_cells * k, row per cell); inactive cells hold NaN, most_likely MISSING.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Prediction {
     pub k: usize,
+    #[serde(with = "crate::serde_mat::values")]
     pub probabilities: Vec<f64>,
     pub most_likely: Vec<Code>,
+    #[serde(with = "crate::serde_mat::values")]
     pub entropy: Vec<f64>,
     pub corrected: f64,
 }
 
 /// `codes` is n * n_cells, realization-major; inactive cells hold MISSING.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Realizations {
     pub n: usize,
     pub n_cells: usize,

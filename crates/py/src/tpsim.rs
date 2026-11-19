@@ -8,7 +8,7 @@ use varvite_tpsim::{Options, QuenchOptions};
 use varvite_transiogram::TransitionModel;
 
 use crate::args::{codes, column, coords, mask, to_rust, vec1};
-use crate::core::PyGrid;
+use crate::core::{PyGrid, json, same_json, unjson};
 use crate::invalid;
 use crate::transiogram::PyTransitionModel;
 
@@ -43,6 +43,15 @@ pub(crate) fn hard<'py>(
 
 fn probabilities<'py>(py: Python<'py>, k: usize, p: &[f64]) -> PyResult<Bound<'py, PyArray2<f64>>> {
     PyArray1::from_slice(py, p).reshape([p.len() / k.max(1), k])
+}
+
+fn valid_codes(c: &[u32], k: usize, what: &str) -> PyResult<()> {
+    match c.iter().find(|&&c| c != MISSING && c as usize >= k) {
+        Some(bad) => Err(invalid(format!(
+            "{what} holds code {bad}, not one of {k} categories"
+        ))),
+        None => Ok(()),
+    }
 }
 
 fn codes_i64<'py>(py: Python<'py>, c: &[u32]) -> Bound<'py, PyArray1<i64>> {
@@ -86,6 +95,25 @@ impl PyPrediction {
     #[getter]
     fn corrected(&self) -> f64 {
         self.0.corrected
+    }
+    fn to_json(&self) -> PyResult<String> {
+        json(&self.0)
+    }
+    #[staticmethod]
+    fn from_json(text: &str) -> PyResult<Self> {
+        let p: Prediction = unjson(text, "Prediction")?;
+        let cells = p.most_likely.len();
+        if p.k == 0 || p.probabilities.len() != cells * p.k || p.entropy.len() != cells {
+            return Err(invalid(format!(
+                "Prediction JSON with {cells} cells needs k >= 1, {cells} * k probabilities and \
+                 {cells} entropies"
+            )));
+        }
+        valid_codes(&p.most_likely, p.k, "most_likely")?;
+        Ok(Self(p))
+    }
+    fn __eq__(&self, other: PyRef<Self>) -> PyResult<bool> {
+        same_json(&self.0, &other.0)
     }
     fn __repr__(&self) -> String {
         format!(
@@ -194,6 +222,31 @@ impl PyRealizations {
     }
     fn __len__(&self) -> usize {
         self.r.n
+    }
+    fn to_json(&self) -> PyResult<String> {
+        memory::check(
+            (self.r.codes.len() as u64).saturating_mul(12),
+            self.memory,
+            "Realizations JSON",
+        )
+        .map_err(to_rust)?;
+        json(&self.r)
+    }
+    #[staticmethod]
+    fn from_json(text: &str) -> PyResult<Self> {
+        let r: Realizations = unjson(text, "Realizations")?;
+        if r.k == 0 || r.n.checked_mul(r.n_cells) != Some(r.codes.len()) || r.corrected.len() != r.n
+        {
+            return Err(invalid(format!(
+                "Realizations JSON needs k >= 1, n * n_cells = {} * {} codes and n corrected values",
+                r.n, r.n_cells
+            )));
+        }
+        valid_codes(&r.codes, r.k, "codes")?;
+        Ok(Self { r, memory: None })
+    }
+    fn __eq__(&self, other: PyRef<Self>) -> PyResult<bool> {
+        same_json(&self.r, &other.r)
     }
     fn __repr__(&self) -> String {
         format!(

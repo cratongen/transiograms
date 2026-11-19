@@ -1,14 +1,17 @@
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 use varvite_core::rng::tag;
 use varvite_core::{Code, Direction, Result, SequenceSet, Stream, invalid};
 
 use crate::tests::TestResult;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Sojourn {
     pub n_beds: Vec<usize>,
     pub n_open: Vec<usize>,
     pub total: Vec<f64>,
+    #[serde(with = "varvite_core::serde_mat::values")]
     pub mean_length: Vec<f64>,
     pub thickness: Vec<Vec<f64>>,
     pub open: Vec<Vec<bool>>,

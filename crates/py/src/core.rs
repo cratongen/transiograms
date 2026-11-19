@@ -17,6 +17,11 @@ pub(crate) fn unjson<T: serde::de::DeserializeOwned>(text: &str, what: &str) -> 
     serde_json::from_str(text).map_err(|e| invalid(format!("not {what} JSON: {e}")))
 }
 
+/// Equality through JSON, so NaN entries (written as null) compare equal.
+pub(crate) fn same_json<T: serde::Serialize>(a: &T, b: &T) -> PyResult<bool> {
+    Ok(json(a)? == json(b)?)
+}
+
 /// A label as text: None and NaN are missing; integral floats lose their decimal point.
 fn label(obj: &Bound<PyAny>) -> PyResult<Option<String>> {
     if obj.is_none() {

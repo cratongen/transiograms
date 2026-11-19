@@ -31,12 +31,16 @@ pub struct TestResult {
     pub small_expected: f64,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct OrderTable {
     pub orders: Vec<usize>,
+    #[serde(with = "varvite_core::serde_mat::values")]
     pub log_likelihood: Vec<f64>,
     pub n_params: Vec<usize>,
+    #[serde(with = "varvite_core::serde_mat::values")]
     pub aic: Vec<f64>,
+    #[serde(with = "varvite_core::serde_mat::values")]
     pub bic: Vec<f64>,
     pub n_transitions: usize,
 }

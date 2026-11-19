@@ -1,4 +1,5 @@
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 use varvite_core::rng::tag;
 use varvite_core::{Result, Stream, invalid};
 use varvite_hmm::{Clamp, Family, FitOptions, Hmm, Implementation, Params, Sequence};
@@ -34,16 +35,23 @@ pub struct SelectionSpec {
     pub cv_folds: Option<usize>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SelectionTable {
     pub states: Vec<usize>,
+    #[serde(with = "varvite_core::serde_mat::values")]
     pub log_likelihood: Vec<f64>,
     pub n_params: Vec<usize>,
     pub n_observations: usize,
+    #[serde(with = "varvite_core::serde_mat::values")]
     pub aic: Vec<f64>,
+    #[serde(with = "varvite_core::serde_mat::values")]
     pub bic: Vec<f64>,
+    #[serde(with = "varvite_core::serde_mat::values")]
     pub icl: Vec<f64>,
+    #[serde(with = "varvite_core::serde_mat::values")]
     pub cv_log_likelihood: Vec<f64>,
+    #[serde(with = "varvite_core::serde_mat::values")]
     pub cv_per_step: Vec<f64>,
 }
 
