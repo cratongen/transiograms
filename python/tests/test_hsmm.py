@@ -138,3 +138,21 @@ def test_pseudocounts_survive_restarts():
         2, duration="empirical", max_duration=10, pseudocount=2.0, n_init=2, direction="down"
     ).fit(obs)
     assert all(d.pseudocount == 2.0 for d in f.durations)
+
+
+def test_public_members_have_numpy_docstrings():
+    cls = vv.HiddenSemiMarkovModel
+    for name in (
+        "score",
+        "score_samples",
+        "predict_proba",
+        "viterbi",
+        "sample",
+        "sample_posterior",
+        "aic",
+        "bic",
+        "icl",
+    ):
+        assert "Returns\n-------" in (getattr(cls, name).__doc__ or ""), name
+    for name in ("durations", "max_duration", "history", "converged", "n_iter", "transition", "start"):
+        assert getattr(cls, name).__doc__, name

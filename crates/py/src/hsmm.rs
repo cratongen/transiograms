@@ -716,6 +716,22 @@ impl PyHiddenSemiMarkovModel {
         Ok(slf)
     }
 
+    /// Total log-likelihood over holes (unclamped), summed over the segmentations of each hole.
+    ///
+    /// Parameters
+    /// ----------
+    /// sequences : array_like or list of array_like
+    ///     Observations, rows top-down by depth: one array per hole, or one array split by
+    ///     ``holes``.
+    /// holes : array_like, optional
+    ///     Hole identifier per row of a single ``sequences`` array.
+    /// data : mapping, optional
+    ///     Table whose columns ``sequences`` and ``holes`` name.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     Sum of the per-hole log-likelihoods.
     #[pyo3(signature = (sequences, *, holes=None, data=None))]
     fn score(
         &self,
@@ -728,6 +744,22 @@ impl PyHiddenSemiMarkovModel {
         score_of(py, &Engined(self.fitted()?), &inp)
     }
 
+    /// Log-likelihood of each hole (unclamped).
+    ///
+    /// Parameters
+    /// ----------
+    /// sequences : array_like or list of array_like
+    ///     Observations, rows top-down by depth: one array per hole, or one array split by
+    ///     ``holes``.
+    /// holes : array_like, optional
+    ///     Hole identifier per row of a single ``sequences`` array.
+    /// data : mapping, optional
+    ///     Table whose columns ``sequences`` and ``holes`` name.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     float64 ``(n_holes,)`` in hole order; it sums to ``score``.
     #[pyo3(signature = (sequences, *, holes=None, data=None))]
     fn score_samples<'py>(
         &self,
@@ -765,6 +797,27 @@ impl PyHiddenSemiMarkovModel {
         predict_of(py, &Engined(self.fitted()?), &inp, algorithm)
     }
 
+    /// Posterior state probabilities per row, ``(rows, K)``, from segment starts and ends.
+    ///
+    /// Parameters
+    /// ----------
+    /// sequences : array_like or list of array_like
+    ///     Observations, rows top-down by depth: one array per hole, or one array split by
+    ///     ``holes``.
+    /// holes : array_like, optional
+    ///     Hole identifier per row of a single ``sequences`` array.
+    /// data : mapping, optional
+    ///     Table whose columns ``sequences`` and ``holes`` name.
+    /// labels : array_like, optional
+    ///     Known state per row (-1 where unknown); the posterior is clamped to it.
+    /// allowed : array_like, optional
+    ///     Boolean ``(rows, K)`` mask of the states each row may take.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray or list of numpy.ndarray
+    ///     float64 ``(rows, K)`` in input row order, or one ``(t, K)`` array per hole when
+    ///     ``sequences`` is a list; each row sums to 1.
     #[pyo3(signature = (sequences, *, holes=None, labels=None, allowed=None, data=None))]
     fn predict_proba<'py>(
         &self,
@@ -779,6 +832,27 @@ impl PyHiddenSemiMarkovModel {
         proba_of(py, &Engined(self.fitted()?), &inp)
     }
 
+    /// Best segmentation per hole and its joint log-probability, durations included.
+    ///
+    /// Parameters
+    /// ----------
+    /// sequences : array_like or list of array_like
+    ///     Observations, rows top-down by depth: one array per hole, or one array split by
+    ///     ``holes``.
+    /// holes : array_like, optional
+    ///     Hole identifier per row of a single ``sequences`` array.
+    /// data : mapping, optional
+    ///     Table whose columns ``sequences`` and ``holes`` name.
+    /// labels : array_like, optional
+    ///     Known state per row (-1 where unknown); the posterior is clamped to it.
+    /// allowed : array_like, optional
+    ///     Boolean ``(rows, K)`` mask of the states each row may take.
+    ///
+    /// Returns
+    /// -------
+    /// tuple of (numpy.ndarray or list of numpy.ndarray, numpy.ndarray)
+    ///     int64 states in input row order (a list when ``sequences`` is a list), and
+    ///     float64 log-probability per hole.
     #[pyo3(signature = (sequences, *, holes=None, labels=None, allowed=None, data=None))]
     fn viterbi<'py>(
         &self,
@@ -793,6 +867,21 @@ impl PyHiddenSemiMarkovModel {
         viterbi_of(py, &Engined(self.fitted()?), &inp)
     }
 
+    /// Seeded state paths and observations, one per length, rows top-down.
+    ///
+    /// Durations are drawn from the truncated laws; the last segment is cut at the length.
+    ///
+    /// Parameters
+    /// ----------
+    /// lengths : int or sequence of int
+    ///     Rows per simulated hole.
+    /// seed : int
+    ///     Seed; the same seed gives the same draws for any thread count.
+    ///
+    /// Returns
+    /// -------
+    /// tuple of (list of numpy.ndarray, list of numpy.ndarray)
+    ///     States (int64) and observations (``(t, d)``; int64 ``(t,)`` codes when categorical).
     #[pyo3(signature = (lengths, *, seed=0))]
     fn sample<'py>(
         &self,
@@ -809,6 +898,31 @@ impl PyHiddenSemiMarkovModel {
         )
     }
 
+    /// ``n`` seeded segmentations drawn from the posterior by forward filtering, backward
+    /// sampling.
+    ///
+    /// Parameters
+    /// ----------
+    /// sequences : array_like or list of array_like
+    ///     Observations, rows top-down by depth: one array per hole, or one array split by
+    /// n : int
+    ///     Number of draws.
+    /// seed : int
+    ///     Seed; draws do not depend on thread count.
+    ///     ``holes``.
+    /// holes : array_like, optional
+    ///     Hole identifier per row of a single ``sequences`` array.
+    /// data : mapping, optional
+    ///     Table whose columns ``sequences`` and ``holes`` name.
+    /// labels : array_like, optional
+    ///     Known state per row (-1 where unknown); the posterior is clamped to it.
+    /// allowed : array_like, optional
+    ///     Boolean ``(rows, K)`` mask of the states each row may take.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     int64 ``(n, rows)``, columns in input row order.
     #[pyo3(signature = (sequences, *, n=100, seed=0, holes=None, labels=None, allowed=None, data=None))]
     #[allow(clippy::too_many_arguments)]
     fn sample_posterior<'py>(
@@ -826,6 +940,23 @@ impl PyHiddenSemiMarkovModel {
         sample_posterior_of(py, &Engined(self.fitted()?), &inp, n, seed)
     }
 
+    /// Akaike information criterion (lower is better): ``-2 log L + 2 p``.
+    ///
+    /// ``p`` counts the free parameters fitted under ``params``, durations included.
+    ///
+    /// Parameters
+    /// ----------
+    /// sequences : array_like or list of array_like
+    ///     Observations, rows top-down by depth: one array per hole, or one array split by
+    ///     ``holes``.
+    /// holes : array_like, optional
+    ///     Hole identifier per row of a single ``sequences`` array.
+    /// data : mapping, optional
+    ///     Table whose columns ``sequences`` and ``holes`` name.
+    ///
+    /// Returns
+    /// -------
+    /// float
     #[pyo3(signature = (sequences, *, holes=None, data=None))]
     fn aic(
         &self,
@@ -839,6 +970,24 @@ impl PyHiddenSemiMarkovModel {
         Ok(varvite_hsmm::aic(ll, p))
     }
 
+    /// Bayesian information criterion (lower is better): ``-2 log L + p ln n``.
+    ///
+    /// ``n`` is the number of rows. Depth samples are autocorrelated, so BIC tends to
+    /// favour too many states on dense logs.
+    ///
+    /// Parameters
+    /// ----------
+    /// sequences : array_like or list of array_like
+    ///     Observations, rows top-down by depth: one array per hole, or one array split by
+    ///     ``holes``.
+    /// holes : array_like, optional
+    ///     Hole identifier per row of a single ``sequences`` array.
+    /// data : mapping, optional
+    ///     Table whose columns ``sequences`` and ``holes`` name.
+    ///
+    /// Returns
+    /// -------
+    /// float
     #[pyo3(signature = (sequences, *, holes=None, data=None))]
     fn bic(
         &self,
@@ -852,6 +1001,23 @@ impl PyHiddenSemiMarkovModel {
         Ok(varvite_hsmm::bic(ll, p, n))
     }
 
+    /// Integrated completed likelihood (lower is better): ``BIC + 2 H``.
+    ///
+    /// ``H`` is the exact entropy of the segmentation given the data, summed over holes.
+    ///
+    /// Parameters
+    /// ----------
+    /// sequences : array_like or list of array_like
+    ///     Observations, rows top-down by depth: one array per hole, or one array split by
+    ///     ``holes``.
+    /// holes : array_like, optional
+    ///     Hole identifier per row of a single ``sequences`` array.
+    /// data : mapping, optional
+    ///     Table whose columns ``sequences`` and ``holes`` name.
+    ///
+    /// Returns
+    /// -------
+    /// float
     #[pyo3(signature = (sequences, *, holes=None, data=None))]
     fn icl(
         &self,
@@ -865,22 +1031,28 @@ impl PyHiddenSemiMarkovModel {
         Ok(varvite_hsmm::icl(ll, p, n, h))
     }
 
+    /// Number of hidden states ``K``.
     #[getter]
     fn n_states(&self) -> usize {
         self.common.n_states
     }
+    /// Start probabilities, float64 ``(K,)``.
     #[getter]
     fn start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray1<f64>>> {
         Ok(vec1(py, self.fitted()?.start.clone()))
     }
+    /// Transition matrix between segments, float64 ``(K, K)`` with a zero diagonal.
     #[getter]
     fn transition<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {
         Ok(mat2(py, &self.fitted()?.transition))
     }
+    /// Emission distribution of each state.
     #[getter]
     fn distributions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyList>> {
         distributions_py(py, &self.fitted()?.emissions)
     }
+    /// Duration law of each state: ``Geometric``, ``ShiftedPoisson``, ``NegativeBinomial`` or
+    /// ``EmpiricalDuration``.
     #[getter]
     fn durations<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyList>> {
         let d = &self.fitted()?.durations;
@@ -891,6 +1063,7 @@ impl PyHiddenSemiMarkovModel {
                 .collect::<PyResult<Vec<_>>>()?,
         )
     }
+    /// Longest duration per state in rows, int64 ``(K,)``.
     #[getter]
     fn max_duration<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray1<i64>>> {
         Ok(PyArray1::from_vec(
@@ -907,14 +1080,17 @@ impl PyHiddenSemiMarkovModel {
     fn truncated_mass<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray1<f64>>> {
         Ok(vec1(py, self.fitted()?.truncated_mass()))
     }
+    /// Objective (log-likelihood plus log prior) after each EM iteration.
     #[getter]
     fn history<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         vec1(py, self.history.clone())
     }
+    /// Whether EM stopped on ``tol`` before ``max_iter``.
     #[getter]
     fn converged(&self) -> bool {
         self.converged
     }
+    /// Number of EM iterations run.
     #[getter]
     fn n_iter(&self) -> usize {
         self.n_iter
