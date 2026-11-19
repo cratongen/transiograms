@@ -351,26 +351,21 @@ fn auto_transiograms(
     mean
 }
 
-/// M5 acceptance (tpsim.md section 6, sizes as recorded under "Implementer decisions").
-#[test]
-fn m5_acceptance() {
-    let model = m5_model();
-    let grid = Grid::new([0.0; 3], M5_SIZE, M5_COUNT).unwrap();
-    let sd = proportion_sd(&model, &grid, 0.01);
-    for (k, s) in sd.iter().enumerate() {
-        assert!(3.0 * s < 0.02, "category {k}: 3 sigma = {}", 3.0 * s);
-    }
+/// The M5 simulation on a 64 x 64 x 32 grid of cell `size`: 16 vertical holes, n = 20, seed 0,
+/// with 100 percent hard agreement asserted in every realization.
+fn m5_simulate(model: &TransitionModel, size: [f64; 3]) -> (Grid, Realizations) {
+    let grid = Grid::new([0.0; 3], size, M5_COUNT).unwrap();
     let [nx, ny, _] = grid.count;
     let columns: Vec<[usize; 2]> = (0..16)
         .map(|h| [(2 * (h % 4) + 1) * nx / 8, (2 * (h / 4) + 1) * ny / 8])
         .collect();
-    let hard = vertical_holes(&model, &grid, &columns);
+    let hard = vertical_holes(model, &grid, &columns);
     let opts = Options {
         n_realizations: 20,
         seed: 0,
         ..Options::default()
     };
-    let sims = simulate(&model, &grid, None, &hard, &opts).unwrap();
+    let sims = simulate(model, &grid, None, &hard, &opts).unwrap();
     let n = grid.n_cells();
     for r in 0..sims.n {
         for (&cell, &code) in hard.cells.iter().zip(&hard.codes) {
@@ -381,21 +376,12 @@ fn m5_acceptance() {
             );
         }
     }
-    let mut counts = [0.0; 3];
-    for &c in &sims.codes {
-        counts[c as usize] += 1.0;
-    }
-    for k in 0..3 {
-        let p = counts[k] / sims.codes.len() as f64;
-        eprintln!(
-            "category {k}: ensemble proportion {p:.4}, target {}",
-            model.proportions[k]
-        );
-        assert!(
-            (p - model.proportions[k]).abs() < 0.02,
-            "category {k}: ensemble proportion {p}"
-        );
-    }
+    (grid, sims)
+}
+
+/// Per axis, RMSE between ensemble-mean auto-transiograms and `T(l Delta_v)` diagonals within
+/// 0.05 for `l Delta_v <= 2 max_i L_i,v`.
+fn assert_m5_auto_transiograms(model: &TransitionModel, grid: &Grid, sims: &Realizations) {
     let lengths = [
         [12.0, 8.0, 6.0],
         [12.0, 8.0, 6.0],
@@ -405,7 +391,7 @@ fn m5_acceptance() {
         let longest = lengths[axis].iter().copied().fold(0.0, f64::max);
         let n_lags = ((2.0 * longest / grid.size[axis]) + 1e-9).floor() as usize;
         let n_lags = n_lags.min(grid.count[axis] - 1);
-        let exp = auto_transiograms(&sims, &grid, axis, n_lags);
+        let exp = auto_transiograms(sims, grid, axis, n_lags);
         let mut sq = 0.0;
         for l in 1..=n_lags {
             let mut d = [0i64; 3];
@@ -424,7 +410,46 @@ fn m5_acceptance() {
     }
 }
 
+/// M5 acceptance (tpsim.md section 6, sizes as recorded under "Implementer decisions").
+#[test]
+fn m5_acceptance() {
+    let model = m5_model();
+    let grid = Grid::new([0.0; 3], M5_SIZE, M5_COUNT).unwrap();
+    let sd = proportion_sd(&model, &grid, 0.01);
+    for (k, s) in sd.iter().enumerate() {
+        assert!(3.0 * s < 0.02, "category {k}: 3 sigma = {}", 3.0 * s);
+    }
+    let (grid, sims) = m5_simulate(&model, M5_SIZE);
+    let mut counts = [0.0; 3];
+    for &c in &sims.codes {
+        counts[c as usize] += 1.0;
+    }
+    for k in 0..3 {
+        let p = counts[k] / sims.codes.len() as f64;
+        eprintln!(
+            "category {k}: ensemble proportion {p:.4}, target {}",
+            model.proportions[k]
+        );
+        assert!(
+            (p - model.proportions[k]).abs() < 0.02,
+            "category {k}: ensemble proportion {p}"
+        );
+    }
+    assert_m5_auto_transiograms(&model, &grid, &sims);
+}
+
+/// M5 at the spec cell (1, 1, 0.25): hard agreement and auto-transiograms over the full spec lag
+/// range (24 lags in x and y, 16 in z). The proportion tolerance is left out because its variance
+/// assertion fails at these sizes (tpsim.md "Implementer decisions").
+#[test]
+fn m5_spec_cell_reproduces_hard_data_and_auto_transiograms() {
+    let model = m5_model();
+    let (grid, sims) = m5_simulate(&model, M5_SPEC_SIZE);
+    assert_m5_auto_transiograms(&model, &grid, &sims);
+}
+
 const M5_SIZE: [f64; 3] = [6.0, 6.0, 1.0];
+const M5_SPEC_SIZE: [f64; 3] = [1.0, 1.0, 0.25];
 const M5_COUNT: [usize; 3] = [64, 64, 32];
 
 fn model_with(p: &[f64]) -> TransitionModel {

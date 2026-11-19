@@ -89,7 +89,11 @@ fails, and records the change under "Implementer decisions".
   the spec sizes the untruncated section 5 bound is 3 sigma = 0.194 for category 0, far above
   0.02. At (6, 6, 1) it is 0.0199, 0.0151 and 0.0124 for categories 0, 1 and 2 (test
   `implementer_m5_sizes_pass_the_untruncated_variance_assertion`, brute force over every lag).
-  The x and y auto-transiogram RMSE then covers 4 lags (`2 * 12 / 6`).
+  The x and y auto-transiogram RMSE then covers 4 lags (`2 * 12 / 6`). A second test,
+  `m5_spec_cell_reproduces_hard_data_and_auto_transiograms`, runs the spec cell (1, 1, 0.25)
+  with the same holes, n and seed, and asserts 100 percent hard agreement and the 0.05 RMSE over
+  the full spec lag range (24 lags in x and y, 16 in z). Only the proportion tolerance is left
+  out there, because its variance assertion fails at those sizes.
 - Cokriging null-space gauge (section 7 screening check): row `q = argmax p` is fixed at 0 in
   every `W_alpha` except that of the datum nearest the target (first one on ties). On a line
   x1 < x2 < x0 this gives literally `W1 = 0` and `W2 = T(x0 - x2)`. Probabilities do not depend
