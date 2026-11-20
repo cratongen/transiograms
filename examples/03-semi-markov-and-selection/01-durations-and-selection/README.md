@@ -9,7 +9,8 @@ states by AIC, BIC, ICL and cross-validated likelihood.
 import matplotlib.pyplot as plt
 import numpy as np
 import transiograms as tg
-from common import ACCENT, GRAY, HIGHLIGHT, save
+
+ACCENT, GRAY, HIGHLIGHT = "#0072b2", "#8c8c8c", "#d55e00"
 
 truth = tg.HiddenSemiMarkovModel(
     [tg.Gaussian([m], 1.0) for m in (0.0, 2.5, 5.0)],
@@ -47,7 +48,7 @@ for j, ax in enumerate(axes):
     ax.set(xlabel="thickness (steps)", title=f"state {j}", xlim=(0, 30))
 axes[0].set_ylabel("probability")
 axes[0].legend()
-save(fig, "durations")
+fig.savefig("durations.png")
 ```
 
 ```text
@@ -83,7 +84,7 @@ fig, (a, b) = plt.subplots(1, 2, figsize=(10, 3.4), layout="constrained")
 tg.plot.selection(table, ax=a)
 b.plot(table["states"], table["cv_per_step"], marker="o", color=ACCENT)
 b.set(xlabel="number of states", ylabel="held-out log-likelihood per step", title="Leave one hole out")
-save(fig, "selection")
+fig.savefig("selection.png")
 ```
 
 ```text

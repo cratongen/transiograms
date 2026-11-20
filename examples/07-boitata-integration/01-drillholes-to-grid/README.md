@@ -18,7 +18,8 @@ with a gamma-ray reading drawn from each composite's facies.
 import matplotlib.pyplot as plt
 import numpy as np
 import transiograms as tg
-from common import ACCENT, GRAY, save
+
+ACCENT, GRAY = "#0072b2", "#8c8c8c"
 
 source = tg.datasets.layered_drillholes(seed=0)
 rng = np.random.default_rng(7)
@@ -118,7 +119,7 @@ axes[2].scatter(np.arange(3), p, color="black", zorder=3, label="target")
 axes[2].set_xticks(range(3), names.names)
 axes[2].set(ylabel="proportion", title="Ensemble proportions")
 axes[2].legend()
-save(fig, "grids")
+fig.savefig("grids.png")
 ```
 
 ![grids](grids.png)

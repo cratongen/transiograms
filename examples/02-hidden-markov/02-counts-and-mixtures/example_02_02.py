@@ -8,20 +8,14 @@ parameters, scores each hole, picks the number of states with AIC, BIC and ICL, 
 to JSON.
 """
 
-# %% [hidden]
-import sys
-from pathlib import Path
-
-HERE = Path(__file__).parent if "__file__" in globals() else Path.cwd()
-sys.path.insert(0, str(HERE.parents[1]))
-
 # %%
 import math
 
 import matplotlib.pyplot as plt
 import numpy as np
 import transiograms as tg
-from common import ACCENT, GRAY, HIGHLIGHT, save
+
+ACCENT, GRAY, HIGHLIGHT = "#0072b2", "#8c8c8c", "#d55e00"
 
 # %% [markdown]
 # ## Poisson counts
@@ -92,7 +86,7 @@ mixture = tg.HiddenMarkovModel(
 mixture.fit(gr)
 for j, m in enumerate(mixture.distributions):
     print(
-        f"state {j}: weights {m.weights.round(4)}, means {m.means.ravel().round(1)}, variances {m.covariances.round(2)}"
+        f"state {j}: weights {m.weights.round(4)}, means {m.means.ravel().round(1)}, variances {np.array2string(m.covariances, precision=3)}"
     )
 
 # %% [markdown]
@@ -149,7 +143,7 @@ for i, (name, colour) in enumerate([("AIC", GRAY), ("BIC", ACCENT), ("ICL", HIGH
     b.plot(n, [r[i] for r in rows], marker="o", label=name, color=colour)
 b.set(xlabel="states", ylabel="criterion", title="Model choice", xticks=n)
 b.legend()
-save(fig, "mixtures")
+fig.savefig("mixtures.png")
 
 # %% [markdown]
 # ## Saving a model

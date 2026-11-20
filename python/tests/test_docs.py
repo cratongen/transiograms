@@ -21,7 +21,6 @@ PAGES = sorted(
 )
 EXAMPLE_PAGES = [p for p in PAGES if p.startswith("examples/")]
 KNOWN_FAILING = {
-    **{p: "imports `common`, a helper that only exists in the repository's examples/" for p in EXAMPLE_PAGES},
     **{
         p: "stub signatures in a python fence: NDArray, ArrayLike and class names are undefined"
         for p in PAGES
@@ -31,9 +30,7 @@ KNOWN_FAILING = {
 }
 BLOCK = re.compile(r"```(python|text)\n(.*?)\n```", re.DOTALL)
 RUNNER = """
-import contextlib, io, json, os, sys, traceback
-if os.environ.get("TG_DOCS_EXTRA_PATH"):
-    sys.path.insert(0, os.environ["TG_DOCS_EXTRA_PATH"])
+import contextlib, io, json, sys, traceback
 import matplotlib
 matplotlib.use("Agg")
 blocks = json.load(sys.stdin)
@@ -74,18 +71,34 @@ def normalise(text: str) -> str:
     ],
 )
 def test_documented_code_runs_and_prints_what_the_page_says(page, tmp_path):
-    check_page(page, tmp_path, {})
+    check_page(page, tmp_path)
 
 
 @pytest.mark.parametrize("page", EXAMPLE_PAGES)
-def test_example_page_runs_with_the_examples_helper(page, tmp_path):
-    check_page(page, tmp_path, {"TG_DOCS_EXTRA_PATH": str(ROOT / "examples")})
+def test_full_script_download_runs_on_its_own(page, tmp_path):
+    script = next((ROOT / page).parent.glob("example_*.py"))
+    alone = tmp_path / script.name
+    alone.write_text(script.read_text(encoding="utf-8"), encoding="utf-8")
+    python = os.environ.get("TG_DOCS_PYTHON", sys.executable)
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"} | {"MPLBACKEND": "Agg"}
+    run = subprocess.run(
+        [python, "-I", alone.name],
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+        env=env,
+        timeout=600,
+    )
+    assert run.returncode == 0, run.stderr[-2000:]
+    figures = set(re.findall(r"!\[[^]]*\]\(([^)]+\.png)\)", (ROOT / page).read_text(encoding="utf-8")))
+    assert figures <= {f.name for f in tmp_path.glob("*.png")}
 
 
-def check_page(page: str, tmp_path: Path, extra_env: dict[str, str]):
+def check_page(page: str, tmp_path: Path):
     pairs = documented(page)
     python = os.environ.get("TG_DOCS_PYTHON", sys.executable)
-    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"} | {"MPLBACKEND": "Agg"} | extra_env
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"} | {"MPLBACKEND": "Agg"}
     run = subprocess.run(
         [python, "-I", "-c", RUNNER],
         check=False,

@@ -8,18 +8,24 @@ always sum to one, and assembles the 3D transition model that the grid simulatio
 import matplotlib.pyplot as plt
 import numpy as np
 import transiograms as tg
-from common import save
 
 d = tg.datasets.layered_drillholes(seed=0)
 names = tg.Categories(["mud", "sand", "gravel"], colors=["#8c8c8c", "#e69f00", "#0072b2"])
 truth = tg.TransitionModel.from_json(d["model"])
+grid = tg.Grid.from_json(d["grid"])
 p = np.bincount(d["CODE"], minlength=3) / len(d["CODE"])
-print("sample proportions:", p.round(3), "model:", truth.proportions)
+field_p = np.bincount(d["field"], minlength=3) / d["field"].size
+print("sample proportions:", p.round(3), "field:", field_p.round(3), "model:", truth.proportions)
 ```
 
 ```text
-sample proportions: [0.497 0.287 0.216] model: [0.5 0.3 0.2]
+sample proportions: [0.497 0.287 0.216] field: [0.525 0.263 0.211] model: [0.5 0.3 0.2]
 ```
+
+The holes sample one field, and the field is not the model. `layered_drillholes` draws it by
+unconditional MCRF from `d["model"]`, and MCRF without hard data does not reproduce its own
+model (see the MCRF guide). The seeded test `test_layered_drillholes_departs_from_its_model`
+pins the gap at seed 0; the fits below are compared with the field as well as the model.
 
 The downhole estimator measures overlap lengths of the logged intervals at each lag, so it
 needs no lag tolerance. `fit_markov` fits a generator `R` with `T(h) = exp(R h)`, its sills
@@ -29,19 +35,29 @@ held at the sample proportions.
 lags = np.arange(0.5, 12.5, 0.5)
 exp = tg.downhole_transiogram("CODE", holes="HOLE_ID", from_="FROM", to="TO", lags=lags, data=d)
 vertical = tg.TransiogramModel.fit_markov(exp, proportions=p)
-print("fitted vertical mean lengths (m):", (-1 / np.diag(vertical.rates)).round(2))
-print("true:", truth.mean_lengths([0.0, 0.0, 1.0]).round(2))
+field_exp = tg.grid_transiogram(d["field"], grid, offset=(0, 0, 1), n_lags=12)
+field_fit = tg.TransiogramModel.fit_markov(field_exp, proportions=field_p)
+print("vertical mean lengths (m), fitted to the 25 holes:", (-1 / np.diag(vertical.rates)).round(2))
+print("                           fitted to the field:   ", (-1 / np.diag(field_fit.rates)).round(2))
+print("                           model of the dataset:  ", truth.mean_lengths([0.0, 0.0, 1.0]).round(2))
 fig, axes = tg.plot.transiogram(exp, vertical, h=np.linspace(0, 12, 200), categories=names)
 fig.suptitle("Vertical transiograms: data (points) and Markov model (lines)")
-save(fig, "vertical")
+fig.savefig("vertical.png")
 ```
 
 ```text
-fitted vertical mean lengths (m): [9.13 6.52 5.14]
-true: [6. 4. 3.]
+vertical mean lengths (m), fitted to the 25 holes: [9.13 6.52 5.14]
+                           fitted to the field:    [10.54  6.79  5.24]
+                           model of the dataset:   [6. 4. 3.]
 ```
 
 ![vertical](vertical.png)
+
+The fit to the 25 holes lands near the fit to all 30 720 cells of the field (mud 9.1 m against
+10.5 m): the estimator and the fit follow the data. Both are 1.5 to 1.8 times the mean lengths of
+the model the field was drawn from, which is the MCRF gap, not a fitting error. The sills are held at the sample proportions, so
+entries that are still far from their sill at 12 m in these 25 holes, such as sand to gravel,
+sit above the fitted curve.
 
 The same transiograms from points: composites at hole midpoints with a lag class every metre
 and pairs only within a hole. Lag classes count pairs, so the probabilities match the downhole
@@ -85,7 +101,7 @@ for a, axis, label in ((ax[0], [1.0, 0.0, 0.0], "x"), (ax[1], [0.0, 0.0, 0.1], "
     a.set(xlabel=f"lag along {label} (m)", title=f"Auto-transiograms along {label}")
 ax[0].set_ylabel("t_jj(h)")
 ax[0].legend()
-save(fig, "axes")
+fig.savefig("axes.png")
 ```
 
 ![axes](axes.png)

@@ -10,7 +10,8 @@ over every state path of a short log closes the page.
 import matplotlib.pyplot as plt
 import numpy as np
 import transiograms as tg
-from common import ACCENT, GRAY, HIGHLIGHT, save
+
+ACCENT, GRAY, HIGHLIGHT = "#0072b2", "#8c8c8c", "#d55e00"
 
 truth = tg.HiddenSemiMarkovModel(
     [tg.Gaussian([0.0], 1.0), tg.Gaussian([3.0], 1.0)],
@@ -71,7 +72,7 @@ for j, ax in enumerate(axes):
     ax.set(xlabel="thickness (steps)", title=f"state {j}")
 axes[0].set_ylabel("probability")
 axes[0].legend()
-save(fig, "laws")
+fig.savefig("laws.png")
 ```
 
 ![laws](laws.png)

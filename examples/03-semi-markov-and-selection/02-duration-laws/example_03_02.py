@@ -8,18 +8,12 @@ and `aic`, `bic` and `icl` weigh each fitted law against its parameter count. A 
 over every state path of a short log closes the page.
 """
 
-# %% [hidden]
-import sys
-from pathlib import Path
-
-HERE = Path(__file__).parent if "__file__" in globals() else Path.cwd()
-sys.path.insert(0, str(HERE.parents[1]))
-
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
 import transiograms as tg
-from common import ACCENT, GRAY, HIGHLIGHT, save
+
+ACCENT, GRAY, HIGHLIGHT = "#0072b2", "#8c8c8c", "#d55e00"
 
 truth = tg.HiddenSemiMarkovModel(
     [tg.Gaussian([0.0], 1.0), tg.Gaussian([3.0], 1.0)],
@@ -68,7 +62,7 @@ for j, ax in enumerate(axes):
     ax.set(xlabel="thickness (steps)", title=f"state {j}")
 axes[0].set_ylabel("probability")
 axes[0].legend()
-save(fig, "laws")
+fig.savefig("laws.png")
 
 # %% [markdown]
 # Theory check: on eight steps there are 2^8 = 256 state paths. `tg.checks.brute_force_hsmm`

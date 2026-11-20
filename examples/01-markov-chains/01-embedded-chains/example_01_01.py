@@ -6,18 +6,12 @@ follows which, ignoring thickness, and the bed thicknesses give the continuous-l
 with `P(h) = exp(Q h)`.
 """
 
-# %% [hidden]
-import sys
-from pathlib import Path
-
-HERE = Path(__file__).parent if "__file__" in globals() else Path.cwd()
-sys.path.insert(0, str(HERE.parents[1]))
-
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
 import transiograms as tg
-from common import GRAY, save
+
+GRAY = "#8c8c8c"
 
 d = tg.datasets.varved_sequence(seed=0)
 names = tg.Categories(d["names"], colors=["#e69f00", "#56b4e9", "#0072b2"])
@@ -63,7 +57,7 @@ for j, color in enumerate(names.colors):
 axes[2].axhline(chain.proportions[0], color=GRAY, lw=0.8)
 axes[2].set(xlabel="lag (m)", ylabel="P(h)", title="From sand: fitted (solid), true (dashed)")
 axes[2].legend()
-save(fig, "matrices")
+fig.savefig("matrices.png")
 
 # %% [markdown]
 # The proportion identity ties the three summaries together: volume proportion equals bed

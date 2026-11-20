@@ -8,7 +8,8 @@ fits both, and Viterbi decodes the most likely facies column.
 import matplotlib.pyplot as plt
 import numpy as np
 import transiograms as tg
-from common import ACCENT, GRAY, save
+
+ACCENT, GRAY = "#0072b2", "#8c8c8c"
 
 logs = tg.datasets.electrofacies_logs(seed=0)
 x = np.column_stack([logs["GR"], logs["RHOB"]])
@@ -79,7 +80,7 @@ b.invert_yaxis()
 c, p = fig.add_subplot(grid[2], sharey=b), fig.add_subplot(grid[3], sharey=b)
 tg.plot.strip_log(states[well], depth=logs["DEPTH"][well], posterior=posterior, ax=[c, p])
 c.set_title("Viterbi")
-save(fig, "segmentation")
+fig.savefig("segmentation.png")
 ```
 
 ![segmentation](segmentation.png)

@@ -1,7 +1,4 @@
-"""Figure style shared by the examples."""
-
-import inspect
-from pathlib import Path
+"""Figure style that render.py applies to every example; the scripts do not import it."""
 
 import matplotlib as mpl
 
@@ -28,14 +25,3 @@ mpl.rcParams.update(
         "image.cmap": "cividis",
     }
 )
-
-SAVED: list[Path] = []
-
-
-def save(fig, name: str) -> Path:
-    """Saves `fig` as `name.png` next to the calling script and records it for render.py."""
-    caller = Path(inspect.stack()[1].filename).resolve().parent
-    path = caller / f"{name}.png"
-    fig.savefig(path)
-    SAVED.append(path)
-    return path

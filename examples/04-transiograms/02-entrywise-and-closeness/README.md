@@ -10,7 +10,6 @@ the simulation neighbourhoods rank lags by.
 import matplotlib.pyplot as plt
 import numpy as np
 import transiograms as tg
-from common import save
 
 d = tg.datasets.layered_drillholes(seed=0)
 names = tg.Categories(["mud", "sand", "gravel"], colors=["#8c8c8c", "#e69f00", "#0072b2"])
@@ -33,7 +32,7 @@ for label, m in (("entrywise fit", fitted), ("Markov fit", markov), ("spherical 
     print(f"{label:18s} kind={m.kind:9s} rows sum to 1: {bool(np.allclose(t.sum(axis=2), 1.0))}")
 fig, axes = tg.plot.transiogram(exp, fitted, h=h, categories=names)
 fig.suptitle("Vertical transiograms: data (points) and entrywise model (lines)")
-save(fig, "entrywise")
+fig.savefig("entrywise.png")
 ```
 
 ```text
@@ -74,7 +73,7 @@ fig, ax = plt.subplots(figsize=(4.6, 4), layout="constrained")
 cs = ax.contourf(xx, yy, c, levels=np.linspace(0.0, 1.0, 11))
 fig.colorbar(cs, ax=ax, label="closeness")
 ax.set(xlabel="east (m)", ylabel="north (m)", title="Closeness in the horizontal plane", aspect="equal")
-save(fig, "closeness")
+fig.savefig("closeness.png")
 print("closeness at lag 0:", model.closeness([0.0, 0.0, 0.0]))
 ```
 

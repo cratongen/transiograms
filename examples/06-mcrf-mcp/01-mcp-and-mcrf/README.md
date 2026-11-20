@@ -9,7 +9,6 @@ conditional along a random path, adding the cells it has already drawn.
 import matplotlib.pyplot as plt
 import numpy as np
 import transiograms as tg
-from common import save
 
 d = tg.datasets.layered_drillholes(seed=0)
 names = tg.Categories(["mud", "sand", "gravel"], colors=["#8c8c8c", "#e69f00", "#0072b2"])
@@ -67,7 +66,7 @@ panels += [(real.realizations[r], f"MCRF realization {r + 1}") for r in range(4)
 for ax, (values, title) in zip(axes.flat, panels):
     tg.plot.grid_slice(values, grid, axis="y", index=15, categories=names, ax=ax)
     ax.set_title(f"{title}, y = 155 m")
-save(fig, "sections")
+fig.savefig("sections.png")
 ```
 
 ```text

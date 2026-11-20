@@ -7,18 +7,12 @@ along a random path from those probabilities, then quenches each realization tow
 transiograms. Hard cells never change.
 """
 
-# %% [hidden]
-import sys
-from pathlib import Path
-
-HERE = Path(__file__).parent if "__file__" in globals() else Path.cwd()
-sys.path.insert(0, str(HERE.parents[1]))
-
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
 import transiograms as tg
-from common import ACCENT, GRAY, save
+
+ACCENT, GRAY, HIGHLIGHT = "#0072b2", "#8c8c8c", "#d55e00"
 
 d = tg.datasets.layered_drillholes(seed=0)
 names = tg.Categories(["mud", "sand", "gravel"], colors=["#8c8c8c", "#e69f00", "#0072b2"])
@@ -42,7 +36,7 @@ tg.plot.grid_slice(pred.probabilities[:, 2], grid, index=15, ax=axes[1], vmin=0,
 axes[1].set_title("P(gravel)")
 tg.plot.grid_slice(pred.entropy, grid, index=15, ax=axes[2], vmin=0, vmax=1)
 axes[2].set_title("Normalised entropy")
-save(fig, "cokriging")
+fig.savefig("cokriging.png")
 
 # %% [markdown]
 # Ten realizations. Each takes its own seeded path and draws, so the result does not depend on
@@ -61,25 +55,37 @@ for r, ax in enumerate(axes[0]):
 for r, ax in enumerate(axes[1]):
     tg.plot.grid_slice(real.realizations[r], grid, axis="y", index=15, categories=names, ax=ax)
     ax.set_title(f"Realization {r + 1}, section y = 155 m")
-save(fig, "realizations")
+fig.savefig("realizations.png")
 
 # %% [markdown]
-# Quenching never raises its objective, and the vertical transiograms of the realizations
-# scatter around the model.
+# Quenching never raises its objective. The objective counts only the proportions and the lags
+# between adjacent cells (closeness above `quench_limit`), so its fall to near zero says nothing
+# about longer lags. From 2 m down, the sand auto-transiograms of the realizations sit above the
+# model, between it and the field the holes were drawn from: the hard data carry the field's
+# longer sand beds (the transiograms page shows how far the dataset's field is from its model).
 
 # %%
 fig, (a, b) = plt.subplots(1, 2, figsize=(10, 3.4), layout="constrained")
 for o in real.objective:
     a.plot(o, marker="o", color=ACCENT, lw=0.8)
-a.set(xlabel="sweep", ylabel="objective", title="Quenching")
+a.set(xlabel="sweep", ylabel="objective", title="Quenching (proportions and adjacent cells)")
 lags = np.arange(1, 9)
+ensemble = []
 for r in real.realizations:
     e = tg.grid_transiogram(r, grid, offset=(0, 0, 1), n_lags=8)
+    ensemble.append(e.probabilities[:, 1, 1])
     b.plot(lags, e.probabilities[:, 1, 1], color=GRAY, lw=0.8)
-b.plot(lags, model.transition(np.outer(lags, [0.0, 0.0, 1.0]))[:, 1, 1], color=ACCENT, lw=2, label="model")
+target = model.transition(np.outer(lags, [0.0, 0.0, 1.0]))[:, 1, 1]
+field = tg.grid_transiogram(d["field"], grid, offset=(0, 0, 1), n_lags=8).probabilities[:, 1, 1]
+b.plot(lags, target, color=ACCENT, lw=2, label="model")
+b.plot(lags, field, color=HIGHLIGHT, lw=2, ls="--", label="field the holes sample")
 b.set(xlabel="vertical lag (m)", ylabel="t_sand,sand", title="Sand auto-transiogram")
 b.legend()
-save(fig, "reproduction")
+print("lag (m):            ", lags[:6])
+print("model:              ", target[:6].round(3))
+print("realizations (mean):", np.mean(ensemble, axis=0)[:6].round(3))
+print("field:              ", field[:6].round(3))
+fig.savefig("reproduction.png")
 
 # %% [markdown]
 # `tg.fit_quality` puts the reproduction in numbers: ensemble proportions against the model, and

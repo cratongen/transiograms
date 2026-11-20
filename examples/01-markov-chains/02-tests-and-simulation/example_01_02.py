@@ -6,19 +6,13 @@ Markov order, compares the bed thicknesses with the exponential law a Markov cha
 draws logs that honour logged intervals.
 """
 
-# %% [hidden]
-import sys
-from pathlib import Path
-
-HERE = Path(__file__).parent if "__file__" in globals() else Path.cwd()
-sys.path.insert(0, str(HERE.parents[1]))
-
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
 import transiograms as tg
-from common import ACCENT, GRAY, HIGHLIGHT, save
 from matplotlib.colors import ListedColormap
+
+ACCENT, GRAY, HIGHLIGHT = "#0072b2", "#8c8c8c", "#d55e00"
 
 d = tg.datasets.varved_sequence(seed=0)
 names = tg.Categories(d["names"], colors=["#e69f00", "#56b4e9", "#0072b2"])
@@ -57,7 +51,7 @@ for code, ax in enumerate(axes):
     tg.plot.sojourn(s, code, ax=ax, color=names.colors[code])
     t = s.exponential_test(code, n_bootstrap=199, seed=0)
     ax.set_title(f"{names.names[code]}: KS p = {t.p_value:.2f}")
-save(fig, "sojourns")
+fig.savefig("sojourns.png")
 
 # %% [markdown]
 # Twenty logs of 6 m from the fixed chain, conditioned on a logged clay interval between 2.0 and
@@ -77,7 +71,7 @@ ax.imshow(
 )
 ax.axvspan(2.0, 2.6, fill=False, ec=HIGHLIGHT, lw=1.5)
 ax.set(xlabel="height above base (m)", ylabel="realization", title="Conditioned fixed-step simulations")
-save(fig, "simulations")
+fig.savefig("simulations.png")
 
 # %% [markdown]
 # Between two conditioning samples the sampler draws a Markov bridge. Its marginal at step `t`
@@ -97,4 +91,4 @@ ax.bar(np.arange(3) + 0.2, want, 0.4, color=GRAY, label="closed form")
 ax.set_xticks(range(3), names.names)
 ax.set(ylabel=f"P(code at step {t})", title="Bridge marginal")
 ax.legend()
-save(fig, "bridge")
+fig.savefig("bridge.png")

@@ -12,7 +12,8 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 import transiograms as tg
-from common import ACCENT, GRAY, HIGHLIGHT, save
+
+ACCENT, GRAY, HIGHLIGHT = "#0072b2", "#8c8c8c", "#d55e00"
 ```
 
 ## Poisson counts
@@ -104,13 +105,13 @@ mixture = tg.HiddenMarkovModel(
 mixture.fit(gr)
 for j, m in enumerate(mixture.distributions):
     print(
-        f"state {j}: weights {m.weights.round(4)}, means {m.means.ravel().round(1)}, variances {m.covariances.round(2)}"
+        f"state {j}: weights {m.weights.round(4)}, means {m.means.ravel().round(1)}, variances {np.array2string(m.covariances, precision=3)}"
     )
 ```
 
 ```text
-state 0: weights [9.992e-01 8.000e-04], means [20.1 60.5], variances [23.38  0.  ]
-state 1: weights [0.475 0.525], means [ 75.1 124.6], variances [66.83 59.81]
+state 0: weights [9.992e-01 8.000e-04], means [20.1 60.5], variances [2.338e+01 1.194e-03]
+state 1: weights [0.475 0.525], means [ 75.1 124.6], variances [66.83  59.809]
 ```
 
 The heterolithic state recovers both modes and their equal weights. The sand state needs one
@@ -177,7 +178,7 @@ for i, (name, colour) in enumerate([("AIC", GRAY), ("BIC", ACCENT), ("ICL", HIGH
     b.plot(n, [r[i] for r in rows], marker="o", label=name, color=colour)
 b.set(xlabel="states", ylabel="criterion", title="Model choice", xticks=n)
 b.legend()
-save(fig, "mixtures")
+fig.savefig("mixtures.png")
 ```
 
 ![mixtures](mixtures.png)
