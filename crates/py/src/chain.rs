@@ -455,7 +455,10 @@ impl PyMarkovChain {
     ///     Read only the upper triangle of ``embedded`` and fill the rest by symmetry.
     /// direction : {"up", "down"}
     #[staticmethod]
-    #[pyo3(signature = (proportions, mean_lengths, embedded=None, *, background=-1, symmetric=false, direction="up"))]
+    #[pyo3(
+        signature = (proportions, mean_lengths, embedded=None, *, background=-1, symmetric=false, direction="up"),
+        text_signature = "(proportions, mean_lengths, embedded=None, *, background=-1, symmetric=False, direction='up')"
+    )]
     fn from_geology(
         proportions: &Bound<PyAny>,
         mean_lengths: &Bound<PyAny>,

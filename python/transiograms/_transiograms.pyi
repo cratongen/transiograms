@@ -186,7 +186,7 @@ class MarkovChain:
         hard_from: ArrayLike | None = None,
         hard_to: ArrayLike | None = None,
         hard_codes: ArrayLike | None = None,
-        start: int | Literal["stationary"] = "stationary",
+        start: int | Literal["stationary"] | None = None,
     ) -> NDArray[np.int64] | dict[str, NDArray]: ...
     def simulate_beds(
         self,
@@ -197,7 +197,7 @@ class MarkovChain:
         hard_from: ArrayLike | None = None,
         hard_to: ArrayLike | None = None,
         hard_codes: ArrayLike | None = None,
-        start: int | Literal["stationary"] = "stationary",
+        start: int | Literal["stationary"] | None = None,
     ) -> NDArray[np.int64]: ...
     def to_json(self) -> str: ...
     @staticmethod
@@ -696,7 +696,7 @@ def select_states(
     data: Mapping[str, ArrayLike] | None = None,
     labels: ArrayLike | str | None = None,
     allowed: ArrayLike | None = None,
-    states: Sequence[int] = ...,
+    states: Sequence[int] | None = None,
     model: Literal["hmm", "hsmm"] = "hmm",
     emission: Literal["gaussian", "categorical", "poisson", "mixture"] = "gaussian",
     covariance_type: Literal["full", "diag", "spherical"] = "diag",
@@ -799,7 +799,7 @@ class TransiogramModel:
         experimental: ExperimentalTransiogram,
         proportions: ArrayLike,
         *,
-        structures: str | Sequence[str] = "exponential",
+        structures: str | Sequence[str] | None = None,
         complement: ArrayLike | None = None,
     ) -> TransiogramModel: ...
     @property
@@ -974,7 +974,7 @@ def mcp_predict(
     codes: ArrayLike | str,
     *,
     mask: ArrayLike | None = None,
-    neighbours: Literal["sectors"] | int = "sectors",
+    neighbours: Literal["sectors"] | int | None = None,
     closeness_limit: float = 0.01,
     memory: int | None = None,
     data: Mapping[str, ArrayLike] | None = None,
@@ -988,7 +988,7 @@ def mcrf_simulate(
     n: int = 1,
     seed: int = 0,
     mask: ArrayLike | None = None,
-    neighbours: Literal["sectors"] | int = "sectors",
+    neighbours: Literal["sectors"] | int | None = None,
     closeness_limit: float = 0.01,
     memory: int | None = None,
     data: Mapping[str, ArrayLike] | None = None,

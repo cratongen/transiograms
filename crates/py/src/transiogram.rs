@@ -421,7 +421,10 @@ impl PyTransiogramModel {
     /// start : array_like, optional
     ///     Starting rates.
     #[staticmethod]
-    #[pyo3(signature = (experimental, *, proportions=None, background=-1, start=None))]
+    #[pyo3(
+        signature = (experimental, *, proportions=None, background=-1, start=None),
+        text_signature = "(experimental, *, proportions=None, background=-1, start=None)"
+    )]
     fn fit_markov(
         py: Python,
         experimental: &PyExperimental,
@@ -547,7 +550,10 @@ pub struct PyTransitionModel(pub TransitionModel);
 #[pymethods]
 impl PyTransitionModel {
     #[new]
-    #[pyo3(signature = (proportions, rates_x, rates_y, rates_z, *, rotation=(0.0, 0.0, 0.0), background=-1))]
+    #[pyo3(
+        signature = (proportions, rates_x, rates_y, rates_z, *, rotation=(0.0, 0.0, 0.0), background=-1),
+        text_signature = "(proportions, rates_x, rates_y, rates_z, *, rotation=(0.0, 0.0, 0.0), background=-1)"
+    )]
     fn new(
         proportions: &Bound<PyAny>,
         rates_x: &Bound<PyAny>,
@@ -584,7 +590,10 @@ impl PyTransitionModel {
     /// rotation : tuple of 3 float
     /// background : int
     #[staticmethod]
-    #[pyo3(signature = (proportions, mean_lengths, *, embedded_x=None, embedded_y=None, embedded_z=None, rotation=(0.0, 0.0, 0.0), background=-1))]
+    #[pyo3(
+        signature = (proportions, mean_lengths, *, embedded_x=None, embedded_y=None, embedded_z=None, rotation=(0.0, 0.0, 0.0), background=-1),
+        text_signature = "(proportions, mean_lengths, *, embedded_x=None, embedded_y=None, embedded_z=None, rotation=(0.0, 0.0, 0.0), background=-1)"
+    )]
     fn from_geology(
         proportions: &Bound<PyAny>,
         mean_lengths: &Bound<PyAny>,
