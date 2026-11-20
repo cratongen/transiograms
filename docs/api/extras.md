@@ -25,7 +25,7 @@ Seeded synthetic data with known parameters; each takes `seed=0` and returns a d
 | --- | --- |
 | `varved_sequence()` | 12 holes of sand, silt and clay intervals: `HOLE_ID`, `FROM`, `TO`, `CODE`, `names`, `generator` |
 | `electrofacies_logs()` | 20 wells x 300 samples from a 3-state Gaussian HMM: `HOLE_ID`, `DEPTH`, `GR`, `RHOB`, `STATE`, `model` |
-| `layered_drillholes()` | 25 vertical holes through an MCRF field: `X`, `Y`, `Z`, `FROM`, `TO`, `HOLE_ID`, `CODE`, `field`, `model`, `grid` |
+| `layered_drillholes()` | 25 vertical holes through an unconditional MCRF field, which departs from its `model` (quantified in the docstring): `X`, `Y`, `Z`, `FROM`, `TO`, `HOLE_ID`, `CODE`, `field`, `model`, `grid` |
 
 ## tg.checks
 

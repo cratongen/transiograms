@@ -130,6 +130,12 @@ def layered_drillholes(seed=0):
     along z) are simulated by MCRF on a 32 x 32 x 30 grid of 10 x 10 x 1 m cells, then sampled
     by 25 vertical holes on a regular pattern at 1 m composites.
 
+    The field does not follow ``model``: unconditional MCRF does not reproduce its own model (see
+    the MCRF guide). At ``seed=0`` the field proportions are 0.525, 0.263 and 0.211, a Markov fit
+    to the field's vertical transiograms gives mean lengths of 10.54, 6.79 and 5.24 m, and its
+    vertical transiograms at lags 1 to 12 m miss ``model`` by up to 0.231 (0.423 at ``seed=2``).
+    Compare fits of the holes with ``field`` as well as with ``model``.
+
     Parameters
     ----------
     seed : int

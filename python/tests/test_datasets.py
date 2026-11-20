@@ -37,3 +37,25 @@ def test_layered_holes_sample_the_field():
     grid = tg.Grid.from_json(d["grid"])
     cells, codes = grid.snap(np.column_stack([d["X"], d["Y"], d["Z"]]), d["CODE"])
     np.testing.assert_array_equal(d["field"][cells], codes)
+
+
+def field_statistics(seed):
+    d = tg.datasets.layered_drillholes(seed=seed)
+    grid, model = tg.Grid.from_json(d["grid"]), tg.TransitionModel.from_json(d["model"])
+    p = np.bincount(d["field"], minlength=3) / d["field"].size
+    e = tg.grid_transiogram(d["field"], grid, offset=(0, 0, 1), n_lags=12)
+    lengths = -1 / np.diag(tg.TransiogramModel.fit_markov(e, proportions=p).rates)
+    gap = np.abs(e.probabilities - model.transition(np.outer(np.arange(1, 13), [0.0, 0.0, 1.0]))).max()
+    return p, lengths, gap
+
+
+def test_layered_drillholes_departs_from_its_model():
+    """Pins the MCRF gap that the docstring and the transiograms example quantify."""
+    p, lengths, gap = field_statistics(0)
+    np.testing.assert_allclose(p, [0.525, 0.263, 0.211], atol=5e-4)
+    np.testing.assert_allclose(lengths, [10.54, 6.79, 5.24], atol=5e-3)
+    assert round(gap, 3) == 0.231
+    assert round(field_statistics(2)[2], 3) == 0.423
+    doc = tg.datasets.layered_drillholes.__doc__
+    for quoted in ("0.525, 0.263 and 0.211", "10.54, 6.79 and 5.24 m", "up to 0.231", "0.423 at ``seed=2``"):
+        assert quoted in doc
