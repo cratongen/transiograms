@@ -9,6 +9,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT OR Apache-2.0"
 license-files = ["LICENSE-MIT", "LICENSE-APACHE"]
+authors = [{ name = "Gustavo Pretto Scholze" }]
 keywords = ["geostatistics", "markov chain", "hidden markov model", "transiogram", "t-progs", "geology"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
@@ -26,6 +27,13 @@ dynamic = ["version"]
 [project.optional-dependencies]
 plot = ["matplotlib>=3.8"]
 all = ["matplotlib>=3.8"]
+
+[project.urls]
+Homepage = "https://cratongen.github.io/transiograms/"
+Documentation = "https://cratongen.github.io/transiograms/"
+Repository = "https://github.com/cratongen/transiograms"
+Issues = "https://github.com/cratongen/transiograms/issues"
+Changelog = "https://github.com/cratongen/transiograms/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [

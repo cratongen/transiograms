@@ -2,6 +2,12 @@
 
 `transiograms` is a Rust-core, Python-exposed library for Markov modelling in geostatistics (`import transiograms as tg`).
 
+```sh
+pip install transiograms
+```
+
+Documentation: <https://cratongen.github.io/transiograms/>. Source and issues: <https://github.com/cratongen/transiograms>.
+
 Transiograms is a sedimentary rock formed in proglacial lakes, where alternating summer and winter deposition creates rhythmic pairs of coarse and fine laminae (varves). The library takes its name from those layered sequences and focuses on transition-based models of geological categories along drillholes and across 3D grids.
 
 The API draws inspiration from the compositional design of the original `pomegranate` library (explicit distributions, transition graphs, fit/predict/sample methods) while staying scoped to geostatistical sequences and spatial facies modelling. `transiograms` is standalone and has zero dependency on `boitata`. The two libraries exchange drillhole intervals, category codes, coordinates, and block-model grids through NumPy arrays, and `transiograms` follows `boitata`'s Python conventions (flat namespace, Rust-backed value types with JSON and pickle serialization, `.pyi` stubs, `tg.plot`, and `tg.datasets`).

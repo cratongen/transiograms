@@ -1,6 +1,8 @@
 site_name: transiograms
 site_description: Markov models for geostatistics.
-repo_name: transiograms
+site_url: https://cratongen.github.io/transiograms/
+repo_url: https://github.com/cratongen/transiograms
+repo_name: cratongen/transiograms
 edit_uri: ""
 
 theme:
