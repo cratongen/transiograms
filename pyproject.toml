@@ -50,6 +50,7 @@ package = false
 
 [tool.pytest.ini_options]
 testpaths = ["python/tests"]
+filterwarnings = ["error::DeprecationWarning"]
 
 [tool.ruff]
 line-length = 110

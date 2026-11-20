@@ -394,9 +394,22 @@ pub fn lags3(obj: &Bound<PyAny>, what: &str) -> PyResult<(Vec<[f64; 3]>, bool)> 
     ))
 }
 
+/// Whether `obj` is 0-dimensional; size-1 arrays are not scalars on any NumPy version.
+pub fn is_scalar(obj: &Bound<PyAny>) -> PyResult<bool> {
+    Ok(obj
+        .py()
+        .import("numpy")?
+        .call_method1("ndim", (obj,))?
+        .extract::<usize>()?
+        == 0)
+}
+
 /// A float or a 1-D array of floats; the flag says whether a scalar was given.
 pub fn scalar_or_floats(obj: &Bound<PyAny>, what: &str) -> PyResult<(Vec<f64>, bool)> {
-    if let Ok(v) = obj.extract::<f64>() {
+    if is_scalar(obj)? {
+        let v = obj
+            .extract::<f64>()
+            .map_err(|_| invalid(format!("{what} must be a number or a 1-D numeric array")))?;
         return Ok((vec![v], true));
     }
     Ok((floats(obj, what)?, false))

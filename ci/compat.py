@@ -3,7 +3,8 @@
 Usage: python ci/compat.py [all|venv|uv|pixi|conda]
 
 The wheel is built once (abi3, Python >= 3.11) and installed with pip into a venv, with uv into a
-Python 3.11 venv, into a pixi environment and into a micromamba (conda-forge) environment.
+Python 3.11 venv pinned to the declared NumPy floor (1.26), into a pixi environment and into a
+micromamba (conda-forge) environment. The smoke check runs with DeprecationWarning as an error.
 """
 
 import subprocess
@@ -26,6 +27,10 @@ try:
     raise SystemExit("bad matrix accepted")
 except tg.InvalidInput:
     pass
+assert tg.Poisson([1.0]).rate.shape == (1,)
+assert tg.Poisson(1.0).rate.shape == (1,)
+assert c.transition_at([1.0]).shape == (1, 2, 2) and c.transition_at(1.0).shape == (2, 2)
+tg.GaussianMixture([1.0], [[0.0]], [[[1.0]]])
 print("transiograms", tg.__version__, "ok")
 """
 
@@ -44,14 +49,14 @@ def venv(tmp, wheel):
     env = tmp / "venv"
     run(sys.executable, "-m", "venv", env)
     run(env / "bin" / "python", "-m", "pip", "install", "-q", wheel)
-    run(env / "bin" / "python", "-c", SMOKE)
+    run(env / "bin" / "python", "-W", "error::DeprecationWarning", "-c", SMOKE)
 
 
 def uv(tmp, wheel):
     env = tmp / "uv"
     run("uv", "venv", "-q", "--python", "3.11", env)
-    run("uv", "pip", "install", "-q", "--python", env / "bin" / "python", wheel)
-    run(env / "bin" / "python", "-c", SMOKE)
+    run("uv", "pip", "install", "-q", "--python", env / "bin" / "python", wheel, "numpy==1.26.*")
+    run(env / "bin" / "python", "-W", "error::DeprecationWarning", "-c", SMOKE)
 
 
 def pixi(tmp, wheel):

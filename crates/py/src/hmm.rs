@@ -40,7 +40,10 @@ fn covariance_name(c: CovarianceType) -> &'static str {
 
 /// `d x d` covariance from a scalar, a `(d,)` diagonal or a `(d, d)` matrix.
 fn covariance(obj: &Bound<PyAny>, d: usize, ct: CovarianceType) -> PyResult<Mat> {
-    if let Ok(v) = obj.extract::<f64>() {
+    if crate::args::is_scalar(obj)? {
+        let v = obj
+            .extract::<f64>()
+            .map_err(|_| invalid("covariance must be a number or a numeric array"))?;
         return Ok(Mat::identity(d, d) * v);
     }
     let ndim: usize = obj

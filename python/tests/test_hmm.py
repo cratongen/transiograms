@@ -222,3 +222,10 @@ def test_json_pickle_and_errors():
         m.predict(np.zeros((5, 2)), labels=[0, 1, 9, 0, 0])
     with pytest.raises(tg.InvalidInput):
         m.sample_posterior(np.zeros((5, 2)), n=2**62)
+
+
+def test_size_one_arrays_are_arrays_on_every_numpy():
+    assert tg.Poisson([1.0]).rate.shape == (1,)
+    assert tg.Poisson(2.0).rate.shape == (1,)
+    m = tg.GaussianMixture([1.0], [[0.0]], [[[1.0]]])
+    assert m.covariances.shape == (1, 1, 1)

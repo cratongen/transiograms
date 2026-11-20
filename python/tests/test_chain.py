@@ -246,3 +246,12 @@ def test_fixed_hard_points_freeze_the_cell_that_contains_them():
     c = tg.MarkovChain.from_matrix(np.full((3, 3), 1 / 3), step=0.5)
     sims = c.simulate(5.0, n=50, seed=1, hard_from=[0.0, 2.5, 4.99], hard_codes=[2, 1, 0])
     assert np.all(sims[:, 0] == 2) and np.all(sims[:, 5] == 1) and np.all(sims[:, 9] == 0)
+
+
+def test_transition_at_keeps_a_size_one_lag_array():
+    c = tg.MarkovChain.from_matrix([[0.9, 0.1], [0.2, 0.8]])
+    assert c.transition_at(1.0).shape == (2, 2)
+    assert c.transition_at([1.0]).shape == (1, 2, 2)
+    assert c.transition_at(np.array([1.0])).shape == (1, 2, 2)
+    m = tg.TransiogramModel.markov([[-0.5, 0.5], [1.0, -1.0]])
+    assert m.transition([2.0]).shape == (1, 2, 2)
