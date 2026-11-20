@@ -27,7 +27,6 @@ KNOWN_FAILING = {
         for p in PAGES
         if p.startswith("docs/api/")
     },
-    "docs/guide/mcrf-mcp.md": "uses tg, model, grid, xyz and codes without defining them",
     "docs/guide/semi-markov.md": "fits `sequences`, which the page never defines",
 }
 BLOCK = re.compile(r"```(python|text)\n(.*?)\n```", re.DOTALL)

@@ -67,3 +67,14 @@ for ax, (values, title) in zip(axes.flat, panels):
     tg.plot.grid_slice(values, grid, axis="y", index=15, categories=names, ax=ax)
     ax.set_title(f"{title}, y = 155 m")
 save(fig, "sections")
+
+# %% [markdown]
+# `tg.fit_quality` puts the gap in numbers. MCRF assumes the neighbours of a cell are
+# independent given its facies, which counts their shared information twice: realizations come
+# out too continuous and drift from the target proportions. The MCP and MCRF guide quantifies
+# this limit of the method.
+
+# %%
+q = tg.fit_quality(model, grid, real)
+print(q)
+print("ensemble:", q.mean_proportions.round(3), "target:", q.target_proportions.round(3))

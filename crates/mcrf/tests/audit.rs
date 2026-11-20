@@ -99,7 +99,7 @@ fn unconditional(neighbourhood: Neighbourhood) -> (TransitionModel, Grid, Realiz
 /// states for the M6 grid with hard data). Measured on 2026-11-20 at seed 1 with the default
 /// sectors neighbourhood: [0.462, 0.314, 0.225] against [0.5, 0.3, 0.2].
 #[test]
-#[ignore = "release audit: unconditional MCRF (default sectors neighbourhood) misses the target proportions by 0.038 (0.462 vs 0.5)"]
+#[ignore = "method limit, documented in docs/guide/mcrf-mcp.md and pinned by tests/limits.rs: unconditional MCRF (default sectors neighbourhood) misses the target proportions by 0.038 (0.462 vs 0.5)"]
 fn unconditional_ensemble_reproduces_the_proportions() {
     let (model, _, sims) = unconditional(Neighbourhood::Sectors);
     let mut counts = [0.0; 3];
@@ -120,7 +120,7 @@ fn unconditional_ensemble_reproduces_the_proportions() {
 /// 0.088, Nearest(2) 0.276, Nearest(1) 0.393. Realizations are too continuous: vertical
 /// `t_11(1)` is 0.765 against 0.643 with the default.
 #[test]
-#[ignore = "release audit: MCRF ensemble transiograms miss the model by up to 0.19 abs (27-31 standard errors) with the default sectors neighbourhood"]
+#[ignore = "method limit, documented in docs/guide/mcrf-mcp.md and pinned by tests/limits.rs: MCRF ensemble transiograms miss the model by up to 0.19 abs (27-31 standard errors) with the default sectors neighbourhood"]
 fn unconditional_ensemble_transiograms_match_the_model_within_sampling_error() {
     for nb in [Neighbourhood::Sectors, Neighbourhood::Nearest(4)] {
         let (model, grid, sims) = unconditional(nb);

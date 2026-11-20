@@ -82,4 +82,20 @@ proportions per realization:
 
 ![sections](sections.png)
 
+`tg.fit_quality` puts the gap in numbers. MCRF assumes the neighbours of a cell are
+independent given its facies, which counts their shared information twice: realizations come
+out too continuous and drift from the target proportions. The MCP and MCRF guide quantifies
+this limit of the method.
+
+```python
+q = tg.fit_quality(model, grid, real)
+print(q)
+print("ensemble:", q.mean_proportions.round(3), "target:", q.target_proportions.round(3))
+```
+
+```text
+FitQuality(n=5, k=3, offsets=24, proportion_error=0.0451, transiogram_error=0.3552, max_standard_errors=99.1)
+ensemble: [0.469 0.286 0.245] target: [0.5 0.3 0.2]
+```
+
 Full script: [`example_06_01.py`](example_06_01.py)

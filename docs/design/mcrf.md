@@ -64,6 +64,15 @@ collected in index order. Memory check as in tpsim.
 
 ## Implementer decisions
 
+- Known limit, kept. Eq. 14 is exact only when the neighbours are screened by the cell, as on a
+  single column with the two vertical sectors (`limits.rs::one_column_sectors_simulation_reproduces_the_markov_chain`,
+  within 2.8 standard errors). In 2D and 3D, unconditional MCRF on the M5 model (48 x 48 x 32,
+  cell 3 x 3 x 0.5, n = 10, seed 1) gives proportions [0.462, 0.314, 0.225] and transiograms up
+  to 0.190 from the model (31 standard errors) with the default sectors, 0.088 with
+  `Nearest(4)`. `limits.rs` pins both; `transiograms_transiogram::fit_quality` reports the gap;
+  `docs/guide/mcrf-mcp.md` documents it. The strict sampling-bound tests in `audit.rs` stay
+  ignored as the record of the unmet target.
+
 - M6 grid. On the spec grid (64 x 64 x 32, cell 1 x 1 x 0.25) the tpsim.md section 5 variance
   assertion fails: 3 sigma = 0.180 / 0.141 / 0.118 for categories 0 / 1 / 2, against the 0.02
   required. The proportion check therefore runs on 96 x 96 x 32 with cell 4 x 4 x 1, where it
