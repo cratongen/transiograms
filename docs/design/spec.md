@@ -110,7 +110,7 @@ resolver = "3"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.97"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 publish = false
 
 [workspace.dependencies]

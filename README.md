@@ -116,4 +116,4 @@ We have not run benchmarks yet:
 
 ## License
 
-MIT
+Licensed under either of the [Apache License, Version 2.0](https://github.com/cratongen/transiograms/blob/main/LICENSE-APACHE) or the [MIT licence](https://github.com/cratongen/transiograms/blob/main/LICENSE-MIT), at your option.
