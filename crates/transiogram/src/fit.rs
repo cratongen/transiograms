@@ -232,3 +232,23 @@ impl Model1D {
         Self::entrywise(proportions.to_vec(), entries, complement.to_vec(), last)
     }
 }
+
+impl Model1D {
+    /// Experimental minus model `t_ij` at each lag of `exp` (the mean lag of its pairs when known,
+    /// the nominal lag otherwise): the misfit `fit_markov` and `fit_entrywise` minimise, weighted
+    /// there by the tail totals. NaN where the experimental entry is NaN.
+    pub fn residuals(&self, exp: &Experimental) -> Result<Vec<Mat>> {
+        let k = check_experimental(exp)?;
+        if self.proportions().len() != k {
+            return invalid(format!(
+                "the model has {} categories, the experimental transiogram {k}",
+                self.proportions().len()
+            ));
+        }
+        Ok(effective_lags(exp)
+            .iter()
+            .zip(&exp.probabilities)
+            .map(|(&h, t)| t - self.transition(h))
+            .collect())
+    }
+}

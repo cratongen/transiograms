@@ -30,6 +30,41 @@ simulations use: one generator per principal axis, interpolated in between (Carl
 rotated by azimuth, dip and rake. `TransitionModel.from_geology(proportions, mean_lengths)` builds
 it from mean lengths per axis, with maximum-entropy juxtapositions unless you give `embedded_*`.
 
+## Fit quality
+
+`TransiogramModel.residuals(experimental)` (Rust `Model1D::residuals`) returns experimental minus
+model `t_ij` at every lag, `(n_lags, k, k)`: the misfit that `fit_markov` and `fit_entrywise`
+minimise. A Markov model cannot follow a log whose transiogram oscillates, such as cyclic beds of
+nearly constant thickness; the residuals show how far it falls short.
+
+```python
+import numpy as np
+import transiograms as tg
+
+d = tg.datasets.varved_sequence()
+exp = tg.downhole_transiogram(d["CODE"], lags=[0.5, 1.0, 1.5, 2.0], holes=d["HOLE_ID"], from_=d["FROM"], to=d["TO"])
+fit = tg.TransiogramModel.fit_markov(exp)
+print(f"varved: largest |residual| = {np.nanmax(np.abs(fit.residuals(exp))):.3f}")
+
+rng = np.random.default_rng(7)
+thickness = rng.integers(3, 6, size=20_000)
+codes = np.repeat(np.arange(20_000) % 3, thickness)
+cyclic = tg.downhole_transiogram(codes, lags=np.arange(1.0, 13.0), depth=np.arange(codes.size) + 0.5)
+r = tg.TransiogramModel.fit_markov(cyclic).residuals(cyclic)
+print(f"cyclic: largest |residual| = {np.nanmax(np.abs(r)):.3f} at lag {cyclic.lags[np.nanargmax(np.abs(r).max(axis=(1, 2)))]:.0f}")
+```
+
+```text
+varved: largest |residual| = 0.046
+cyclic: largest |residual| = 0.449 at lag 8
+```
+
+The varved logs come from a Markov chain, so their residuals are sampling noise. The cyclic log
+(beds 0, 1, 2 in turn, 3 to 5 cells thick) is not Markov: the best Markov fit misses it by 0.45.
+The seeded Rust test `markov_fit_residuals_quantify_a_cyclic_log` pins that gap between 0.40 and
+0.50. The entrywise curves rise monotonically too, so neither family follows such a log; where
+the residuals stay large, treat the model as an approximation at those lags.
+
 ## Theory checks
 
 At 200 lags up to 20 mean lengths and at `10^4` mean lengths, every model has non-negative

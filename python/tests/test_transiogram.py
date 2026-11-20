@@ -184,3 +184,21 @@ def test_batched_transition_raises_before_allocating_an_absurd_stack():
     with pytest.raises(tg.InvalidInput, match="transition matrices of 40 x 40"):
         markov.transition(np.broadcast_to(1.0, 10**7))
     assert big.closeness(np.ones((1000, 3))).shape == (1000,)
+
+
+def test_residuals_are_experimental_minus_model_at_the_mean_lags():
+    d = tg.datasets.varved_sequence()
+    exp = tg.downhole_transiogram(
+        d["CODE"], lags=[0.5, 1.0, 2.0], holes=d["HOLE_ID"], from_=d["FROM"], to=d["TO"]
+    )
+    for model in (
+        tg.TransiogramModel.fit_markov(exp),
+        tg.TransiogramModel.fit_entrywise(exp, [0.4, 0.35, 0.25]),
+    ):
+        lags = np.where(np.isfinite(exp.mean_lags) & (exp.mean_lags > 0), exp.mean_lags, exp.lags)
+        np.testing.assert_allclose(
+            model.residuals(exp), exp.probabilities - model.transition(lags), atol=1e-12
+        )
+    two = tg.TransiogramModel.markov([[-1.0, 1.0], [1.0, -1.0]])
+    with pytest.raises(tg.InvalidInput, match="2 categories"):
+        two.residuals(exp)

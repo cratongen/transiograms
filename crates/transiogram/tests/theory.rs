@@ -1033,3 +1033,62 @@ fn point_estimator_with_large_coordinates_returns_instead_of_panicking() {
         Err(p) => panic!("experimental panicked: {}", message(p)),
     }
 }
+
+#[test]
+fn residuals_are_experimental_minus_model() {
+    let lags: Vec<f64> = (1..=10).map(|l| 0.7 * l as f64).collect();
+    let truth = Model1D::markov(carle()).unwrap();
+    let exact = exact_experimental(&truth, &lags);
+    for r in truth.residuals(&exact).unwrap() {
+        assert!(r.iter().all(|v| v.abs() < 1e-12));
+    }
+    let other = entrywise();
+    let res = other.residuals(&exact).unwrap();
+    for (l, r) in res.iter().enumerate() {
+        assert!(max_diff(&(r + other.transition(lags[l])), &exact.probabilities[l]) < 1e-12);
+    }
+    let two = Model1D::markov(
+        RateMatrix::new(Mat::from_row_slice(2, 2, &[-1.0, 1.0, 1.0, -1.0])).unwrap(),
+    )
+    .unwrap();
+    assert!(two.residuals(&exact).is_err());
+}
+
+#[test]
+fn markov_fit_residuals_on_markov_logs_are_sampling_noise() {
+    let logs = regular_logs(&carle(), 10, 100_000.0, 21);
+    let lags: Vec<f64> = (1..=6).map(f64::from).collect();
+    let exp = downhole(&logs, Direction::Down, &lags, 0.0).unwrap();
+    let fit = Model1D::fit_markov(&exp, None, 2, None).unwrap();
+    let worst = fit
+        .residuals(&exp)
+        .unwrap()
+        .iter()
+        .flat_map(|r| r.iter().map(|v| v.abs()).collect::<Vec<_>>())
+        .fold(0.0, f64::max);
+    assert!(worst < 0.005, "{worst}");
+}
+
+/// Beds 0 -> 1 -> 2 -> 0 of 3 to 5 cells, seeded: a cyclic, non-Markov log whose transiogram
+/// oscillates. A Markov model cannot follow the oscillation; `residuals` measures the gap.
+#[test]
+fn markov_fit_residuals_quantify_a_cyclic_log() {
+    let mut s = Stream::new(7, &[0]);
+    let mut codes = Vec::new();
+    while codes.len() < 200_000 {
+        let thick = 3 + s.below(3) as usize;
+        let c = codes.last().map_or(0, |&c: &u32| (c + 1) % 3);
+        codes.extend(std::iter::repeat_n(c, thick));
+    }
+    let logs = SequenceSet::from_regular(&[codes], 3).unwrap();
+    let lags: Vec<f64> = (1..=12).map(f64::from).collect();
+    let exp = downhole(&logs, Direction::Down, &lags, 0.0).unwrap();
+    let fit = Model1D::fit_markov(&exp, None, 2, None).unwrap();
+    let worst = fit
+        .residuals(&exp)
+        .unwrap()
+        .iter()
+        .flat_map(|r| r.iter().map(|v| v.abs()).collect::<Vec<_>>())
+        .fold(0.0, f64::max);
+    assert!((0.40..0.50).contains(&worst), "{worst}");
+}

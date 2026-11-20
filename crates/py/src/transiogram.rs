@@ -504,6 +504,47 @@ impl PyTransiogramModel {
         let k = self.0.proportions().len();
         Ok(stack(py, hs.len(), k, |i| self.0.transition(hs[i]))?.into_any())
     }
+    /// Fit-quality report against an experimental transiogram: experimental minus model ``t_ij``
+    /// at each of its lags.
+    ///
+    /// The model is evaluated at the mean lag of each lag class's pairs (the nominal lag when a
+    /// class is empty), as ``fit_markov`` and ``fit_entrywise`` do; those fits minimise the sum of
+    /// these squared residuals weighted by the tail totals.
+    ///
+    /// Parameters
+    /// ----------
+    /// experimental : ExperimentalTransiogram
+    ///     With as many categories as the model.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     ``(n_lags, k, k)`` residuals; NaN where the experimental row has no pairs.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the category counts differ.
+    ///
+    /// Examples
+    /// --------
+    /// >>> d = tg.datasets.varved_sequence()
+    /// >>> exp = tg.downhole_transiogram(
+    /// ...     d["CODE"], lags=[0.5, 1.0, 2.0], holes=d["HOLE_ID"], from_=d["FROM"], to=d["TO"])
+    /// >>> r = tg.TransiogramModel.fit_markov(exp).residuals(exp)
+    /// >>> r.shape
+    /// (3, 3, 3)
+    /// >>> round(float(np.nanmax(np.abs(r))), 2)
+    /// 0.05
+    fn residuals<'py>(
+        &self,
+        py: Python<'py>,
+        experimental: PyRef<'py, PyExperimental>,
+    ) -> PyResult<Bound<'py, PyArray3<f64>>> {
+        let r = self.0.residuals(&experimental.0).map_err(to_rust)?;
+        let k = self.0.proportions().len();
+        stack(py, r.len(), k, |i| r[i].clone())
+    }
     fn to_json(&self) -> PyResult<String> {
         json(&self.0)
     }
