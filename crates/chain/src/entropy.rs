@@ -19,8 +19,9 @@ pub struct Entropy {
     pub max: f64,
 }
 
+/// Shannon entropy in bits; a certain outcome gives +0.0, not -0.0.
 fn h(ps: impl Iterator<Item = f64>) -> f64 {
-    -ps.filter(|&p| p > 0.0).map(|p| p * p.log2()).sum::<f64>()
+    0.0 - ps.filter(|&p| p > 0.0).map(|p| p * p.log2()).sum::<f64>()
 }
 
 impl MarkovChain {

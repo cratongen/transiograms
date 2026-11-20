@@ -255,3 +255,8 @@ def test_transition_at_keeps_a_size_one_lag_array():
     assert c.transition_at(np.array([1.0])).shape == (1, 2, 2)
     m = tg.TransiogramModel.markov([[-0.5, 0.5], [1.0, -1.0]])
     assert m.transition([2.0]).shape == (1, 2, 2)
+
+
+def test_certain_rows_have_positive_zero_entropy():
+    e = tg.MarkovChain.from_matrix([[0.0, 1.0], [1.0, 0.0]], kind="embedded").entropy()
+    assert not np.any(np.signbit(e.post)) and not np.signbit(e.chain)
