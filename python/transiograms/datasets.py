@@ -20,6 +20,19 @@ def varved_sequence(seed=0):
     dict
         ``HOLE_ID`` (str), ``FROM`` and ``TO`` (depth, top-down), ``CODE`` (0 sand, 1 silt,
         2 clay), ``names`` and ``generator`` (the true ``MarkovChain`` as JSON).
+
+    Raises
+    ------
+    InvalidInput
+        When ``seed`` is outside ``0..2**64-1``.
+
+    Examples
+    --------
+    >>> d = tg.datasets.varved_sequence()
+    >>> d["names"], len(np.unique(d["HOLE_ID"]))
+    (['sand', 'silt', 'clay'], 12)
+    >>> bool(np.all(d["TO"] > d["FROM"]))
+    True
     """
     import transiograms as tg
 
@@ -63,6 +76,17 @@ def electrofacies_logs(seed=0):
     dict
         ``HOLE_ID``, ``DEPTH``, ``GR`` (API), ``RHOB`` (g/cm3) and ``STATE`` per row, top-down,
         and ``model``: the true ``HiddenMarkovModel`` (on the scaled channels) as JSON.
+
+    Raises
+    ------
+    InvalidInput
+        When ``seed`` is outside ``0..2**64-1``.
+
+    Examples
+    --------
+    >>> d = tg.datasets.electrofacies_logs()
+    >>> d["GR"].shape, tg.HiddenMarkovModel.from_json(d["model"]).n_states
+    ((6000,), 3)
     """
     import transiograms as tg
 
@@ -116,6 +140,18 @@ def layered_drillholes(seed=0):
         ``X``, ``Y``, ``Z`` (composite midpoints), ``HOLE_ID``, ``CODE``; ``FROM`` and ``TO``
         (depth below the grid top); ``field`` (the realization, one code per cell, x fastest);
         ``model`` (``TransitionModel`` JSON) and ``grid`` (``Grid`` JSON).
+
+    Raises
+    ------
+    InvalidInput
+        When ``seed`` is outside ``0..2**64-1``.
+
+    Examples
+    --------
+    >>> d = tg.datasets.layered_drillholes()
+    >>> grid = tg.Grid.from_json(d["grid"])
+    >>> d["field"].shape == (grid.n_cells,), len(np.unique(d["HOLE_ID"]))
+    (True, 25)
     """
     import transiograms as tg
 

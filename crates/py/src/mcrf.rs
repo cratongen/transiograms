@@ -56,8 +56,9 @@ fn options(
 ///     ``(n, 3)`` hard data coordinates.
 /// codes : array_like or str
 /// mask : array_like, optional
-/// neighbours : "sectors" or int
-///     Nearest datum per quadrant (2D) or octant (3D), or the nearest ``neighbours`` data.
+/// neighbours : "sectors", int or None
+///     Nearest datum per quadrant (2D) or octant (3D) ("sectors" or None), or the nearest
+///     ``neighbours`` data.
 /// closeness_limit : float
 /// memory : int, optional
 /// data : mapping, optional
@@ -65,6 +66,27 @@ fn options(
 /// Returns
 /// -------
 /// Prediction
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When the coordinates are not ``(n, 3)``, the lengths differ, a code is not a category
+///     of ``model``, ``mask`` has another length than the grid, an option is out of range,
+///     ``seed`` is out of range, or the work would need more than ``memory`` (the available
+///     memory by default); the message names the bytes.
+///
+/// Examples
+/// --------
+/// >>> model = tg.TransitionModel.from_geology(
+/// ...     [0.5, 0.3, 0.2], [[40.0, 30.0, 20.0], [40.0, 30.0, 20.0], [4.0, 3.0, 2.0]])
+/// >>> grid = tg.Grid((0.0, 0.0, 0.0), (10.0, 10.0, 1.0), (12, 12, 6))
+/// >>> xyz, codes = [[55.0, 55.0, 0.5], [55.0, 55.0, 3.5], [5.0, 105.0, 2.5]], [0, 1, 2]
+/// >>> cells, hard = grid.snap(xyz, codes)
+/// >>> pred = tg.mcp_predict(model, grid, xyz, codes)
+/// >>> pred.probabilities.shape
+/// (864, 3)
+/// >>> pred.most_likely[cells], hard
+/// (array([0, 2, 1]), array([0, 2, 1]))
 #[pyfunction]
 #[pyo3(signature = (model, grid, coords, codes, *, mask=None, neighbours=None, closeness_limit=0.01, memory=None, data=None))]
 #[allow(clippy::too_many_arguments)]
@@ -101,6 +123,27 @@ fn mcp_predict<'py>(
 /// Returns
 /// -------
 /// Realizations
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When the coordinates are not ``(n, 3)``, the lengths differ, a code is not a category
+///     of ``model``, ``mask`` has another length than the grid, an option is out of range,
+///     ``seed`` is out of range, or the work would need more than ``memory`` (the available
+///     memory by default); the message names the bytes.
+///
+/// Examples
+/// --------
+/// >>> model = tg.TransitionModel.from_geology(
+/// ...     [0.5, 0.3, 0.2], [[40.0, 30.0, 20.0], [40.0, 30.0, 20.0], [4.0, 3.0, 2.0]])
+/// >>> grid = tg.Grid((0.0, 0.0, 0.0), (10.0, 10.0, 1.0), (12, 12, 6))
+/// >>> xyz, codes = [[55.0, 55.0, 0.5], [55.0, 55.0, 3.5], [5.0, 105.0, 2.5]], [0, 1, 2]
+/// >>> cells, hard = grid.snap(xyz, codes)
+/// >>> real = tg.mcrf_simulate(model, grid, xyz, codes, n=2, seed=1, neighbours=8)
+/// >>> real.realizations.shape
+/// (2, 864)
+/// >>> bool(np.array_equal(real.realizations, tg.mcrf_simulate(model, grid, xyz, codes, n=2, seed=1, neighbours=8).realizations))
+/// True
 #[pyfunction]
 #[pyo3(signature = (model, grid, coords, codes, *, n=1, seed=0, mask=None, neighbours=None, closeness_limit=0.01, memory=None, data=None))]
 #[allow(clippy::too_many_arguments)]

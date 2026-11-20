@@ -45,11 +45,28 @@ def quasi_independence(counts, *, tol=1e-12, max_iter=10_000):
     ----------
     counts : array_like
         ``(m, m)`` transition counts with a zero diagonal.
+    tol : float
+        Stop when the row totals match to ``tol`` times the total count.
+    max_iter : int
+        Largest number of fitting sweeps.
 
     Returns
     -------
     numpy.ndarray
         ``(m, m)`` expected counts, zero diagonal.
+
+    Raises
+    ------
+    ValueError
+        When ``counts`` is not a square numeric table.
+
+    Examples
+    --------
+    >>> e = tg.checks.quasi_independence([[0, 30, 10], [20, 0, 20], [10, 30, 0]])
+    >>> np.round(e.sum(axis=1), 6)
+    array([40., 40., 40.])
+    >>> float(np.trace(e))
+    0.0
     """
     n = np.asarray(counts, dtype=float)
     rows, cols = n.sum(axis=1), n.sum(axis=0)
@@ -68,6 +85,29 @@ def kemeny_snell_std(P, n):
     """Kemeny and Snell standard deviation of the state proportions over ``n`` steps.
 
     ``sqrt(pi_k (2 Z_kk - 1 - pi_k) / n)`` with ``Z = (I - P + 1 pi^T)^-1``.
+
+    Parameters
+    ----------
+    P : array_like
+        ``(m, m)`` row-stochastic, irreducible transition matrix.
+    n : int
+        Number of steps.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``(m,)`` standard deviations.
+
+    Raises
+    ------
+    numpy.linalg.LinAlgError
+        When ``I - P + 1 pi^T`` is singular (a reducible chain).
+
+    Examples
+    --------
+    >>> P = [[0.9, 0.1], [0.2, 0.8]]
+    >>> bool(np.allclose(tg.checks.kemeny_snell_std(P, 100), tg.MarkovChain.from_matrix(P).proportion_std(100)))
+    True
     """
     P = np.asarray(P, dtype=float)
     m = len(P)
@@ -78,7 +118,32 @@ def kemeny_snell_std(P, n):
 
 
 def markov_bridge_marginal(P, a, b, n, t):
-    """``P(x_t = j | x_0 = a, x_n = b) = (P^t)_aj (P^(n-t))_jb / (P^n)_ab`` for every ``j``."""
+    """``P(x_t = j | x_0 = a, x_n = b) = (P^t)_aj (P^(n-t))_jb / (P^n)_ab`` for every ``j``.
+
+    Parameters
+    ----------
+    P : array_like
+        ``(m, m)`` transition matrix.
+    a, b : int
+        States at steps 0 and ``n``.
+    n, t : int
+        Bridge length and the step asked for, ``0 <= t <= n``.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``(m,)`` probabilities summing to 1.
+
+    Raises
+    ------
+    ValueError
+        When ``t`` is outside ``0..n`` (a negative matrix power).
+
+    Examples
+    --------
+    >>> tg.checks.markov_bridge_marginal([[0.5, 0.5], [0.5, 0.5]], 0, 1, 2, 1)
+    array([0.5, 0.5])
+    """
     P = np.asarray(P, dtype=float)
     mp = np.linalg.matrix_power
     return mp(P, t)[a] * mp(P, n - t)[:, b] / mp(P, n)[a, b]
@@ -105,6 +170,18 @@ def brute_force_hmm(start, transition, log_b):
     tuple
         ``(log_likelihood, best_path, best_log_probability, gamma, path_entropy)``; ties of the
         best path go to the lexicographically smallest path.
+
+    Raises
+    ------
+    ValueError
+        When ``K^T`` exceeds the 500 000 paths a check enumerates.
+
+    Examples
+    --------
+    >>> ll, path, best, gamma, h = tg.checks.brute_force_hmm(
+    ...     [0.5, 0.5], [[0.9, 0.1], [0.1, 0.9]], np.log([[0.9, 0.1], [0.8, 0.2], [0.01, 0.99]]))
+    >>> path, gamma.shape
+    (array([0, 0, 1]), (3, 2))
     """
     log_b = np.asarray(log_b, dtype=float)
     t, k = log_b.shape
@@ -141,6 +218,20 @@ def brute_force_hsmm(start, transition, log_d, log_survivor, log_b):
     -------
     tuple
         As ``brute_force_hmm``.
+
+    Raises
+    ------
+    ValueError
+        When ``K^T`` exceeds the 500 000 paths a check enumerates.
+
+    Examples
+    --------
+    >>> log_d = [np.log([0.5, 0.5]), np.log([0.5, 0.5])]
+    >>> log_s = [np.log([1.0, 0.5]), np.log([1.0, 0.5])]
+    >>> out = tg.checks.brute_force_hsmm(
+    ...     [0.5, 0.5], [[0.0, 1.0], [1.0, 0.0]], log_d, log_s, np.log([[0.9, 0.1], [0.9, 0.1], [0.1, 0.9]]))
+    >>> out[1]
+    array([0, 0, 1])
     """
     log_b = np.asarray(log_b, dtype=float)
     t, k = log_b.shape
@@ -188,11 +279,27 @@ def mcp_brute_force(p, T_list, codes, *, tol=1e-13, max_iter=10_000):
         One ``(K, K)`` transition matrix ``T(x_g - x_0)`` per neighbour.
     codes : sequence of int
         Category of each neighbour.
+    tol : float
+        Stop when every margin matches to ``tol``.
+    max_iter : int
+        Largest number of fitting sweeps.
 
     Returns
     -------
     numpy.ndarray
         ``(K,)`` conditional probabilities of ``x_0``.
+
+    Raises
+    ------
+    ValueError
+        When the ``K^(G+1)`` table exceeds the 500 000 cells a check enumerates.
+
+    Examples
+    --------
+    >>> p = np.array([0.6, 0.4])
+    >>> T = np.array([[0.8, 0.2], [0.3, 0.7]])
+    >>> np.round(tg.checks.mcp_brute_force(p, [T], [0]), 4)
+    array([0.8, 0.2])
     """
     p = np.asarray(p, dtype=float)
     k, g = len(p), len(T_list)

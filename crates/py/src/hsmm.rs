@@ -87,21 +87,71 @@ macro_rules! duration_class {
         impl $ty {
             $($own)*
 
-            /// Probabilities of durations ``1..=max_duration``, renormalised on that support.
+                    /// Probabilities of durations ``1..=max_duration``, renormalised on that support.
+            ///
+            /// Parameters
+            /// ----------
+            /// max_duration : int
+            ///     Longest duration, at least 1.
+            ///
+            /// Returns
+            /// -------
+            /// numpy.ndarray
+            ///     ``(max_duration,)`` probabilities summing to 1.
+            ///
+            /// Raises
+            /// ------
+            /// InvalidInput
+            ///     When ``max_duration`` is 0 or the law has no mass on the support.
             fn pmf<'py>(&self, py: Python<'py>, max_duration: usize) -> PyResult<Bound<'py, PyArray1<f64>>> {
                 pmf_of(py, &self.0, max_duration)
             }
-            /// Mean duration of the law truncated to ``1..=max_duration``.
+                    /// Mean duration of the law truncated to ``1..=max_duration``.
+            ///
+            /// Parameters
+            /// ----------
+            /// max_duration : int
+            ///     Longest duration, at least 1.
+            ///
+            /// Returns
+            /// -------
+            /// float
+            ///
+            /// Raises
+            /// ------
+            /// InvalidInput
+            ///     When ``max_duration`` is 0 or the law has no mass on the support.
             fn mean(&self, max_duration: usize) -> PyResult<f64> {
                 mean_of(&self.0, max_duration)
             }
+            /// Whether the parameters stay fixed while fitting.
             #[getter]
             fn frozen(&self) -> bool {
                 self.0.frozen
             }
+            /// JSON text of this object; ``from_json`` reads it back.
+            ///
+            /// Returns
+            /// -------
+            /// str
             fn to_json(&self) -> PyResult<String> {
                 json(&self.0)
             }
+            /// An object of this class from the text written by ``to_json``.
+            ///
+            /// Parameters
+            /// ----------
+            /// text : str
+            ///
+            /// Returns
+            /// -------
+            /// object
+            ///     Of this class.
+            ///
+            /// Raises
+            /// ------
+            /// InvalidInput
+            ///     When ``text`` is not JSON of this class or describes an invalid object.
             #[staticmethod]
             fn from_json(text: &str) -> PyResult<Self> {
                 let d: DurationDist = unjson(text, $name)?;
@@ -135,6 +185,21 @@ macro_rules! duration_class {
 ///     ``0 < p <= 1``.
 /// frozen : bool
 ///     Keep the law fixed while fitting.
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When a parameter is outside its range.
+///
+/// Examples
+/// --------
+/// >>> g = tg.Geometric(0.25)
+/// >>> np.round(g.pmf(4), 4)
+/// array([0.3657, 0.2743, 0.2057, 0.1543])
+/// >>> round(g.mean(1000), 6)
+/// 4.0
+/// >>> tg.Geometric.from_json(g.to_json()) == g
+/// True
 #[pyclass(
     module = "transiograms",
     name = "Geometric",
@@ -156,6 +221,7 @@ duration_class!(PyGeometric, "Geometric", {
         })
         .map(Self)
     }
+    /// Probability of ending the run at each step.
     #[getter]
     fn p(&self) -> f64 {
         match self.0.law {
@@ -172,6 +238,21 @@ duration_class!(PyGeometric, "Geometric", {
 /// rate : float
 ///     ``rate >= 0``; the mean is ``1 + rate``.
 /// frozen : bool
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When a parameter is outside its range.
+///
+/// Examples
+/// --------
+/// >>> d = tg.ShiftedPoisson(2.0)
+/// >>> np.round(d.pmf(4), 4)
+/// array([0.1579, 0.3158, 0.3158, 0.2105])
+/// >>> round(d.mean(100), 6)
+/// 3.0
+/// >>> tg.ShiftedPoisson.from_json(d.to_json()) == d
+/// True
 #[pyclass(
     module = "transiograms",
     name = "ShiftedPoisson",
@@ -193,6 +274,7 @@ duration_class!(PyShiftedPoisson, "ShiftedPoisson", {
         })
         .map(Self)
     }
+    /// Rate of the shifted law; the mean duration is ``1 + rate``.
     #[getter]
     fn rate(&self) -> f64 {
         match self.0.law {
@@ -211,6 +293,21 @@ duration_class!(PyShiftedPoisson, "ShiftedPoisson", {
 /// p : float
 ///     ``0 < p <= 1``.
 /// frozen : bool
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When a parameter is outside its range.
+///
+/// Examples
+/// --------
+/// >>> d = tg.NegativeBinomial(2.0, 0.5)
+/// >>> np.round(d.pmf(3), 4)
+/// array([0.3636, 0.3636, 0.2727])
+/// >>> round(d.mean(1000), 6)
+/// 3.0
+/// >>> tg.NegativeBinomial.from_json(d.to_json()) == d
+/// True
 #[pyclass(
     module = "transiograms",
     name = "NegativeBinomial",
@@ -232,6 +329,7 @@ duration_class!(PyNegativeBinomial, "NegativeBinomial", {
         })
         .map(Self)
     }
+    /// Shape ``r > 0``.
     #[getter]
     fn r(&self) -> f64 {
         match self.0.law {
@@ -239,6 +337,7 @@ duration_class!(PyNegativeBinomial, "NegativeBinomial", {
             _ => f64::NAN,
         }
     }
+    /// Success probability ``0 < p <= 1``.
     #[getter]
     fn p(&self) -> f64 {
         match self.0.law {
@@ -257,6 +356,21 @@ duration_class!(PyNegativeBinomial, "NegativeBinomial", {
 /// pseudocount : float
 ///     Added to every duration count in the M-step.
 /// frozen : bool
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When a parameter is outside its range.
+///
+/// Examples
+/// --------
+/// >>> d = tg.EmpiricalDuration([1.0, 2.0, 1.0])
+/// >>> d.pmf(3)
+/// array([0.25, 0.5 , 0.25])
+/// >>> d.mean(3)
+/// 2.0
+/// >>> tg.EmpiricalDuration.from_json(d.to_json()) == d
+/// True
 #[pyclass(
     module = "transiograms",
     name = "EmpiricalDuration",
@@ -280,6 +394,7 @@ duration_class!(PyEmpiricalDuration, "EmpiricalDuration", {
         })
         .map(Self)
     }
+    /// Count added to every symbol or duration count in the M-step.
     #[getter]
     fn pseudocount(&self) -> f64 {
         self.0.pseudocount
@@ -425,9 +540,44 @@ impl Engine for Engined<'_> {
 /// params, init_params : str
 ///     Letters of the parts fitted and initialised: s start, t transition, e emissions,
 ///     d durations.
-/// emission, covariance_type, n_symbols, n_mix, max_iter, tol, n_init, seed, start_prior,
-/// transition_prior, covariance_prior, pseudocount, direction, ordering
+/// emission, covariance_type, n_symbols, n_mix, max_iter, tol, n_init, seed, start_prior, transition_prior, covariance_prior, pseudocount, direction, ordering
 ///     As in ``HiddenMarkovModel``.
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When an option is unknown, the given parts disagree in their number of states, a
+///     transition diagonal is not zero, or ``seed`` is out of range.
+///
+/// Examples
+/// --------
+/// >>> truth = tg.HiddenSemiMarkovModel(
+/// ...     [tg.Gaussian([0.0], 1.0), tg.Gaussian([5.0], 1.0)],
+/// ...     [tg.ShiftedPoisson(6.0), tg.ShiftedPoisson(3.0)],
+/// ...     start=[0.5, 0.5], transition=[[0.0, 1.0], [1.0, 0.0]], max_duration=30)
+/// >>> states, logs = truth.sample([150, 150], seed=1)
+/// >>> hsmm = tg.HiddenSemiMarkovModel(2, duration="poisson", max_duration=30, ordering="mean", seed=1)
+/// >>> hsmm = hsmm.fit(logs)
+/// >>> hsmm.n_states, [type(d).__name__ for d in hsmm.durations]
+/// (2, ['ShiftedPoisson', 'ShiftedPoisson'])
+/// >>> found = np.concatenate(hsmm.predict(logs))
+/// >>> bool(np.mean(found == np.concatenate(states)) > 0.95)
+/// True
+/// >>> hsmm.predict_proba(logs)[0].shape
+/// (150, 2)
+/// >>> paths, log_p = hsmm.viterbi(logs)
+/// >>> hsmm.score_samples(logs).shape
+/// (2,)
+/// >>> bool(hsmm.score(logs) < 0 and hsmm.aic(logs) < hsmm.bic(logs) <= hsmm.icl(logs))
+/// True
+/// >>> hsmm.sample_posterior(logs[0], n=2, seed=2).shape
+/// (2, 150)
+/// >>> sim_states, sim_logs = hsmm.sample([50], seed=3)
+/// >>> hmm = tg.HiddenMarkovModel(2, seed=1).fit(logs)
+/// >>> tg.HiddenSemiMarkovModel.from_hmm(hmm, max_duration=30).n_states
+/// 2
+/// >>> tg.HiddenSemiMarkovModel.from_json(hsmm.to_json()) == hsmm
+/// True
 #[pyclass(
     module = "transiograms",
     name = "HiddenSemiMarkovModel",
@@ -605,6 +755,22 @@ impl PyHiddenSemiMarkovModel {
 
     /// The HSMM equivalent to ``hmm``: geometric durations with ``p = 1 - a_jj`` and the
     /// transition matrix renormalised off the diagonal.
+    ///
+    /// Parameters
+    /// ----------
+    /// hmm : HiddenMarkovModel
+    ///     A fitted or fully specified model.
+    /// max_duration : int
+    ///     Longest duration of every state.
+    ///
+    /// Returns
+    /// -------
+    /// HiddenSemiMarkovModel
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``hmm`` is not fitted, ``max_duration`` is 0, or a state is absorbing.
     #[staticmethod]
     #[pyo3(signature = (hmm, *, max_duration))]
     fn from_hmm(hmm: &PyHiddenMarkovModel, max_duration: usize) -> PyResult<Self> {
@@ -631,8 +797,34 @@ impl PyHiddenSemiMarkovModel {
         })
     }
 
-    /// EM fit over all holes, with seeded restarts. Arguments as in
-    /// ``HiddenMarkovModel.fit``.
+    /// EM fit over all holes, with seeded restarts.
+    ///
+    /// Parameters
+    /// ----------
+    /// sequences : array_like or list of array_like
+    ///     Observations, rows top-down by depth: one array per hole, or one array split by
+    ///     ``holes``.
+    /// holes : array_like, optional
+    ///     Hole identifier per row of a single ``sequences`` array.
+    /// data : mapping, optional
+    ///     Table whose columns ``sequences`` and ``holes`` name.
+    /// labels : array_like, optional
+    ///     Known state per row (-1 where unknown); the posterior is clamped to it.
+    /// allowed : array_like, optional
+    ///     Boolean ``(rows, K)`` mask of the states each row may take.
+    ///
+    /// Returns
+    /// -------
+    /// HiddenSemiMarkovModel
+    ///     This model, fitted.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the sequences do not match the emissions or ``labels`` and ``allowed`` leave a row
+    ///     no state.
+    /// ConvergenceError
+    ///     When every restart degenerates.
     #[pyo3(signature = (sequences, *, holes=None, labels=None, allowed=None, data=None))]
     fn fit<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -744,6 +936,10 @@ impl PyHiddenSemiMarkovModel {
     /// -------
     /// float
     ///     Sum of the per-hole log-likelihoods.
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, or the sequences do not match its emissions.
     #[pyo3(signature = (sequences, *, holes=None, data=None))]
     fn score(
         &self,
@@ -772,6 +968,10 @@ impl PyHiddenSemiMarkovModel {
     /// -------
     /// numpy.ndarray
     ///     float64 ``(n_holes,)`` in hole order; it sums to ``score``.
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, or the sequences do not match its emissions.
     #[pyo3(signature = (sequences, *, holes=None, data=None))]
     fn score_samples<'py>(
         &self,
@@ -786,8 +986,34 @@ impl PyHiddenSemiMarkovModel {
         Ok(vec1(py, lls))
     }
 
-    /// Most likely states per row: ``algorithm`` "viterbi" (best segmentation) or "map"
-    /// (per-row posterior argmax).
+    /// Most likely states per row.
+    ///
+    /// Parameters
+    /// ----------
+    /// sequences : array_like or list of array_like
+    ///     Observations, rows top-down by depth: one array per hole, or one array split by
+    ///     ``holes``.
+    /// holes : array_like, optional
+    ///     Hole identifier per row of a single ``sequences`` array.
+    /// data : mapping, optional
+    ///     Table whose columns ``sequences`` and ``holes`` name.
+    /// labels : array_like, optional
+    ///     Known state per row (-1 where unknown); the posterior is clamped to it.
+    /// allowed : array_like, optional
+    ///     Boolean ``(rows, K)`` mask of the states each row may take.
+    /// algorithm : {"viterbi", "map"}
+    ///     Best segmentation, or per-row posterior argmax.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray or list of numpy.ndarray
+    ///     int64 states in input row order.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, the sequences do not match its emissions, or
+    ///     ``algorithm`` is unknown.
     #[pyo3(signature = (sequences, *, holes=None, labels=None, allowed=None, data=None, algorithm="viterbi"))]
     #[allow(clippy::too_many_arguments)]
     fn predict<'py>(
@@ -830,6 +1056,10 @@ impl PyHiddenSemiMarkovModel {
     /// numpy.ndarray or list of numpy.ndarray
     ///     float64 ``(rows, K)`` in input row order, or one ``(t, K)`` array per hole when
     ///     ``sequences`` is a list; each row sums to 1.
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, or the sequences do not match its emissions.
     #[pyo3(signature = (sequences, *, holes=None, labels=None, allowed=None, data=None))]
     fn predict_proba<'py>(
         &self,
@@ -865,6 +1095,10 @@ impl PyHiddenSemiMarkovModel {
     /// tuple of (numpy.ndarray or list of numpy.ndarray, numpy.ndarray)
     ///     int64 states in input row order (a list when ``sequences`` is a list), and
     ///     float64 log-probability per hole.
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, or the sequences do not match its emissions.
     #[pyo3(signature = (sequences, *, holes=None, labels=None, allowed=None, data=None))]
     fn viterbi<'py>(
         &self,
@@ -894,6 +1128,10 @@ impl PyHiddenSemiMarkovModel {
     /// -------
     /// tuple of (list of numpy.ndarray, list of numpy.ndarray)
     ///     States (int64) and observations (``(t, d)``; int64 ``(t,)`` codes when categorical).
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, or the sequences do not match its emissions.
     #[pyo3(signature = (lengths, *, seed=0))]
     fn sample<'py>(
         &self,
@@ -918,11 +1156,11 @@ impl PyHiddenSemiMarkovModel {
     /// ----------
     /// sequences : array_like or list of array_like
     ///     Observations, rows top-down by depth: one array per hole, or one array split by
+    ///     ``holes``.
     /// n : int
     ///     Number of draws.
     /// seed : int
     ///     Seed; draws do not depend on thread count.
-    ///     ``holes``.
     /// holes : array_like, optional
     ///     Hole identifier per row of a single ``sequences`` array.
     /// data : mapping, optional
@@ -936,6 +1174,10 @@ impl PyHiddenSemiMarkovModel {
     /// -------
     /// numpy.ndarray
     ///     int64 ``(n, rows)``, columns in input row order.
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, or the sequences do not match its emissions.
     #[pyo3(signature = (sequences, *, n=100, seed=0, holes=None, labels=None, allowed=None, data=None))]
     #[allow(clippy::too_many_arguments)]
     fn sample_posterior<'py>(
@@ -971,6 +1213,10 @@ impl PyHiddenSemiMarkovModel {
     /// Returns
     /// -------
     /// float
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, or the sequences do not match its emissions.
     #[pyo3(signature = (sequences, *, holes=None, data=None))]
     fn aic(
         &self,
@@ -1002,6 +1248,10 @@ impl PyHiddenSemiMarkovModel {
     /// Returns
     /// -------
     /// float
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, or the sequences do not match its emissions.
     #[pyo3(signature = (sequences, *, holes=None, data=None))]
     fn bic(
         &self,
@@ -1032,6 +1282,10 @@ impl PyHiddenSemiMarkovModel {
     /// Returns
     /// -------
     /// float
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, or the sequences do not match its emissions.
     #[pyo3(signature = (sequences, *, holes=None, data=None))]
     fn icl(
         &self,
@@ -1109,9 +1363,28 @@ impl PyHiddenSemiMarkovModel {
     fn n_iter(&self) -> usize {
         self.n_iter
     }
+    /// JSON text of this object; ``HiddenSemiMarkovModel.from_json`` reads it back.
+    ///
+    /// Returns
+    /// -------
+    /// str
     fn to_json(&self) -> PyResult<String> {
         json(self)
     }
+    /// HiddenSemiMarkovModel from the text written by ``to_json``.
+    ///
+    /// Parameters
+    /// ----------
+    /// text : str
+    ///
+    /// Returns
+    /// -------
+    /// HiddenSemiMarkovModel
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``text`` is not HiddenSemiMarkovModel JSON or describes an invalid HiddenSemiMarkovModel.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
         let m: Self = unjson(text, "HiddenSemiMarkovModel")?;
@@ -1149,7 +1422,8 @@ impl PyHiddenSemiMarkovModel {
 ///     As in ``HiddenMarkovModel.fit``.
 /// labels, allowed
 ///     Clamps; only with a single entry in ``states``.
-/// states : sequence of int
+/// states : sequence of int, optional
+///     Numbers of states to try; None means 1 to 6.
 /// model : {"hmm", "hsmm"}
 /// emission, covariance_type, n_symbols, n_mix, duration, max_duration
 ///     Model family, as in the classes.
@@ -1163,6 +1437,23 @@ impl PyHiddenSemiMarkovModel {
 /// dict
 ///     ``states``, ``log_likelihood``, ``n_params``, ``aic``, ``bic``, ``icl``,
 ///     ``cv_log_likelihood`` and ``cv_per_step``.
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When an option is unknown, clamps come with more than one entry in ``states``, or
+///     ``cv_folds`` exceeds the number of holes.
+///
+/// Examples
+/// --------
+/// >>> d = tg.datasets.electrofacies_logs()
+/// >>> keep = np.isin(d["HOLE_ID"], ["W01", "W02", "W03", "W04"])
+/// >>> x = np.column_stack([d["GR"], d["RHOB"]])[keep]
+/// >>> table = tg.select_states(x, holes=d["HOLE_ID"][keep], states=[2, 3], n_init=1, cv_folds=0)
+/// >>> table["states"]
+/// array([2, 3])
+/// >>> int(table["states"][np.argmin(table["bic"])])
+/// 3
 #[pyfunction]
 #[pyo3(signature = (sequences, *, holes=None, data=None, labels=None, allowed=None, states=None, model="hmm", emission="gaussian", covariance_type="diag", n_symbols=None, n_mix=1, duration="geometric", max_duration=None, cv_folds=None, n_init=5, seed=0, max_iter=100, tol=1e-6, direction="up"))]
 #[allow(clippy::too_many_arguments)]

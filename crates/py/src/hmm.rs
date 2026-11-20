@@ -162,6 +162,21 @@ fn sample<'py>(py: Python<'py>, e: &Emission, n: usize, seed: u64) -> PyResult<B
 ///     Added to every symbol count in the M-step.
 /// frozen : bool
 ///     Keep the parameters fixed while fitting.
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When the probabilities are negative or do not sum to 1, or ``pseudocount`` is negative.
+///
+/// Examples
+/// --------
+/// >>> c = tg.Categorical([0.7, 0.2, 0.1])
+/// >>> np.round(c.log_density([0, 2, -1]), 4)
+/// array([-0.3567, -2.3026,  0.    ])
+/// >>> c.sample(5, seed=1).shape
+/// (5,)
+/// >>> tg.Categorical.from_json(c.to_json()) == c
+/// True
 #[pyclass(
     module = "transiograms",
     name = "Categorical",
@@ -185,19 +200,37 @@ impl PyCategorical {
         checked(Emission::Categorical(c.clone()))?;
         Ok(Self(c))
     }
+    /// ``(m,)`` probability of each symbol.
     #[getter]
     fn probabilities<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         vec1(py, self.0.probabilities.clone())
     }
+    /// Count added to every symbol or duration count in the M-step.
     #[getter]
     fn pseudocount(&self) -> f64 {
         self.0.pseudocount
     }
+    /// Whether the parameters stay fixed while fitting.
     #[getter]
     fn frozen(&self) -> bool {
         self.0.frozen
     }
-    /// Log probability of each code in ``x`` (-1 or NaN for missing gives 0).
+    /// Log probability of each observation.
+    ///
+    /// Parameters
+    /// ----------
+    /// x : array_like
+    ///     Codes ``(n,)``; -1 or NaN for missing gives 0.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     ``(n,)`` log values.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``x`` has the wrong number of channels or invalid values.
     fn log_density<'py>(
         &self,
         py: Python<'py>,
@@ -205,15 +238,51 @@ impl PyCategorical {
     ) -> PyResult<Bound<'py, PyArray1<f64>>> {
         log_density(py, &Emission::Categorical(self.0.clone()), x)
     }
-    /// ``n`` seeded draws, int64 ``(n,)``.
+    /// Seeded draws from this distribution.
+    ///
+    /// Parameters
+    /// ----------
+    /// n : int
+    ///     Number of draws.
+    /// seed : int
+    ///     Seed in ``0..2**64-1``; equal seeds give equal draws.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     int64 ``(n,)`` codes.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``seed`` is out of range.
     #[pyo3(signature = (n, *, seed=0))]
     fn sample<'py>(&self, py: Python<'py>, n: usize, seed: i128) -> PyResult<Bound<'py, PyAny>> {
         let seed = crate::args::seed(seed)?;
         sample(py, &Emission::Categorical(self.0.clone()), n, seed)
     }
+    /// JSON text of this object; ``Categorical.from_json`` reads it back.
+    ///
+    /// Returns
+    /// -------
+    /// str
     fn to_json(&self) -> PyResult<String> {
         json(&self.0)
     }
+    /// Categorical from the text written by ``to_json``.
+    ///
+    /// Parameters
+    /// ----------
+    /// text : str
+    ///
+    /// Returns
+    /// -------
+    /// Categorical
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``text`` is not Categorical JSON or describes an invalid Categorical.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
         let c: Categorical = unjson(text, "Categorical")?;
@@ -236,6 +305,22 @@ impl PyCategorical {
 /// covariance_type : {"full", "diag", "spherical"}
 /// frozen : bool
 ///     Keep the parameters fixed while fitting.
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When the covariance has the wrong shape for ``covariance_type`` or is not positive
+///     definite.
+///
+/// Examples
+/// --------
+/// >>> g = tg.Gaussian([0.0, 1.0], [1.0, 4.0], covariance_type="diag")
+/// >>> np.round(g.log_density([[0.0, 1.0], [1.0, np.nan]]), 4)
+/// array([-2.531 , -1.4189])
+/// >>> g.sample(4, seed=1).shape
+/// (4, 2)
+/// >>> tg.Gaussian.from_json(g.to_json()) == g
+/// True
 #[pyclass(module = "transiograms", name = "Gaussian", frozen, eq, from_py_object)]
 #[derive(Clone, PartialEq)]
 pub struct PyGaussian(pub Gaussian);
@@ -259,6 +344,7 @@ impl PyGaussian {
         checked(Emission::Gaussian(g.clone()))?;
         Ok(Self(g))
     }
+    /// ``(d,)`` mean.
     #[getter]
     fn mean<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         vec1(py, self.0.mean.clone())
@@ -268,16 +354,32 @@ impl PyGaussian {
     fn covariance<'py>(&self, py: Python<'py>) -> Bound<'py, PyAny> {
         covariance_py(py, &self.0)
     }
+    /// "full", "diag" or "spherical".
     #[getter]
     fn covariance_type(&self) -> &'static str {
         covariance_name(self.0.covariance_type)
     }
+    /// Whether the parameters stay fixed while fitting.
     #[getter]
     fn frozen(&self) -> bool {
         self.0.frozen
     }
-    /// Log density of each row of ``x`` (``(n, d)``, or ``(n,)`` when ``d = 1``); NaN channels
-    /// are marginalised.
+    /// Log density of each observation.
+    ///
+    /// Parameters
+    /// ----------
+    /// x : array_like
+    ///     ``(n, d)`` rows, or ``(n,)`` when ``d = 1``; NaN channels are marginalised.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     ``(n,)`` log values.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``x`` has the wrong number of channels or invalid values.
     fn log_density<'py>(
         &self,
         py: Python<'py>,
@@ -285,15 +387,51 @@ impl PyGaussian {
     ) -> PyResult<Bound<'py, PyArray1<f64>>> {
         log_density(py, &Emission::Gaussian(self.0.clone()), x)
     }
-    /// ``n`` seeded draws, ``(n, d)``.
+    /// Seeded draws from this distribution.
+    ///
+    /// Parameters
+    /// ----------
+    /// n : int
+    ///     Number of draws.
+    /// seed : int
+    ///     Seed in ``0..2**64-1``; equal seeds give equal draws.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     ``(n, d)`` draws.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``seed`` is out of range.
     #[pyo3(signature = (n, *, seed=0))]
     fn sample<'py>(&self, py: Python<'py>, n: usize, seed: i128) -> PyResult<Bound<'py, PyAny>> {
         let seed = crate::args::seed(seed)?;
         sample(py, &Emission::Gaussian(self.0.clone()), n, seed)
     }
+    /// JSON text of this object; ``Gaussian.from_json`` reads it back.
+    ///
+    /// Returns
+    /// -------
+    /// str
     fn to_json(&self) -> PyResult<String> {
         json(&self.0)
     }
+    /// Gaussian from the text written by ``to_json``.
+    ///
+    /// Parameters
+    /// ----------
+    /// text : str
+    ///
+    /// Returns
+    /// -------
+    /// Gaussian
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``text`` is not Gaussian JSON or describes an invalid Gaussian.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
         let g: Gaussian = unjson(text, "Gaussian")?;
@@ -316,6 +454,22 @@ impl PyGaussian {
 /// rate : array_like
 ///     ``(d,)`` rates.
 /// frozen : bool
+///     Keep the parameters fixed while fitting.
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When a rate is negative or not finite.
+///
+/// Examples
+/// --------
+/// >>> p = tg.Poisson([2.0, 0.5])
+/// >>> np.round(p.log_density([[2, 0], [0, 1]]), 4)
+/// array([-1.8069, -3.1931])
+/// >>> p.sample(3, seed=1).shape
+/// (3, 2)
+/// >>> tg.Poisson.from_json(p.to_json()) == p
+/// True
 #[pyclass(module = "transiograms", name = "Poisson", frozen, eq, from_py_object)]
 #[derive(Clone, PartialEq)]
 pub struct PyPoisson(pub Poisson);
@@ -330,15 +484,32 @@ impl PyPoisson {
         checked(Emission::Poisson(p.clone()))?;
         Ok(Self(p))
     }
+    /// ``(d,)`` rate of each channel.
     #[getter]
     fn rate<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         vec1(py, self.0.rate.clone())
     }
+    /// Whether the parameters stay fixed while fitting.
     #[getter]
     fn frozen(&self) -> bool {
         self.0.frozen
     }
-    /// Log probability of each row of counts in ``x``.
+    /// Log probability of each observation.
+    ///
+    /// Parameters
+    /// ----------
+    /// x : array_like
+    ///     ``(n, d)`` counts, or ``(n,)`` when ``d = 1``.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     ``(n,)`` log values.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``x`` has the wrong number of channels or invalid values.
     fn log_density<'py>(
         &self,
         py: Python<'py>,
@@ -346,15 +517,51 @@ impl PyPoisson {
     ) -> PyResult<Bound<'py, PyArray1<f64>>> {
         log_density(py, &Emission::Poisson(self.0.clone()), x)
     }
-    /// ``n`` seeded draws, ``(n, d)``.
+    /// Seeded draws from this distribution.
+    ///
+    /// Parameters
+    /// ----------
+    /// n : int
+    ///     Number of draws.
+    /// seed : int
+    ///     Seed in ``0..2**64-1``; equal seeds give equal draws.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     ``(n, d)`` counts.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``seed`` is out of range.
     #[pyo3(signature = (n, *, seed=0))]
     fn sample<'py>(&self, py: Python<'py>, n: usize, seed: i128) -> PyResult<Bound<'py, PyAny>> {
         let seed = crate::args::seed(seed)?;
         sample(py, &Emission::Poisson(self.0.clone()), n, seed)
     }
+    /// JSON text of this object; ``Poisson.from_json`` reads it back.
+    ///
+    /// Returns
+    /// -------
+    /// str
     fn to_json(&self) -> PyResult<String> {
         json(&self.0)
     }
+    /// Poisson from the text written by ``to_json``.
+    ///
+    /// Parameters
+    /// ----------
+    /// text : str
+    ///
+    /// Returns
+    /// -------
+    /// Poisson
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``text`` is not Poisson JSON or describes an invalid Poisson.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
         let p: Poisson = unjson(text, "Poisson")?;
@@ -378,6 +585,23 @@ impl PyPoisson {
 ///     ``(m, d, d)`` for "full", ``(m, d)`` for "diag", ``(m,)`` for "spherical".
 /// covariance_type : {"full", "diag", "spherical"}
 /// frozen : bool
+///     Keep the parameters fixed while fitting.
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When the weights do not sum to 1, the shapes disagree or a covariance is not positive
+///     definite.
+///
+/// Examples
+/// --------
+/// >>> m = tg.GaussianMixture([0.5, 0.5], [[0.0], [4.0]], [1.0, 1.0], covariance_type="spherical")
+/// >>> np.round(m.log_density([0.0, 2.0]), 4)
+/// array([-1.6118, -2.9189])
+/// >>> m.sample(3, seed=1).shape
+/// (3, 1)
+/// >>> tg.GaussianMixture.from_json(m.to_json()) == m
+/// True
 #[pyclass(
     module = "transiograms",
     name = "GaussianMixture",
@@ -428,6 +652,7 @@ impl PyGaussianMixture {
         checked(Emission::Mixture(g.clone()))?;
         Ok(Self(g))
     }
+    /// ``(m,)`` component weights.
     #[getter]
     fn weights<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         vec1(py, self.0.weights.clone())
@@ -450,6 +675,7 @@ impl PyGaussianMixture {
             .collect();
         py.import("numpy")?.call_method1("array", (items,))
     }
+    /// "full", "diag" or "spherical".
     #[getter]
     fn covariance_type(&self) -> &'static str {
         covariance_name(
@@ -459,6 +685,7 @@ impl PyGaussianMixture {
                 .map_or(CovarianceType::Full, |g| g.covariance_type),
         )
     }
+    /// Whether the parameters stay fixed while fitting.
     #[getter]
     fn frozen(&self) -> bool {
         self.0.frozen
@@ -475,6 +702,11 @@ impl PyGaussianMixture {
     /// -------
     /// numpy.ndarray
     ///     ``(n,)`` values of ``log sum_k w_k N(x; mu_k, Sigma_k)``.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``x`` has the wrong number of channels.
     fn log_density<'py>(
         &self,
         py: Python<'py>,
@@ -482,15 +714,51 @@ impl PyGaussianMixture {
     ) -> PyResult<Bound<'py, PyArray1<f64>>> {
         log_density(py, &Emission::Mixture(self.0.clone()), x)
     }
-    /// ``n`` seeded draws, ``(n, d)``.
+    /// Seeded draws from this distribution.
+    ///
+    /// Parameters
+    /// ----------
+    /// n : int
+    ///     Number of draws.
+    /// seed : int
+    ///     Seed in ``0..2**64-1``; equal seeds give equal draws.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     ``(n, d)`` draws.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``seed`` is out of range.
     #[pyo3(signature = (n, *, seed=0))]
     fn sample<'py>(&self, py: Python<'py>, n: usize, seed: i128) -> PyResult<Bound<'py, PyAny>> {
         let seed = crate::args::seed(seed)?;
         sample(py, &Emission::Mixture(self.0.clone()), n, seed)
     }
+    /// JSON text of this object; ``GaussianMixture.from_json`` reads it back.
+    ///
+    /// Returns
+    /// -------
+    /// str
     fn to_json(&self) -> PyResult<String> {
         json(&self.0)
     }
+    /// GaussianMixture from the text written by ``to_json``.
+    ///
+    /// Parameters
+    /// ----------
+    /// text : str
+    ///
+    /// Returns
+    /// -------
+    /// GaussianMixture
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``text`` is not GaussianMixture JSON or describes an invalid GaussianMixture.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
         let g: GaussianMixture = unjson(text, "GaussianMixture")?;
@@ -1107,6 +1375,38 @@ impl Engine for Engined<'_> {
 ///     Forward-backward arithmetic used while fitting.
 /// ordering : {"none", "mean", "occupancy"}
 ///     Relabel the fitted states by first-channel mean or by stationary occupancy.
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When an option is unknown, the given parts disagree in their number of states, or
+///     ``seed`` is out of range.
+///
+/// Examples
+/// --------
+/// >>> truth = tg.HiddenMarkovModel(
+/// ...     [tg.Gaussian([0.0], 1.0), tg.Gaussian([5.0], 1.0)],
+/// ...     start=[0.5, 0.5], transition=[[0.9, 0.1], [0.1, 0.9]])
+/// >>> states, logs = truth.sample([200, 200], seed=1)
+/// >>> hmm = tg.HiddenMarkovModel(2, ordering="mean", seed=1).fit(logs)
+/// >>> hmm.n_states, hmm.converged
+/// (2, True)
+/// >>> found = np.concatenate(hmm.predict(logs))
+/// >>> bool(np.mean(found == np.concatenate(states)) > 0.95)
+/// True
+/// >>> hmm.predict_proba(logs)[0].shape
+/// (200, 2)
+/// >>> paths, log_p = hmm.viterbi(logs)
+/// >>> len(paths), log_p.shape
+/// (2, (2,))
+/// >>> hmm.score_samples(logs).shape
+/// (2,)
+/// >>> bool(hmm.score(logs) < 0 and hmm.aic(logs) < hmm.bic(logs) <= hmm.icl(logs))
+/// True
+/// >>> hmm.sample_posterior(logs[0], n=3, seed=2).shape
+/// (3, 200)
+/// >>> tg.HiddenMarkovModel.from_json(hmm.to_json()) == hmm
+/// True
 #[pyclass(
     module = "transiograms",
     name = "HiddenMarkovModel",
@@ -1281,6 +1581,14 @@ impl PyHiddenMarkovModel {
     /// -------
     /// HiddenMarkovModel
     ///     This model, fitted.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the sequences do not match the emissions or ``labels`` and ``allowed`` leave a
+    ///     row no state.
+    /// ConvergenceError
+    ///     When every restart degenerates.
     #[pyo3(signature = (sequences, *, holes=None, labels=None, allowed=None, data=None))]
     fn fit<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -1357,6 +1665,24 @@ impl PyHiddenMarkovModel {
     }
 
     /// Total log-likelihood over holes (unclamped).
+    ///
+    /// Parameters
+    /// ----------
+    /// sequences : array_like, list of array_like or str
+    ///     One array per hole (rows top-down, ``(t,)`` or ``(t, d)``), or one array with ``holes``.
+    /// holes : array_like or str, optional
+    ///     Per-row hole ids when ``sequences`` is one array.
+    /// data : mapping, optional
+    ///     Strings above name its columns.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, or the sequences do not match its emissions.
     #[pyo3(signature = (sequences, *, holes=None, data=None))]
     fn score(
         &self,
@@ -1370,6 +1696,25 @@ impl PyHiddenMarkovModel {
     }
 
     /// Log-likelihood of each hole (unclamped).
+    ///
+    /// Parameters
+    /// ----------
+    /// sequences : array_like, list of array_like or str
+    ///     One array per hole (rows top-down, ``(t,)`` or ``(t, d)``), or one array with ``holes``.
+    /// holes : array_like or str, optional
+    ///     Per-row hole ids when ``sequences`` is one array.
+    /// data : mapping, optional
+    ///     Strings above name its columns.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     ``(n_holes,)``.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, or the sequences do not match its emissions.
     #[pyo3(signature = (sequences, *, holes=None, data=None))]
     fn score_samples<'py>(
         &self,
@@ -1388,6 +1733,16 @@ impl PyHiddenMarkovModel {
     ///
     /// Parameters
     /// ----------
+    /// sequences : array_like, list of array_like or str
+    ///     One array per hole (rows top-down, ``(t,)`` or ``(t, d)``), or one array with ``holes``.
+    /// holes : array_like or str, optional
+    ///     Per-row hole ids when ``sequences`` is one array.
+    /// labels : array_like or str, optional
+    ///     Per-row known state, -1 where unknown.
+    /// allowed : array_like, optional
+    ///     ``(rows, K)`` booleans: the states each row may take.
+    /// data : mapping, optional
+    ///     Strings above name its columns.
     /// algorithm : {"viterbi", "map", "posterior_viterbi"}
     ///     Best joint path, per-row posterior argmax, or the best path through rows with
     ///     non-zero posterior.
@@ -1396,6 +1751,11 @@ impl PyHiddenMarkovModel {
     /// -------
     /// numpy.ndarray or list of numpy.ndarray
     ///     int64 states in input row order.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, or the sequences do not match its emissions. Also when ``algorithm`` is unknown.
     #[pyo3(signature = (sequences, *, holes=None, labels=None, allowed=None, data=None, algorithm="viterbi"))]
     #[allow(clippy::too_many_arguments)]
     fn predict<'py>(
@@ -1417,7 +1777,30 @@ impl PyHiddenMarkovModel {
         predict_of(py, &Engined(self.fitted()?), &inp, algorithm)
     }
 
-    /// Posterior state probabilities per row, ``(rows, K)``.
+    /// Posterior state probabilities per row.
+    ///
+    /// Parameters
+    /// ----------
+    /// sequences : array_like, list of array_like or str
+    ///     One array per hole (rows top-down, ``(t,)`` or ``(t, d)``), or one array with ``holes``.
+    /// holes : array_like or str, optional
+    ///     Per-row hole ids when ``sequences`` is one array.
+    /// labels : array_like or str, optional
+    ///     Per-row known state, -1 where unknown.
+    /// allowed : array_like, optional
+    ///     ``(rows, K)`` booleans: the states each row may take.
+    /// data : mapping, optional
+    ///     Strings above name its columns.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray or list of numpy.ndarray
+    ///     ``(rows, K)``, rows summing to 1.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, or the sequences do not match its emissions.
     #[pyo3(signature = (sequences, *, holes=None, labels=None, allowed=None, data=None))]
     fn predict_proba<'py>(
         &self,
@@ -1433,6 +1816,31 @@ impl PyHiddenMarkovModel {
     }
 
     /// Viterbi path per row and its log-probability per hole.
+    ///
+    /// Parameters
+    /// ----------
+    /// sequences : array_like, list of array_like or str
+    ///     One array per hole (rows top-down, ``(t,)`` or ``(t, d)``), or one array with ``holes``.
+    /// holes : array_like or str, optional
+    ///     Per-row hole ids when ``sequences`` is one array.
+    /// labels : array_like or str, optional
+    ///     Per-row known state, -1 where unknown.
+    /// allowed : array_like, optional
+    ///     ``(rows, K)`` booleans: the states each row may take.
+    /// data : mapping, optional
+    ///     Strings above name its columns.
+    ///
+    /// Returns
+    /// -------
+    /// paths : numpy.ndarray or list of numpy.ndarray
+    ///     int64 states in input row order.
+    /// log_probability : numpy.ndarray
+    ///     ``(n_holes,)``.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, or the sequences do not match its emissions.
     #[pyo3(signature = (sequences, *, holes=None, labels=None, allowed=None, data=None))]
     fn viterbi<'py>(
         &self,
@@ -1449,10 +1857,22 @@ impl PyHiddenMarkovModel {
 
     /// Seeded state paths and observations, one per length, rows top-down.
     ///
+    /// Parameters
+    /// ----------
+    /// lengths : sequence of int
+    ///     Rows of each sampled hole.
+    /// seed : int
+    ///     Seed in ``0..2**64-1``.
+    ///
     /// Returns
     /// -------
     /// tuple of (list of numpy.ndarray, list of numpy.ndarray)
     ///     States (int64) and observations (``(t, d)``; int64 ``(t,)`` codes when categorical).
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted or ``seed`` is out of range.
     #[pyo3(signature = (lengths, *, seed=0))]
     fn sample<'py>(
         &self,
@@ -1470,7 +1890,34 @@ impl PyHiddenMarkovModel {
         )
     }
 
-    /// ``n`` seeded state paths drawn from the posterior, int64 ``(n, rows)``.
+    /// Seeded state paths drawn from the posterior.
+    ///
+    /// Parameters
+    /// ----------
+    /// sequences : array_like, list of array_like or str
+    ///     One array per hole (rows top-down, ``(t,)`` or ``(t, d)``), or one array with ``holes``.
+    /// n : int
+    ///     Number of paths.
+    /// seed : int
+    ///     Seed in ``0..2**64-1``.
+    /// holes : array_like or str, optional
+    ///     Per-row hole ids when ``sequences`` is one array.
+    /// labels : array_like or str, optional
+    ///     Per-row known state, -1 where unknown.
+    /// allowed : array_like, optional
+    ///     ``(rows, K)`` booleans: the states each row may take.
+    /// data : mapping, optional
+    ///     Strings above name its columns.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     int64 ``(n, rows)``.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, or the sequences do not match its emissions. Also when ``seed`` is out of range.
     #[pyo3(signature = (sequences, *, n=100, seed=0, holes=None, labels=None, allowed=None, data=None))]
     #[allow(clippy::too_many_arguments)]
     fn sample_posterior<'py>(
@@ -1490,6 +1937,24 @@ impl PyHiddenMarkovModel {
     }
 
     /// Akaike information criterion (lower is better).
+    ///
+    /// Parameters
+    /// ----------
+    /// sequences : array_like, list of array_like or str
+    ///     One array per hole (rows top-down, ``(t,)`` or ``(t, d)``), or one array with ``holes``.
+    /// holes : array_like or str, optional
+    ///     Per-row hole ids when ``sequences`` is one array.
+    /// data : mapping, optional
+    ///     Strings above name its columns.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, or the sequences do not match its emissions.
     #[pyo3(signature = (sequences, *, holes=None, data=None))]
     fn aic(
         &self,
@@ -1503,8 +1968,27 @@ impl PyHiddenMarkovModel {
         Ok(transiograms_hsmm::aic(ll, p))
     }
 
-    /// Bayesian information criterion (lower is better). Depth samples are autocorrelated, so
-    /// BIC tends to favour too many states on dense logs.
+    /// Bayesian information criterion (lower is better).
+    ///
+    /// Depth samples are autocorrelated, so BIC tends to favour too many states on dense logs.
+    ///
+    /// Parameters
+    /// ----------
+    /// sequences : array_like, list of array_like or str
+    ///     One array per hole (rows top-down, ``(t,)`` or ``(t, d)``), or one array with ``holes``.
+    /// holes : array_like or str, optional
+    ///     Per-row hole ids when ``sequences`` is one array.
+    /// data : mapping, optional
+    ///     Strings above name its columns.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, or the sequences do not match its emissions.
     #[pyo3(signature = (sequences, *, holes=None, data=None))]
     fn bic(
         &self,
@@ -1519,6 +2003,24 @@ impl PyHiddenMarkovModel {
     }
 
     /// Integrated completed likelihood: BIC plus twice the path entropy (lower is better).
+    ///
+    /// Parameters
+    /// ----------
+    /// sequences : array_like, list of array_like or str
+    ///     One array per hole (rows top-down, ``(t,)`` or ``(t, d)``), or one array with ``holes``.
+    /// holes : array_like or str, optional
+    ///     Per-row hole ids when ``sequences`` is one array.
+    /// data : mapping, optional
+    ///     Strings above name its columns.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the model is not fitted, or the sequences do not match its emissions.
     #[pyo3(signature = (sequences, *, holes=None, data=None))]
     fn icl(
         &self,
@@ -1532,10 +2034,12 @@ impl PyHiddenMarkovModel {
         Ok(transiograms_hsmm::icl(ll, p, n, h))
     }
 
+    /// Number of hidden states.
     #[getter]
     fn n_states(&self) -> usize {
         self.common.n_states
     }
+    /// "up" or "down": the order in which rows are read.
     #[getter]
     fn direction(&self) -> &'static str {
         match self.common.direction {
@@ -1543,14 +2047,17 @@ impl PyHiddenMarkovModel {
             Direction::Down => "down",
         }
     }
+    /// ``(n_states,)`` initial state probabilities; InvalidInput before fitting.
     #[getter]
     fn start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray1<f64>>> {
         Ok(vec1(py, self.fitted()?.start.clone()))
     }
+    /// ``(n_states, n_states)`` row-stochastic transition matrix; InvalidInput before fitting.
     #[getter]
     fn transition<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {
         Ok(mat2(py, &self.fitted()?.transition))
     }
+    /// Emission distribution of each state.
     #[getter]
     fn distributions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyList>> {
         distributions_py(py, &self.fitted()?.emissions)
@@ -1560,18 +2067,39 @@ impl PyHiddenMarkovModel {
     fn history<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         vec1(py, self.history.clone())
     }
+    /// Whether the last fit met ``tol`` before ``max_iter``.
     #[getter]
     fn converged(&self) -> bool {
         self.converged
     }
+    /// EM iterations of the best start in the last fit.
     #[getter]
     fn n_iter(&self) -> usize {
         self.n_iter
     }
 
+    /// JSON text of this object; ``HiddenMarkovModel.from_json`` reads it back.
+    ///
+    /// Returns
+    /// -------
+    /// str
     fn to_json(&self) -> PyResult<String> {
         json(self)
     }
+    /// HiddenMarkovModel from the text written by ``to_json``.
+    ///
+    /// Parameters
+    /// ----------
+    /// text : str
+    ///
+    /// Returns
+    /// -------
+    /// HiddenMarkovModel
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``text`` is not HiddenMarkovModel JSON or describes an invalid HiddenMarkovModel.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
         let m: Self = unjson(text, "HiddenMarkovModel")?;

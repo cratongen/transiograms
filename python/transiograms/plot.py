@@ -1,5 +1,7 @@
 """Figures for transiograms results (`tg.plot`). Every function takes `ax=None` and returns `(fig, ax)`."""
 
+from transiograms.errors import InvalidInput
+
 
 def _pyplot():
     try:
@@ -16,8 +18,6 @@ _PALETTE = ["#e69f00", "#56b4e9", "#009e73", "#f0e442", "#0072b2", "#d55e00", "#
 
 def _names_colors(categories, k, *, exact=False):
     if categories is not None and (len(categories) < k or (exact and len(categories) != k)):
-        from transiograms.errors import InvalidInput
-
         need = f"{k}" if exact else f"at least {k}"
         raise InvalidInput(f"categories has {len(categories)} names but the data needs {need}")
     names = getattr(categories, "names", None) or [str(i) for i in range(k)]
@@ -48,6 +48,24 @@ def transition_matrix(matrix, *, categories=None, annotate=True, ax=None, **kwar
     ax : matplotlib.axes.Axes, optional
     **kwargs
         Passed to ``imshow``.
+
+    Returns
+    -------
+    (fig, ax)
+
+    Raises
+    ------
+    ImportError
+        When matplotlib is not installed.
+    InvalidInput
+        When ``categories`` has another number of names than the data needs.
+
+    Examples
+    --------
+    >>> chain = tg.MarkovChain.from_matrix([[0.9, 0.1], [0.2, 0.8]])
+    >>> fig, ax = tg.plot.transition_matrix(chain, categories=tg.Categories(["sand", "clay"]))
+    >>> [t.get_text() for t in ax.get_xticklabels()]
+    ['sand', 'clay']
     """
     import numpy as np
 
@@ -89,6 +107,25 @@ def sojourn(sojourn, code, *, exponential=True, ax=None, **kwargs):
     ax : matplotlib.axes.Axes, optional
     **kwargs
         Passed to the survival ``step`` call.
+
+    Returns
+    -------
+    (fig, ax)
+
+    Raises
+    ------
+    ImportError
+        When matplotlib is not installed.
+    InvalidInput
+        When ``code`` is not a category.
+
+    Examples
+    --------
+    >>> d = tg.datasets.varved_sequence()
+    >>> s = tg.sojourn(d["CODE"], holes=d["HOLE_ID"], from_=d["FROM"], to=d["TO"])
+    >>> fig, ax = tg.plot.sojourn(s, 0)
+    >>> ax.get_ylabel()
+    'P(thickness > t)'
     """
     import numpy as np
 
@@ -129,6 +166,18 @@ def strip_log(codes, *, depth=None, from_=None, to=None, posterior=None, categor
     Returns
     -------
     (fig, ax) or (fig, axes)
+    Raises
+    ------
+    ImportError
+        When matplotlib is not installed.
+    InvalidInput
+        When ``categories`` has fewer names than the codes need.
+
+    Examples
+    --------
+    >>> fig, axes = tg.plot.strip_log([0, 0, 1, 2], depth=[0.5, 1.5, 2.5, 3.5], posterior=np.eye(3)[[0, 0, 1, 2]])
+    >>> len(axes)
+    2
     """
     import numpy as np
 
@@ -190,6 +239,24 @@ def selection(table, *, criteria=("aic", "bic", "icl"), ax=None, **kwargs):
     ax : matplotlib.axes.Axes, optional
     **kwargs
         Passed to ``plot``.
+
+    Returns
+    -------
+    (fig, ax)
+
+    Raises
+    ------
+    ImportError
+        When matplotlib is not installed.
+    KeyError
+        When a criterion is not a key of ``table``.
+
+    Examples
+    --------
+    >>> table = {"states": [1, 2, 3], "aic": [30.0, 20.0, 25.0], "bic": [31.0, 24.0, 33.0]}
+    >>> fig, ax = tg.plot.selection(table, criteria=("aic", "bic"))
+    >>> [t.get_text() for t in ax.get_legend().get_texts()]
+    ['AIC', 'BIC']
     """
     import numpy as np
 
@@ -231,12 +298,26 @@ def transiogram(experimental=None, model=None, *, h=None, categories=None, axes=
     Returns
     -------
     (fig, axes)
+    Raises
+    ------
+    ImportError
+        When matplotlib is not installed.
+    InvalidInput
+        When neither ``experimental`` nor ``model`` is given, or ``categories`` has another
+        number of names than the data needs.
+
+    Examples
+    --------
+    >>> m = tg.TransiogramModel.markov([[-0.5, 0.5], [1.0, -1.0]])
+    >>> fig, axes = tg.plot.transiogram(model=m, h=np.linspace(0.0, 5.0, 20))
+    >>> axes.shape
+    (2, 2)
     """
     import numpy as np
 
     plt = _pyplot()
     if experimental is None and model is None:
-        raise ValueError("give experimental, model or both")
+        raise InvalidInput("give experimental, model or both")
     k = experimental.probabilities.shape[1] if experimental is not None else len(model.proportions)
     names, colors = _names_colors(categories, k, exact=True)
     if axes is None:
@@ -293,6 +374,25 @@ def grid_slice(values, grid, *, axis="z", index=0, categories=None, ax=None, **k
     ax : matplotlib.axes.Axes, optional
     **kwargs
         Passed to ``imshow``.
+
+    Returns
+    -------
+    (fig, ax)
+
+    Raises
+    ------
+    ImportError
+        When matplotlib is not installed.
+    InvalidInput
+        When ``axis`` is not "x", "y" or "z", or ``categories`` has fewer names than the
+        codes need.
+
+    Examples
+    --------
+    >>> grid = tg.Grid((0.0, 0.0, 0.0), (1.0, 1.0, 1.0), (4, 3, 2))
+    >>> fig, ax = tg.plot.grid_slice(np.arange(24) % 3, grid, axis="z", index=1)
+    >>> ax.get_xlabel(), ax.get_ylabel()
+    ('x', 'y')
     """
     import numpy as np
 
@@ -306,7 +406,7 @@ def grid_slice(values, grid, *, axis="z", index=0, categories=None, ax=None, **k
     elif axis == "x":
         image, extent, labels = cube[:, :, index], (oy, oy + ny * sy, oz, oz + nz * sz), ("y", "z")
     else:
-        raise ValueError(f"axis must be 'x', 'y' or 'z', not {axis!r}")
+        raise InvalidInput(f"axis must be 'x', 'y' or 'z', not {axis!r}")
     integer = np.issubdtype(image.dtype, np.integer)
     if categories is not None or integer:
         from matplotlib.colors import ListedColormap

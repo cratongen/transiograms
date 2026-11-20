@@ -70,6 +70,17 @@ fn kind_of(kind: &str, step: Option<f64>, sampled: Option<f64>) -> PyResult<Kind
 ///     Expected counts under the null hypothesis when the test is tabular.
 /// small_expected : float
 ///     Fraction of allowed cells whose expected count is below 5.
+///
+/// Examples
+/// --------
+/// >>> codes = tg.MarkovChain.from_matrix([[0.9, 0.1], [0.2, 0.8]]).simulate(500, seed=1)[0]
+/// >>> r = tg.MarkovChain(kind="fixed", step=1.0).fit(codes).independence_test()
+/// >>> r.name, r.method, r.df
+/// ('independence', 'g', 1)
+/// >>> bool(r.p_value < 0.001)
+/// True
+/// >>> tg.TestResult.from_json(r.to_json()).to_json() == r.to_json()
+/// True
 #[pyclass(
     module = "transiograms",
     name = "TestResult",
@@ -82,37 +93,63 @@ pub struct PyTestResult(pub TestResult);
 
 #[pymethods]
 impl PyTestResult {
+    /// "independence", "order 2 vs 1", "symmetry", "homogeneity" or "exponential".
     #[getter]
     fn name(&self) -> &str {
         &self.0.name
     }
+    /// "g", "pearson", "bowker" or "ks".
     #[getter]
     fn method(&self) -> &str {
         &self.0.method
     }
+    /// Test statistic.
     #[getter]
     fn statistic(&self) -> f64 {
         self.0.statistic
     }
+    /// Degrees of freedom; 0 for "ks".
     #[getter]
     fn df(&self) -> usize {
         self.0.df
     }
+    /// p-value of ``statistic`` under the null hypothesis.
     #[getter]
     fn p_value(&self) -> f64 {
         self.0.p_value
     }
+    /// Expected counts under the null hypothesis for a tabular test, else None.
     #[getter]
     fn expected<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyArray2<f64>>> {
         self.0.expected.as_ref().map(|m| mat2(py, m))
     }
+    /// Fraction of allowed cells whose expected count is below 5.
     #[getter]
     fn small_expected(&self) -> f64 {
         self.0.small_expected
     }
+    /// JSON text of this object; ``TestResult.from_json`` reads it back.
+    ///
+    /// Returns
+    /// -------
+    /// str
     fn to_json(&self) -> PyResult<String> {
         json(&self.0)
     }
+    /// TestResult from the text written by ``to_json``.
+    ///
+    /// Parameters
+    /// ----------
+    /// text : str
+    ///
+    /// Returns
+    /// -------
+    /// TestResult
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``text`` is not TestResult JSON or describes an invalid TestResult.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
         unjson(text, "TestResult").map(Self)
@@ -137,38 +174,71 @@ impl PyTestResult {
 ///     Entropy rate of the whole chain.
 /// max : float
 ///     Its maximum for this number of categories.
+///
+/// Examples
+/// --------
+/// >>> e = tg.MarkovChain.from_matrix([[0.0, 1.0], [1.0, 0.0]], kind="embedded").entropy()
+/// >>> e.post, e.chain
+/// (array([0., 0.]), 0.0)
+/// >>> tg.Entropy.from_json(e.to_json()) == e
+/// True
 #[pyclass(module = "transiograms", name = "Entropy", frozen)]
 pub struct PyEntropy(transiograms_chain::Entropy);
 
 #[pymethods]
 impl PyEntropy {
+    /// ``(k,)`` entropy in bits of what follows each category (row entropy).
     #[getter]
     fn post<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         vec1(py, self.0.post.clone())
     }
+    /// ``(k,)`` entropy in bits of what precedes each category (column entropy).
     #[getter]
     fn pre<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         vec1(py, self.0.pre.clone())
     }
+    /// ``post`` divided by its maximum, in [0, 1].
     #[getter]
     fn post_normalized<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         vec1(py, self.0.post_normalized.clone())
     }
+    /// ``pre`` divided by its maximum, in [0, 1].
     #[getter]
     fn pre_normalized<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         vec1(py, self.0.pre_normalized.clone())
     }
+    /// Entropy rate of the whole chain, in bits.
     #[getter]
     fn chain(&self) -> f64 {
         self.0.chain
     }
+    /// Largest entropy rate for this number of categories, in bits.
     #[getter]
     fn max(&self) -> f64 {
         self.0.max
     }
+    /// JSON text of this object; ``Entropy.from_json`` reads it back.
+    ///
+    /// Returns
+    /// -------
+    /// str
     fn to_json(&self) -> PyResult<String> {
         json(&self.0)
     }
+    /// Entropy from the text written by ``to_json``.
+    ///
+    /// Parameters
+    /// ----------
+    /// text : str
+    ///
+    /// Returns
+    /// -------
+    /// Entropy
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``text`` is not Entropy JSON or describes an invalid Entropy.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
         let e: transiograms_chain::Entropy = unjson(text, "Entropy")?;
@@ -220,6 +290,44 @@ struct Settings {
 ///     Added to every allowed count.
 /// on_empty_row : {"raise", "uniform"}
 ///     What a category with no transition out gives when ``pseudocount`` is 0.
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When an option is unknown or ``pseudocount`` is negative.
+///
+/// Examples
+/// --------
+/// >>> d = tg.datasets.varved_sequence()
+/// >>> chain = tg.MarkovChain().fit(d["CODE"], holes=d["HOLE_ID"], from_=d["FROM"], to=d["TO"])
+/// >>> chain.kind, chain.n_categories
+/// ('embedded', 3)
+/// >>> bool(np.allclose(chain.transition_matrix.sum(axis=1), 1.0))
+/// True
+/// >>> chain.transition_at(2.0).shape, chain.transition_at([1.0, 2.0]).shape
+/// ((3, 3), (2, 3, 3))
+/// >>> bool(chain.independence_test().p_value < 0.01)
+/// True
+/// >>> chain.symmetry_test().name
+/// 'symmetry'
+/// >>> e = chain.entropy()
+/// >>> bool(0.0 < e.chain <= e.max)
+/// True
+/// >>> chain.difference_matrix().shape, chain.asymmetry().shape, chain.proportion_std(100).shape
+/// ((3, 3), (3, 3), (3,))
+/// >>> sorted(chain.simulate(10.0, n=2, seed=1))
+/// ['code', 'from', 'realization', 'to']
+/// >>> chain.simulate_beds(5, n=2, seed=1).shape
+/// (2, 5)
+/// >>> fixed = tg.MarkovChain.from_matrix([[0.9, 0.1], [0.2, 0.8]])
+/// >>> fixed.simulate(5, seed=1).shape
+/// (1, 5)
+/// >>> np.round(tg.MarkovChain.from_rates([[-0.5, 0.5], [0.25, -0.25]]).proportions, 4)
+/// array([0.3333, 0.6667])
+/// >>> tg.MarkovChain.from_geology([0.5, 0.3, 0.2], [2.0, 1.0, 0.5]).kind
+/// 'continuous'
+/// >>> tg.MarkovChain.from_json(chain.to_json()) == chain
+/// True
 #[pyclass(module = "transiograms", name = "MarkovChain", eq, from_py_object)]
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct PyMarkovChain {
@@ -350,6 +458,13 @@ impl PyMarkovChain {
     /// -------
     /// MarkovChain
     ///     This chain, fitted.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When a code is out of range, the sequence arguments disagree in length, a named
+    ///     column is missing from ``data``, or a category has no transition out and
+    ///     ``on_empty_row="raise"``.
     #[pyo3(signature = (codes, *, holes=None, from_=None, to=None, depth=None, step=None, gap=1e-6, categories=None, data=None))]
     #[allow(clippy::too_many_arguments)]
     fn fit<'py>(
@@ -407,6 +522,16 @@ impl PyMarkovChain {
     /// mean_lengths : array_like, optional
     ///     Embedded only: mean bed length per category, which gives the generator.
     /// direction : {"up", "down"}
+    ///
+    /// Returns
+    /// -------
+    /// MarkovChain
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``matrix`` is not row-stochastic, an embedded diagonal is not zero, or
+    ///     ``mean_lengths`` has another length or a non-positive entry.
     #[staticmethod]
     #[pyo3(signature = (matrix, *, kind="fixed", step=1.0, mean_lengths=None, direction="up"))]
     fn from_matrix(
@@ -428,7 +553,22 @@ impl PyMarkovChain {
         Ok(Self::built(chain, kind, (kind == "fixed").then_some(step)))
     }
 
-    /// Continuous-lag chain from a generator (rate) matrix ``Q``: off-diagonals >= 0, rows sum to 0.
+    /// Continuous-lag chain from a generator (rate) matrix ``Q``.
+    ///
+    /// Parameters
+    /// ----------
+    /// rates : array_like
+    ///     ``(k, k)`` with off-diagonals >= 0 and rows summing to 0.
+    /// direction : {"up", "down"}
+    ///
+    /// Returns
+    /// -------
+    /// MarkovChain
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``rates`` is not a generator matrix.
     #[staticmethod]
     #[pyo3(signature = (rates, *, direction="up"))]
     fn from_rates(rates: &Bound<PyAny>, direction: &str) -> PyResult<Self> {
@@ -454,6 +594,16 @@ impl PyMarkovChain {
     /// symmetric : bool
     ///     Read only the upper triangle of ``embedded`` and fill the rest by symmetry.
     /// direction : {"up", "down"}
+    ///
+    /// Returns
+    /// -------
+    /// MarkovChain
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the proportions do not sum to 1, a mean length is not positive, or the
+    ///     juxtapositions give no valid generator.
     #[staticmethod]
     #[pyo3(
         signature = (proportions, mean_lengths, embedded=None, *, background=-1, symmetric=false, direction="up"),
@@ -494,10 +644,12 @@ impl PyMarkovChain {
             _ => &self.settings.kind,
         }
     }
+    /// "up" or "down".
     #[getter]
     fn direction(&self) -> &'static str {
         direction_name(self.settings.direction)
     }
+    /// Step of a fixed chain, else None.
     #[getter]
     fn step(&self) -> Option<f64> {
         match self.chain.as_ref().map(|c| c.kind) {
@@ -505,6 +657,7 @@ impl PyMarkovChain {
             _ => None,
         }
     }
+    /// Number of categories ``k``; InvalidInput before fitting.
     #[getter]
     fn n_categories(&self) -> PyResult<usize> {
         Ok(self.fitted()?.k())
@@ -514,6 +667,7 @@ impl PyMarkovChain {
     fn counts<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyArray2<f64>>>> {
         Ok(self.fitted()?.counts.as_ref().map(|m| mat2(py, m)))
     }
+    /// ``(k, k)`` row-stochastic transition matrix (embedded or one step).
     #[getter]
     fn transition_matrix<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {
         Ok(mat2(py, self.fitted()?.transition.matrix()))
@@ -527,14 +681,17 @@ impl PyMarkovChain {
             .as_ref()
             .map(|q| mat2(py, q.matrix())))
     }
+    /// ``(k,)`` stationary proportions.
     #[getter]
     fn proportions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray1<f64>>> {
         Ok(vec1(py, self.fitted()?.proportions.clone()))
     }
+    /// ``(k,)`` mean bed length per category, or None for a fixed chain.
     #[getter]
     fn mean_lengths<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyArray1<f64>>>> {
         Ok(self.fitted()?.mean_lengths.clone().map(|v| vec1(py, v)))
     }
+    /// ``(k,)`` frequency of each category among beds (embedded) or steps (fixed).
     #[getter]
     fn bed_frequencies<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray1<f64>>> {
         Ok(vec1(py, self.fitted()?.bed_frequencies.clone()))
@@ -545,7 +702,23 @@ impl PyMarkovChain {
         Ok(self.fitted()?.projection.map(|p| p.distance))
     }
 
-    /// Transition matrix at lag ``h``: ``(k, k)`` for a scalar, ``(n, k, k)`` for an array.
+    /// Transition matrix at lag ``h``.
+    ///
+    /// Parameters
+    /// ----------
+    /// h : float or array_like
+    ///     Lag along the direction; whole steps for a fixed chain without a generator.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     ``(k, k)`` for a scalar, ``(n, k, k)`` for an array.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the chain is not fitted, a lag is invalid for it, or the stack exceeds the
+    ///     available memory.
     fn transition_at<'py>(
         &self,
         py: Python<'py>,
@@ -574,6 +747,19 @@ impl PyMarkovChain {
     }
 
     /// Test of the counts against independence (quasi-independence for embedded chains).
+    ///
+    /// Parameters
+    /// ----------
+    /// method : {"g", "pearson"}
+    ///
+    /// Returns
+    /// -------
+    /// TestResult
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the chain has no counts (built from a matrix) or ``method`` is unknown.
     #[pyo3(signature = (*, method="g"))]
     fn independence_test(&self, method: &str) -> PyResult<PyTestResult> {
         self.fitted()?
@@ -583,6 +769,15 @@ impl PyMarkovChain {
     }
 
     /// Bowker test of symmetry of the counts.
+    ///
+    /// Returns
+    /// -------
+    /// TestResult
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the chain has no counts.
     fn symmetry_test(&self) -> PyResult<PyTestResult> {
         self.fitted()?
             .symmetry_test()
@@ -597,11 +792,26 @@ impl PyMarkovChain {
     /// Entropy
     ///     ``post`` and ``pre`` per category (``pre`` is NaN for a category never entered),
     ///     their normalized forms, the whole-chain entropy ``chain`` and its maximum ``max``.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the chain is not fitted.
     fn entropy(&self) -> PyResult<PyEntropy> {
         self.fitted()?.entropy().map(PyEntropy).map_err(to_rust)
     }
 
     /// Observed minus quasi-independent embedded transition probabilities.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     ``(k, k)``.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the chain has no embedded counts.
     fn difference_matrix<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {
         Ok(mat2(
             py,
@@ -610,11 +820,36 @@ impl PyMarkovChain {
     }
 
     /// ``F - F^T`` of the transition flux ``F``: zero for a reversible chain.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     ``(k, k)``.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the chain is not fitted.
     fn asymmetry<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {
         Ok(mat2(py, &self.fitted()?.asymmetry().map_err(to_rust)?))
     }
 
     /// Kemeny and Snell standard deviation of the proportions over ``n_steps`` steps.
+    ///
+    /// Parameters
+    /// ----------
+    /// n_steps : int
+    ///     Steps of the chain, at least 1.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     ``(k,)``.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the chain is not fitted or ``n_steps`` is 0.
     fn proportion_std<'py>(
         &self,
         py: Python<'py>,
@@ -639,8 +874,8 @@ impl PyMarkovChain {
     ///     Conditioning intervals as lengths along the direction from 0; a point has
     ///     ``from == to``. Fixed chains freeze the cells whose centres an interval covers, and
     ///     the cell that contains a point.
-    /// start : int or "stationary"
-    ///     Category at position 0, or a draw from the stationary law.
+    /// start : int, "stationary" or None
+    ///     Category at position 0, or a draw from the stationary law (None).
     ///
     /// Returns
     /// -------
@@ -649,6 +884,12 @@ impl PyMarkovChain {
     ///     direction (for "up", column 0 is the deepest; reverse the columns for top-down rows).
     ///     Chains with a generator: a dict of arrays ``realization``, ``from``, ``to`` and
     ///     ``code``, one entry per bed, positions along the direction.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the chain is not fitted, ``length`` is not a positive multiple of a fixed
+    ///     step, the conditioning contradicts itself, or ``seed`` is out of range.
     #[pyo3(signature = (length, *, n=1, seed=0, hard_from=None, hard_to=None, hard_codes=None, start=None))]
     #[allow(clippy::too_many_arguments)]
     fn simulate<'py>(
@@ -721,12 +962,19 @@ impl PyMarkovChain {
     /// seed : int
     /// hard_from, hard_to, hard_codes : array_like, optional
     ///     Conditioning as bed indices (inclusive).
-    /// start : int or "stationary"
+    /// start : int, "stationary" or None
+    ///     Category of the first bed, or a draw from the stationary law (None).
     ///
     /// Returns
     /// -------
     /// numpy.ndarray
     ///     int64 ``(n, n_beds)``, beds in order along the direction.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the chain has no embedded matrix, the conditioning contradicts itself, or
+    ///     ``seed`` is out of range.
     #[pyo3(signature = (n_beds, *, n=1, seed=0, hard_from=None, hard_to=None, hard_codes=None, start=None))]
     #[allow(clippy::too_many_arguments)]
     fn simulate_beds<'py>(
@@ -756,10 +1004,29 @@ impl PyMarkovChain {
         }
     }
 
+    /// JSON text of this object; ``MarkovChain.from_json`` reads it back.
+    ///
+    /// Returns
+    /// -------
+    /// str
     fn to_json(&self) -> PyResult<String> {
         json(self)
     }
 
+    /// MarkovChain from the text written by ``to_json``.
+    ///
+    /// Parameters
+    /// ----------
+    /// text : str
+    ///
+    /// Returns
+    /// -------
+    /// MarkovChain
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``text`` is not MarkovChain JSON or describes an invalid MarkovChain.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
         unjson(text, "MarkovChain")
@@ -824,29 +1091,66 @@ pub fn background_index(background: i64, k: usize) -> PyResult<usize> {
 ///     Beds per category, and how many of them are cut by the end of a run (censored).
 /// total, mean_length : numpy.ndarray
 ///     Total thickness, and thickness over closed beds (the censored exponential MLE).
+///
+/// Examples
+/// --------
+/// >>> d = tg.datasets.varved_sequence()
+/// >>> s = tg.sojourn(d["CODE"], holes=d["HOLE_ID"], from_=d["FROM"], to=d["TO"])
+/// >>> s.n_beds.shape, s.mean_length.shape
+/// ((3,), (3,))
+/// >>> thickness, is_open = s.thickness(0)
+/// >>> thickness.shape == is_open.shape
+/// True
+/// >>> at, survival = s.survival(0)
+/// >>> bool(np.all(np.diff(survival) <= 0))
+/// True
+/// >>> s.exponential_test(0, n_bootstrap=99, seed=1).name
+/// 'exponential'
+/// >>> tg.Sojourn.from_json(s.to_json()).to_json() == s.to_json()
+/// True
 #[pyclass(module = "transiograms", name = "Sojourn", frozen)]
 pub struct PySojourn(pub transiograms_chain::Sojourn);
 
 #[pymethods]
 impl PySojourn {
+    /// ``(k,)`` beds per category.
     #[getter]
     fn n_beds<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<i64>> {
         PyArray1::from_vec(py, self.0.n_beds.iter().map(|&n| n as i64).collect())
     }
+    /// ``(k,)`` beds cut by the end of a run (censored).
     #[getter]
     fn n_open<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<i64>> {
         PyArray1::from_vec(py, self.0.n_open.iter().map(|&n| n as i64).collect())
     }
+    /// ``(k,)`` total thickness per category.
     #[getter]
     fn total<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         vec1(py, self.0.total.clone())
     }
+    /// ``(k,)`` total thickness divided by the number of closed beds (the censored
+    /// exponential MLE).
     #[getter]
     fn mean_length<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         vec1(py, self.0.mean_length.clone())
     }
 
     /// Thickness of every bed of ``code`` and whether it is open (censored).
+    ///
+    /// Parameters
+    /// ----------
+    /// code : int
+    ///
+    /// Returns
+    /// -------
+    /// thickness : numpy.ndarray
+    /// open : numpy.ndarray
+    ///     bool, True for a bed cut by the end of its run.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``code`` is not a category.
     fn thickness<'py>(
         &self,
         py: Python<'py>,
@@ -859,8 +1163,23 @@ impl PySojourn {
         ))
     }
 
-    /// Kaplan-Meier survival of the thickness of ``code``, open beds censored: the distinct
-    /// event thicknesses and the survival just after each.
+    /// Kaplan-Meier survival of the thickness of ``code``, open beds censored.
+    ///
+    /// Parameters
+    /// ----------
+    /// code : int
+    ///
+    /// Returns
+    /// -------
+    /// thickness : numpy.ndarray
+    ///     Distinct event thicknesses, ascending.
+    /// survival : numpy.ndarray
+    ///     Survival just after each.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``code`` is not a category.
     fn survival<'py>(
         &self,
         py: Python<'py>,
@@ -873,6 +1192,23 @@ impl PySojourn {
 
     /// Kolmogorov-Smirnov test of exponential thickness for ``code``, p value by seeded
     /// parametric bootstrap.
+    ///
+    /// Parameters
+    /// ----------
+    /// code : int
+    /// n_bootstrap : int
+    ///     Bootstrap samples.
+    /// seed : int
+    ///     Seed in ``0..2**64-1``.
+    ///
+    /// Returns
+    /// -------
+    /// TestResult
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``code`` is not a category, it has no closed bed, or ``seed`` is out of range.
     #[pyo3(signature = (code, *, n_bootstrap=999, seed=0))]
     fn exponential_test(
         &self,
@@ -888,9 +1224,28 @@ impl PySojourn {
             .map_err(to_rust)
     }
 
+    /// JSON text of this object; ``Sojourn.from_json`` reads it back.
+    ///
+    /// Returns
+    /// -------
+    /// str
     fn to_json(&self) -> PyResult<String> {
         json(&self.0)
     }
+    /// Sojourn from the text written by ``to_json``.
+    ///
+    /// Parameters
+    /// ----------
+    /// text : str
+    ///
+    /// Returns
+    /// -------
+    /// Sojourn
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``text`` is not Sojourn JSON or describes an invalid Sojourn.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
         let s: transiograms_chain::Sojourn = unjson(text, "Sojourn")?;
@@ -961,6 +1316,21 @@ fn options(kind: &str, direction: &str, gap: f64, sampled: Option<f64>) -> PyRes
 /// Returns
 /// -------
 /// TestResult
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When a code is out of range, the sequence arguments disagree in length, a named column
+///     is missing from ``data``, or an option is unknown.
+///
+/// Examples
+/// --------
+/// >>> codes = tg.MarkovChain.from_matrix([[0.9, 0.1], [0.2, 0.8]]).simulate(2000, seed=1)[0]
+/// >>> r = tg.order_test(codes, order=2)
+/// >>> r.name, r.df
+/// ('order 2 vs 1', 2)
+/// >>> bool(r.p_value > 0.01)
+/// True
 #[pyfunction]
 #[pyo3(signature = (codes, *, order=2, kind="fixed", direction="up", method="g", holes=None, from_=None, to=None, depth=None, step=None, gap=1e-6, categories=None, data=None))]
 #[allow(clippy::too_many_arguments)]
@@ -1016,6 +1386,21 @@ fn order_test<'py>(
 /// dict
 ///     ``order``, ``log_likelihood``, ``n_params``, ``aic``, ``bic`` and ``n_transitions`` (an
 ///     int array of length 1).
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When a code is out of range, the sequence arguments disagree in length, a named column
+///     is missing from ``data``, or an option is unknown.
+///
+/// Examples
+/// --------
+/// >>> codes = tg.MarkovChain.from_matrix([[0.9, 0.1], [0.2, 0.8]]).simulate(2000, seed=1)[0]
+/// >>> table = tg.select_order(codes, max_order=2)
+/// >>> table["order"]
+/// array([0, 1, 2])
+/// >>> int(table["order"][np.argmin(table["bic"])])
+/// 1
 #[pyfunction]
 #[pyo3(signature = (codes, *, max_order=3, direction="up", holes=None, from_=None, to=None, depth=None, step=None, gap=1e-6, categories=None, data=None))]
 #[allow(clippy::too_many_arguments)]
@@ -1070,6 +1455,26 @@ fn select_order<'py>(
 ///     As in ``order_test``.
 /// holes, from_, to, depth, step, gap, categories, data
 ///     The shared sequence arguments.
+///
+/// Returns
+/// -------
+/// TestResult
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When a code is out of range, the sequence arguments disagree in length, a named column
+///     is missing from ``data``, or an option is unknown.
+///
+/// Examples
+/// --------
+/// >>> d = tg.datasets.varved_sequence()
+/// >>> groups = np.where(np.isin(d["HOLE_ID"], ["DH01", "DH02", "DH03", "DH04", "DH05", "DH06"]), "A", "B")
+/// >>> r = tg.homogeneity_test(d["CODE"], groups, holes=d["HOLE_ID"], from_=d["FROM"], to=d["TO"])
+/// >>> r.name
+/// 'homogeneity'
+/// >>> bool(r.p_value > 0.01)
+/// True
 #[pyfunction]
 #[pyo3(signature = (codes, groups, *, kind="embedded", direction="up", method="g", holes=None, from_=None, to=None, depth=None, step=None, gap=1e-6, categories=None, data=None))]
 #[allow(clippy::too_many_arguments)]
@@ -1154,6 +1559,19 @@ fn homogeneity_test<'py>(
 /// Returns
 /// -------
 /// Sojourn
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When a code is out of range, the sequence arguments disagree in length, a named column
+///     is missing from ``data``, or an option is unknown.
+///
+/// Examples
+/// --------
+/// >>> d = tg.datasets.varved_sequence()
+/// >>> s = tg.sojourn(d["CODE"], holes=d["HOLE_ID"], from_=d["FROM"], to=d["TO"])
+/// >>> int(s.n_beds.sum()) > 0
+/// True
 #[pyfunction]
 #[pyo3(signature = (codes, *, direction="up", holes=None, from_=None, to=None, depth=None, step=None, gap=1e-6, categories=None, data=None))]
 #[allow(clippy::too_many_arguments)]

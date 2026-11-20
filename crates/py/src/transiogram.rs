@@ -34,6 +34,20 @@ use crate::tpsim::PyRealizations;
 ///     ``(n_lags, k)`` row totals.
 /// directed : bool
 ///     False when both orientations of each pair were counted.
+///
+/// Examples
+/// --------
+/// >>> d = tg.datasets.varved_sequence()
+/// >>> exp = tg.downhole_transiogram(
+/// ...     d["CODE"], lags=[0.5, 1.0, 1.5, 2.0], holes=d["HOLE_ID"], from_=d["FROM"], to=d["TO"])
+/// >>> exp.lags
+/// array([0.5, 1. , 1.5, 2. ])
+/// >>> exp.counts.shape, exp.probabilities.shape, exp.tail_totals.shape
+/// ((4, 3, 3), (4, 3, 3), (4, 3))
+/// >>> bool(np.allclose(exp.probabilities.sum(axis=2), 1.0))
+/// True
+/// >>> tg.ExperimentalTransiogram.from_json(exp.to_json()).to_json() == exp.to_json()
+/// True
 #[pyclass(
     module = "transiograms",
     name = "ExperimentalTransiogram",
@@ -52,34 +66,59 @@ impl PyExperimental {
 
 #[pymethods]
 impl PyExperimental {
+    /// ``(n_lags,)`` nominal lag of each class.
     #[getter]
     fn lags<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         vec1(py, self.0.lags.clone())
     }
+    /// ``(n_lags,)`` mean separation of the pairs in each class, NaN when empty.
     #[getter]
     fn mean_lags<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         vec1(py, self.0.mean_lags.clone())
     }
+    /// ``(n_lags, k, k)`` pair counts (lengths for the downhole estimator).
     #[getter]
     fn counts<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray3<f64>> {
         mat3(py, &self.0.counts, self.k(), self.k())
     }
+    /// ``(n_lags, k, k)`` counts over row totals; NaN rows where a tail category has no pair.
     #[getter]
     fn probabilities<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray3<f64>> {
         mat3(py, &self.0.probabilities, self.k(), self.k())
     }
+    /// ``(n_lags, k)`` row totals.
     #[getter]
     fn tail_totals<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f64>> {
         let t = &self.0.tail_totals;
         mat2(py, &Mat::from_fn(t.len(), self.k(), |l, i| t[l][i]))
     }
+    /// False when both orientations of each pair were counted.
     #[getter]
     fn directed(&self) -> bool {
         self.0.directed
     }
+    /// JSON text of this object; ``ExperimentalTransiogram.from_json`` reads it back.
+    ///
+    /// Returns
+    /// -------
+    /// str
     fn to_json(&self) -> PyResult<String> {
         json(&self.0)
     }
+    /// ExperimentalTransiogram from the text written by ``to_json``.
+    ///
+    /// Parameters
+    /// ----------
+    /// text : str
+    ///
+    /// Returns
+    /// -------
+    /// ExperimentalTransiogram
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``text`` is not ExperimentalTransiogram JSON or describes an invalid ExperimentalTransiogram.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
         unjson(text, "ExperimentalTransiogram").map(Self)
@@ -119,6 +158,24 @@ impl PyExperimental {
 /// categories : Categories or int, optional
 /// data : mapping, optional
 ///     Strings name its columns.
+///
+/// Returns
+/// -------
+/// ExperimentalTransiogram
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When ``coords`` is not ``(n, 2)`` or ``(n, 3)``, the lengths differ, ``lag`` or
+///     ``n_lags`` is not positive, ``pairs`` needs ``holes``, or an option is unknown.
+///
+/// Examples
+/// --------
+/// >>> codes = tg.MarkovChain.from_matrix([[0.8, 0.2], [0.3, 0.7]]).simulate(200, seed=1)[0]
+/// >>> xyz = np.column_stack([np.zeros(200), np.zeros(200), np.arange(200.0)])
+/// >>> exp = tg.experimental_transiogram(xyz, codes, lag=1.0, n_lags=3)
+/// >>> exp.probabilities.shape, exp.directed
+/// ((3, 2, 2), False)
 #[pyfunction]
 #[pyo3(signature = (coords, codes, *, holes=None, direction=None, lag, n_lags, lag_tolerance=None, angle_tolerance=22.5, bandwidth=f64::INFINITY, vertical_bandwidth=f64::INFINITY, directed=true, pairs="all", categories=None, data=None))]
 #[allow(clippy::too_many_arguments)]
@@ -188,6 +245,24 @@ fn experimental_transiogram<'py>(
 /// direction : {"up", "down"}
 /// holes, from_, to, depth, step, gap, categories, data
 ///     The shared sequence arguments.
+///
+/// Returns
+/// -------
+/// ExperimentalTransiogram
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When a lag is not positive and finite, a code is out of range, or the sequence
+///     arguments disagree in length.
+///
+/// Examples
+/// --------
+/// >>> d = tg.datasets.varved_sequence()
+/// >>> exp = tg.downhole_transiogram(
+/// ...     d["CODE"], lags=[0.5, 1.0, 1.5, 2.0], holes=d["HOLE_ID"], from_=d["FROM"], to=d["TO"])
+/// >>> exp.probabilities.shape
+/// (4, 3, 3)
 #[pyfunction]
 #[pyo3(signature = (codes, *, lags, direction="up", holes=None, from_=None, to=None, depth=None, step=None, gap=1e-6, categories=None, data=None))]
 #[allow(clippy::too_many_arguments)]
@@ -236,6 +311,26 @@ fn downhole_transiogram<'py>(
 /// mask : array_like, optional
 ///     Active cells.
 /// categories : Categories or int, optional
+///
+/// Returns
+/// -------
+/// ExperimentalTransiogram
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When ``codes`` or ``mask`` has another length than the grid, a code is out of range,
+///     or ``offset`` is zero.
+///
+/// Examples
+/// --------
+/// >>> grid = tg.Grid((0.0, 0.0, 0.0), (1.0, 1.0, 1.0), (4, 1, 6))
+/// >>> codes = np.repeat([0, 0, 1, 1, 2, 2], 4)
+/// >>> exp = tg.grid_transiogram(codes, grid, offset=(0, 0, 1), n_lags=2)
+/// >>> exp.probabilities[0]
+/// array([[0.5, 0.5, 0. ],
+///        [0. , 0.5, 0.5],
+///        [0. , 0. , 1. ]])
 #[pyfunction]
 #[pyo3(signature = (codes, grid, *, offset, n_lags, mask=None, categories=None))]
 fn grid_transiogram<'py>(
@@ -323,6 +418,29 @@ fn stack<'py>(
 
 /// One-directional transiogram model: a continuous-lag Markov chain (``markov``) or one
 /// analytical curve per entry (``entrywise``, Li 2007).
+///
+/// Examples
+/// --------
+/// >>> d = tg.datasets.varved_sequence()
+/// >>> exp = tg.downhole_transiogram(
+/// ...     d["CODE"], lags=[0.5, 1.0, 1.5, 2.0], holes=d["HOLE_ID"], from_=d["FROM"], to=d["TO"])
+/// >>> markov = tg.TransiogramModel.fit_markov(exp)
+/// >>> markov.kind, markov.transition(1.0).shape, markov.transition([1.0, 2.0]).shape
+/// ('markov', (3, 3), (2, 3, 3))
+/// >>> bool(np.nanmax(np.abs(markov.residuals(exp))) < 0.05)
+/// True
+/// >>> chain = tg.MarkovChain().fit(d["CODE"], holes=d["HOLE_ID"], from_=d["FROM"], to=d["TO"])
+/// >>> tg.TransiogramModel.markov(chain).rates.shape
+/// (3, 3)
+/// >>> curves = tg.TransiogramModel.fit_entrywise(exp, markov.proportions, structures="spherical")
+/// >>> curves.kind, curves.rates
+/// ('entrywise', None)
+/// >>> fixed = tg.TransiogramModel.entrywise([0.5, 0.5], "exponential", [[2.0, 2.0], [2.0, 2.0]], max_lag=10.0)
+/// >>> np.round(fixed.transition(100.0), 3)
+/// array([[0.5, 0.5],
+///        [0.5, 0.5]])
+/// >>> tg.TransiogramModel.from_json(markov.to_json()) == markov
+/// True
 #[pyclass(
     module = "transiograms",
     name = "TransiogramModel",
@@ -336,6 +454,20 @@ pub struct PyTransiogramModel(pub Model1D);
 #[pymethods]
 impl PyTransiogramModel {
     /// Markov model ``T(h) = exp(R h)`` from a rate matrix or a chain with a generator.
+    ///
+    /// Parameters
+    /// ----------
+    /// rates : array_like or MarkovChain
+    ///     ``(k, k)`` generator, or a chain that has one.
+    ///
+    /// Returns
+    /// -------
+    /// TransiogramModel
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``rates`` is not a generator matrix or the chain has none.
     #[staticmethod]
     fn markov(rates: &Bound<PyAny>) -> PyResult<Self> {
         let r = match rates.cast::<PyMarkovChain>() {
@@ -363,6 +495,16 @@ impl PyTransiogramModel {
     ///     Complement column per row; the diagonal by default.
     /// max_lag : float
     ///     Validity (non-negative entries) is checked on a lag grid up to here.
+    ///
+    /// Returns
+    /// -------
+    /// TransiogramModel
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When a shape or name is invalid, a range is not positive, a nugget is outside [0, 1),
+    ///     or the complement entries turn negative before ``max_lag``.
     #[staticmethod]
     #[pyo3(signature = (proportions, structures, ranges, *, nuggets=None, complement=None, max_lag))]
     fn entrywise(
@@ -420,6 +562,19 @@ impl PyTransiogramModel {
     ///     Category whose rates are filled from the others; -1 means the last.
     /// start : array_like, optional
     ///     Starting rates.
+    ///
+    /// Returns
+    /// -------
+    /// TransiogramModel
+    ///     ``kind="markov"``; ``residuals(experimental)`` gives its misfit.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the proportions do not sum to 1, ``background`` is not a category, or no lag has
+    ///     every category as a tail and ``start`` is not given.
+    /// ConvergenceError
+    ///     When no valid starting rates exist for these proportions.
     #[staticmethod]
     #[pyo3(
         signature = (experimental, *, proportions=None, background=-1, start=None),
@@ -448,6 +603,28 @@ impl PyTransiogramModel {
     }
 
     /// Entrywise model fitted entry by entry (range by golden section, nugget 0).
+    ///
+    /// Parameters
+    /// ----------
+    /// experimental : ExperimentalTransiogram
+    /// proportions : array_like
+    ///     Sills ``(k,)``.
+    /// structures : str or sequence of str, optional
+    ///     One shape for all entries or ``k * k`` names (row-major, complement entries ignored);
+    ///     None means "exponential".
+    /// complement : array_like, optional
+    ///     Complement column per row; the diagonal by default.
+    ///
+    /// Returns
+    /// -------
+    /// TransiogramModel
+    ///     ``kind="entrywise"``; ``residuals(experimental)`` gives its misfit.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the proportions do not sum to 1, the number of structures is not 1 or ``k * k``,
+    ///     or the experimental transiogram has no usable row.
     #[staticmethod]
     #[pyo3(signature = (experimental, proportions, *, structures=None, complement=None))]
     fn fit_entrywise(
@@ -477,6 +654,7 @@ impl PyTransiogramModel {
             Model1D::Entrywise { .. } => "entrywise",
         }
     }
+    /// ``(k,)`` proportions (the sills).
     #[getter]
     fn proportions<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         vec1(py, self.0.proportions().to_vec())
@@ -489,8 +667,22 @@ impl PyTransiogramModel {
             Model1D::Entrywise { .. } => None,
         }
     }
-    /// ``T(h)``: ``(k, k)`` for a scalar, ``(n, k, k)`` for an array; negative lags by reversal.
-    /// Raises InvalidInput before allocating a stack larger than the available memory.
+    /// Transition probabilities ``T(h)``; negative lags by reversal.
+    ///
+    /// Parameters
+    /// ----------
+    /// h : float or array_like
+    ///     Lag or lags.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     ``(k, k)`` for a scalar, ``(n, k, k)`` for an array.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When a lag is not finite, or before allocating a stack larger than the available memory.
     fn transition<'py>(
         &self,
         py: Python<'py>,
@@ -545,9 +737,28 @@ impl PyTransiogramModel {
         let k = self.0.proportions().len();
         stack(py, r.len(), k, |i| r[i].clone())
     }
+    /// JSON text of this object; ``TransiogramModel.from_json`` reads it back.
+    ///
+    /// Returns
+    /// -------
+    /// str
     fn to_json(&self) -> PyResult<String> {
         json(&self.0)
     }
+    /// TransiogramModel from the text written by ``to_json``.
+    ///
+    /// Parameters
+    /// ----------
+    /// text : str
+    ///
+    /// Returns
+    /// -------
+    /// TransiogramModel
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``text`` is not TransiogramModel JSON or describes an invalid TransiogramModel.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
         unjson(text, "TransiogramModel").map(Self)
@@ -578,6 +789,33 @@ fn rate_matrix(obj: &Bound<PyAny>, what: &str) -> PyResult<RateMatrix> {
 ///     Azimuth, dip and rake in degrees.
 /// background : int
 ///     Background category; -1 means the last.
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When the proportions do not sum to 1, a rate matrix is not a generator with
+///     ``p^T R = 0``, or ``background`` is not a category.
+///
+/// Examples
+/// --------
+/// >>> m = tg.TransitionModel.from_geology(
+/// ...     [0.5, 0.3, 0.2], [[40.0, 30.0, 20.0], [40.0, 30.0, 20.0], [4.0, 3.0, 2.0]])
+/// >>> m.n_categories, m.background
+/// (3, 2)
+/// >>> np.round(m.mean_lengths([0.0, 0.0, 1.0]), 6)
+/// array([4., 3., 2.])
+/// >>> m.transition([0.0, 0.0, 1.0]).shape, m.transition([[0.0, 0.0, 1.0], [10.0, 0.0, 0.0]]).shape
+/// ((3, 3), (2, 3, 3))
+/// >>> m.rates([1.0, 0.0, 0.0]).shape
+/// (3, 3)
+/// >>> c = m.closeness([[0.0, 0.0, 0.0], [0.0, 0.0, 2.0]])
+/// >>> float(c[0]), bool(c[1] < 1.0)
+/// (1.0, True)
+/// >>> turned = tg.TransitionModel(m.proportions, m.rates_x, m.rates_y, m.rates_z, rotation=(30.0, 0.0, 0.0))
+/// >>> turned.rotation
+/// (30.0, 0.0, 0.0)
+/// >>> tg.TransitionModel.from_json(m.to_json()) == m
+/// True
 #[pyclass(
     module = "transiograms",
     name = "TransitionModel",
@@ -628,8 +866,19 @@ impl PyTransitionModel {
     /// mean_lengths : array_like
     ///     ``(3, k)``: rows x', y', z'.
     /// embedded_x, embedded_y, embedded_z : array_like, optional
+    ///     ``(k, k)`` embedded juxtapositions along each axis.
     /// rotation : tuple of 3 float
     /// background : int
+    ///
+    /// Returns
+    /// -------
+    /// TransitionModel
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When the proportions do not sum to 1, a mean length is not positive, or the
+    ///     juxtapositions give no valid generator.
     #[staticmethod]
     #[pyo3(
         signature = (proportions, mean_lengths, *, embedded_x=None, embedded_y=None, embedded_z=None, rotation=(0.0, 0.0, 0.0), background=-1),
@@ -672,38 +921,60 @@ impl PyTransitionModel {
         .map_err(to_rust)
     }
 
+    /// ``(k,)`` proportions.
     #[getter]
     fn proportions<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         vec1(py, self.0.proportions.clone())
     }
+    /// ``(k, k)`` rate matrix along the rotated x axis.
     #[getter]
     fn rates_x<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f64>> {
         mat2(py, self.0.rates[0].matrix())
     }
+    /// ``(k, k)`` rate matrix along the rotated y axis.
     #[getter]
     fn rates_y<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f64>> {
         mat2(py, self.0.rates[1].matrix())
     }
+    /// ``(k, k)`` rate matrix along the rotated z axis.
     #[getter]
     fn rates_z<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f64>> {
         mat2(py, self.0.rates[2].matrix())
     }
+    /// ``(azimuth, dip, rake)`` in degrees.
     #[getter]
     fn rotation(&self) -> (f64, f64, f64) {
         let r = self.0.rotation;
         (r[0], r[1], r[2])
     }
+    /// Background category whose rates are filled from the others.
     #[getter]
     fn background(&self) -> usize {
         self.0.background
     }
+    /// Number of categories ``k``.
     #[getter]
     fn n_categories(&self) -> usize {
         self.0.k()
     }
 
-    /// ``T(h)`` at lag vectors: ``(3,)`` gives ``(k, k)``, ``(n, 3)`` gives ``(n, k, k)``.
-    /// Raises InvalidInput before allocating a stack larger than the available memory.
+    /// Transition probabilities ``T(h)`` at lag vectors.
+    ///
+    /// Parameters
+    /// ----------
+    /// lags : array_like
+    ///     ``(3,)`` or ``(n, 3)``.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     ``(k, k)`` for one lag, ``(n, k, k)`` for several.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``lags`` has another shape, or before allocating a stack larger than the available
+    ///     memory.
     fn transition<'py>(
         &self,
         py: Python<'py>,
@@ -718,11 +989,40 @@ impl PyTransitionModel {
     }
 
     /// Generator interpolated along a non-zero lag vector.
+    ///
+    /// Parameters
+    /// ----------
+    /// lag : sequence of 3 float
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     ``(k, k)``.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``lag`` is zero or not finite.
     fn rates<'py>(&self, py: Python<'py>, lag: [f64; 3]) -> PyResult<Bound<'py, PyArray2<f64>>> {
         Ok(mat2(py, self.0.rates_along(lag).map_err(to_rust)?.matrix()))
     }
 
-    /// ``det T(h)^(1 / (k - 1))`` per lag: 1 at lag 0, falling with distance.
+    /// Closeness ``det T(h)^(1 / (k - 1))`` per lag: 1 at lag 0, falling with distance.
+    ///
+    /// Parameters
+    /// ----------
+    /// lags : array_like
+    ///     ``(3,)`` or ``(n, 3)``.
+    ///
+    /// Returns
+    /// -------
+    /// float or numpy.ndarray
+    ///     One value per lag.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``lags`` has another shape.
     fn closeness<'py>(
         &self,
         py: Python<'py>,
@@ -738,6 +1038,21 @@ impl PyTransitionModel {
     }
 
     /// Mean lengths of the categories along a lag direction.
+    ///
+    /// Parameters
+    /// ----------
+    /// lag : array_like
+    ///     Non-zero direction vector ``(3,)``.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     ``(k,)``.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``lag`` is zero or not ``(3,)``.
     fn mean_lengths<'py>(
         &self,
         py: Python<'py>,
@@ -747,9 +1062,28 @@ impl PyTransitionModel {
         Ok(vec1(py, self.0.mean_lengths(lag)))
     }
 
+    /// JSON text of this object; ``TransitionModel.from_json`` reads it back.
+    ///
+    /// Returns
+    /// -------
+    /// str
     fn to_json(&self) -> PyResult<String> {
         json(&self.0)
     }
+    /// TransitionModel from the text written by ``to_json``.
+    ///
+    /// Parameters
+    /// ----------
+    /// text : str
+    ///
+    /// Returns
+    /// -------
+    /// TransitionModel
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``text`` is not TransitionModel JSON or describes an invalid TransitionModel.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
         let m: TransitionModel = unjson(text, "TransitionModel")?;
@@ -791,15 +1125,35 @@ impl PyTransitionModel {
 ///     Largest ``|mean t_ij - model t_ij| / se``, with standard errors below 0.001 counted as
 ///     0.001; NaN with one realization. Values above about 4 mean the ensemble misses the
 ///     model by more than sampling error.
+///
+/// Examples
+/// --------
+/// >>> model = tg.TransitionModel.from_geology(
+/// ...     [0.5, 0.3, 0.2], [[40.0, 30.0, 20.0], [40.0, 30.0, 20.0], [4.0, 3.0, 2.0]])
+/// >>> grid = tg.Grid((0.0, 0.0, 0.0), (10.0, 10.0, 1.0), (12, 12, 6))
+/// >>> xyz, codes = [[55.0, 55.0, 0.5], [55.0, 55.0, 3.5], [5.0, 105.0, 2.5]], [0, 1, 2]
+/// >>> cells, hard = grid.snap(xyz, codes)
+/// >>> real = tg.mcrf_simulate(model, grid, np.empty((0, 3)), [], n=4, seed=1)
+/// >>> q = tg.fit_quality(model, grid, real, n_lags=2)
+/// >>> q.offsets.shape, q.model.shape == q.mean.shape == q.standard_error.shape
+/// ((8, 3), True)
+/// >>> q.proportions.shape, q.mean_proportions.shape, q.target_proportions
+/// ((4, 3), (3,), array([0.5, 0.3, 0.2]))
+/// >>> bool(q.proportion_error < 0.2 and q.transiogram_error < 0.5 and q.max_standard_errors > 0)
+/// True
+/// >>> tg.FitQuality.from_json(q.to_json()).to_json() == q.to_json()
+/// True
 #[pyclass(module = "transiograms", name = "FitQuality", frozen)]
 pub struct PyFitQuality(pub FitQuality);
 
 #[pymethods]
 impl PyFitQuality {
+    /// ``(k,)`` model proportions.
     #[getter]
     fn target_proportions<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         vec1(py, self.0.target_proportions.clone())
     }
+    /// ``(n, k)`` proportions of each realization over its active cells.
     #[getter]
     fn proportions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {
         let shape = (self.0.n_realizations, self.0.k);
@@ -807,42 +1161,69 @@ impl PyFitQuality {
             .map(|a| a.into_pyarray(py))
             .map_err(invalid)
     }
+    /// ``(k,)`` ensemble proportions.
     #[getter]
     fn mean_proportions<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         vec1(py, self.0.mean_proportions())
     }
+    /// ``(m, 3)`` cell offsets ``l * direction`` for ``l = 1..n_lags``, direction-major.
     #[getter]
     fn offsets<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<i64>> {
         let o = &self.0.offsets;
         Array2::from_shape_fn((o.len(), 3), |(i, a)| o[i][a]).into_pyarray(py)
     }
+    /// ``(m, k, k)`` model ``t_ij`` at each offset.
     #[getter]
     fn model<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray3<f64>> {
         mat3(py, &self.0.model, self.0.k, self.0.k)
     }
+    /// ``(m, k, k)`` ensemble mean ``t_ij``; NaN where a tail category has no pair.
     #[getter]
     fn mean<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray3<f64>> {
         mat3(py, &self.0.mean, self.0.k, self.0.k)
     }
+    /// ``(m, k, k)`` standard error of ``mean`` (spread over the square root of the number of realizations); NaN with one realization.
     #[getter]
     fn standard_error<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray3<f64>> {
         mat3(py, &self.0.standard_error, self.0.k, self.0.k)
     }
+    /// Largest ``|mean proportion - target|``.
     #[getter]
     fn proportion_error(&self) -> f64 {
         self.0.proportion_error()
     }
+    /// Largest ``|mean t_ij - model t_ij|`` over every entry and offset.
     #[getter]
     fn transiogram_error(&self) -> f64 {
         self.0.transiogram_error()
     }
+    /// Largest ``|mean t_ij - model t_ij| / se`` (se below 0.001 counted as 0.001); above about 4 the ensemble misses the model by more than sampling error.
     #[getter]
     fn max_standard_errors(&self) -> f64 {
         self.0.max_standard_errors()
     }
+    /// JSON text of this object; ``FitQuality.from_json`` reads it back.
+    ///
+    /// Returns
+    /// -------
+    /// str
     fn to_json(&self) -> PyResult<String> {
         json(&self.0)
     }
+    /// FitQuality from the text written by ``to_json``.
+    ///
+    /// Parameters
+    /// ----------
+    /// text : str
+    ///
+    /// Returns
+    /// -------
+    /// FitQuality
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``text`` is not FitQuality JSON or describes an invalid FitQuality.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
         let q: FitQuality = unjson(text, "FitQuality")?;
@@ -896,6 +1277,25 @@ impl PyFitQuality {
 /// Returns
 /// -------
 /// FitQuality
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When ``realizations`` has another number of cells or categories than ``grid`` and
+///     ``model``, ``n_lags`` is 0, a direction is zero, or ``mask`` has another length.
+///
+/// Examples
+/// --------
+/// >>> model = tg.TransitionModel.from_geology(
+/// ...     [0.5, 0.3, 0.2], [[40.0, 30.0, 20.0], [40.0, 30.0, 20.0], [4.0, 3.0, 2.0]])
+/// >>> grid = tg.Grid((0.0, 0.0, 0.0), (10.0, 10.0, 1.0), (12, 12, 6))
+/// >>> xyz, codes = [[55.0, 55.0, 0.5], [55.0, 55.0, 3.5], [5.0, 105.0, 2.5]], [0, 1, 2]
+/// >>> cells, hard = grid.snap(xyz, codes)
+/// >>> real = tg.mcrf_simulate(model, grid, xyz, codes, n=2, seed=1)
+/// >>> tg.fit_quality(model, grid, real, directions=[(0, 0, 1)], n_lags=3).offsets
+/// array([[0, 0, 1],
+///        [0, 0, 2],
+///        [0, 0, 3]])
 #[pyfunction]
 #[pyo3(name = "fit_quality", signature = (model, grid, realizations, *, directions=None, n_lags=6, mask=None))]
 fn fit_quality_report<'py>(

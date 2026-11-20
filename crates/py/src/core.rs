@@ -59,6 +59,26 @@ fn labels(obj: &Bound<PyAny>) -> PyResult<Vec<Option<String>>> {
 ///     Category names in code order, unique and non-empty.
 /// colors : sequence of str, optional
 ///     One matplotlib color per name.
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When a name is empty or repeated, or ``colors`` has another length.
+///
+/// Examples
+/// --------
+/// >>> cats = tg.Categories(["sand", "silt", "clay"])
+/// >>> len(cats), cats.names
+/// (3, ['sand', 'silt', 'clay'])
+/// >>> codes = cats.encode(["clay", None, "sand"])
+/// >>> codes
+/// array([ 2, -1,  0])
+/// >>> cats.decode(codes)
+/// array(['clay', None, 'sand'], dtype=object)
+/// >>> tg.Categories.from_labels(["b", "a", "b"]).names
+/// ['a', 'b']
+/// >>> tg.Categories.from_json(cats.to_json()) == cats
+/// True
 #[pyclass(
     module = "transiograms",
     name = "Categories",
@@ -79,6 +99,20 @@ impl PyCategories {
 
     /// Categories from the sorted unique non-missing labels; numeric order when every label is an
     /// integer.
+    ///
+    /// Parameters
+    /// ----------
+    /// labels : array_like
+    ///     Labels of any type; None and NaN are missing.
+    ///
+    /// Returns
+    /// -------
+    /// Categories
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When there is no non-missing label.
     #[staticmethod]
     fn from_labels(labels: &Bound<PyAny>) -> PyResult<Self> {
         let l = self::labels(labels)?;
@@ -87,17 +121,34 @@ impl PyCategories {
             .map_err(to_rust)
     }
 
+    /// Category names in code order.
     #[getter]
     fn names(&self) -> Vec<String> {
         self.0.names.clone()
     }
 
+    /// One matplotlib color per category, or None.
     #[getter]
     fn colors(&self) -> Option<Vec<String>> {
         self.0.colors.clone()
     }
 
-    /// Codes (int64, -1 for None or NaN) of `labels`; unknown labels raise InvalidInput.
+    /// Codes of ``labels``.
+    ///
+    /// Parameters
+    /// ----------
+    /// labels : array_like
+    ///     Category names; None and NaN are missing.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     int64 codes, -1 for missing.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When a label is not one of the names.
     fn encode<'py>(
         &self,
         py: Python<'py>,
@@ -117,7 +168,22 @@ impl PyCategories {
         ))
     }
 
-    /// Names (object array, None for -1) of `codes`.
+    /// Names of ``codes``.
+    ///
+    /// Parameters
+    /// ----------
+    /// codes : array_like
+    ///     Codes ``0..k-1``, -1 or NaN for missing.
+    ///
+    /// Returns
+    /// -------
+    /// numpy.ndarray
+    ///     Object array of names, None for missing.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When a code is not ``-1`` or in ``0..k-1``.
     fn decode<'py>(
         &self,
         py: Python<'py>,
@@ -133,10 +199,29 @@ impl PyCategories {
         self.0.len()
     }
 
+    /// JSON text of this object; ``Categories.from_json`` reads it back.
+    ///
+    /// Returns
+    /// -------
+    /// str
     fn to_json(&self) -> PyResult<String> {
         json(&self.0)
     }
 
+    /// Categories from the text written by ``to_json``.
+    ///
+    /// Parameters
+    /// ----------
+    /// text : str
+    ///
+    /// Returns
+    /// -------
+    /// Categories
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``text`` is not Categories JSON or describes an invalid Categories.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
         let c: Categories = unjson(text, "Categories")?;
@@ -160,6 +245,25 @@ impl PyCategories {
 ///     Cell size along x, y and z.
 /// count : sequence of 3 ints
 ///     Number of cells along x, y and z; 1 along z for a 2D grid.
+///
+/// Raises
+/// ------
+/// InvalidInput
+///     When a size is not positive and finite or a count is 0.
+///
+/// Examples
+/// --------
+/// >>> grid = tg.Grid((0.0, 0.0, 0.0), (10.0, 10.0, 1.0), (3, 2, 4))
+/// >>> grid.n_cells, grid.shape
+/// (24, (4, 2, 3))
+/// >>> grid.coords[:2]
+/// array([[ 5. ,  5. ,  0.5],
+///        [15. ,  5. ,  0.5]])
+/// >>> cells, codes = grid.snap([[4.0, 6.0, 0.2], [99.0, 0.0, 0.0]], [1, 2])
+/// >>> cells, codes
+/// (array([0], dtype=uint64), array([1]))
+/// >>> tg.Grid.from_json(grid.to_json()) == grid
+/// True
 #[pyclass(module = "transiograms", name = "Grid", frozen, eq, from_py_object)]
 #[derive(Clone, PartialEq)]
 pub struct PyGrid(pub Grid);
@@ -171,24 +275,28 @@ impl PyGrid {
         Grid::new(origin, size, count).map(Self).map_err(to_rust)
     }
 
+    /// Corner of the first cell ``(x, y, z)``.
     #[getter]
     fn origin(&self) -> (f64, f64, f64) {
         let o = self.0.origin;
         (o[0], o[1], o[2])
     }
 
+    /// Cell size along x, y and z.
     #[getter]
     fn size(&self) -> (f64, f64, f64) {
         let s = self.0.size;
         (s[0], s[1], s[2])
     }
 
+    /// Number of cells along x, y and z.
     #[getter]
     fn count(&self) -> (usize, usize, usize) {
         let c = self.0.count;
         (c[0], c[1], c[2])
     }
 
+    /// Total number of cells.
     #[getter]
     fn n_cells(&self) -> usize {
         self.0.n_cells()
@@ -201,7 +309,8 @@ impl PyGrid {
         (c[2], c[1], c[0])
     }
 
-    /// Cell centroids, shape `(n_cells, 3)`.
+    /// Cell centroids, shape ``(n_cells, 3)``, in cell order. Raises InvalidInput before
+    /// allocating more than the available memory.
     #[getter]
     fn coords<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {
         let n = self.0.n_cells();
@@ -213,9 +322,31 @@ impl PyGrid {
             .into_pyarray(py))
     }
 
-    /// Cell index (uint64, ascending) and code (int64) of each snapped cell. Points outside the
-    /// grid or mask and missing codes are skipped; several points in a cell keep the one nearest
-    /// to the centroid, ties to the first.
+    /// Snap point data to cells.
+    ///
+    /// Points outside the grid or mask and missing codes are skipped; several points in a cell keep
+    /// the one nearest to the centroid, ties to the first.
+    ///
+    /// Parameters
+    /// ----------
+    /// coords : array_like
+    ///     ``(n, 3)`` point coordinates.
+    /// codes : array_like
+    ///     ``(n,)`` category codes, -1 or NaN for missing.
+    /// mask : sequence of bool, optional
+    ///     ``(n_cells,)`` active cells.
+    ///
+    /// Returns
+    /// -------
+    /// cells : numpy.ndarray
+    ///     uint64 cell indices, ascending.
+    /// codes : numpy.ndarray
+    ///     int64 code of each snapped cell.
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``coords`` is not ``(n, 3)``, the lengths differ or ``mask`` has another length.
     #[pyo3(signature = (coords, codes, *, mask=None))]
     fn snap<'py>(
         &self,
@@ -236,10 +367,29 @@ impl PyGrid {
         ))
     }
 
+    /// JSON text of this object; ``Grid.from_json`` reads it back.
+    ///
+    /// Returns
+    /// -------
+    /// str
     fn to_json(&self) -> PyResult<String> {
         json(&self.0)
     }
 
+    /// Grid from the text written by ``to_json``.
+    ///
+    /// Parameters
+    /// ----------
+    /// text : str
+    ///
+    /// Returns
+    /// -------
+    /// Grid
+    ///
+    /// Raises
+    /// ------
+    /// InvalidInput
+    ///     When ``text`` is not Grid JSON or describes an invalid Grid.
     #[staticmethod]
     fn from_json(text: &str) -> PyResult<Self> {
         let g: Grid = unjson(text, "Grid")?;
