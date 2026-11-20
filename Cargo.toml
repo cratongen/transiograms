@@ -8,6 +8,8 @@ edition = "2024"
 rust-version = "1.97"
 license = "MIT OR Apache-2.0"
 publish = false
+repository = "https://github.com/cratongen/transiograms"
+homepage = "https://cratongen.github.io/transiograms/"
 
 [workspace.dependencies]
 nalgebra = "0.33"
@@ -19,13 +21,13 @@ pyo3 = { version = "0.29", features = ["abi3-py311"] }
 numpy = "0.29"
 proptest = "1"
 criterion = "0.8"
-transiograms-core = { path = "crates/core" }
-transiograms-chain = { path = "crates/chain" }
-transiograms-hmm = { path = "crates/hmm" }
-transiograms-hsmm = { path = "crates/hsmm" }
-transiograms-transiogram = { path = "crates/transiogram" }
-transiograms-tpsim = { path = "crates/tpsim" }
-transiograms-mcrf = { path = "crates/mcrf" }
+transiograms-core = { version = "0.1.0", path = "crates/core" }
+transiograms-chain = { version = "0.1.0", path = "crates/chain" }
+transiograms-hmm = { version = "0.1.0", path = "crates/hmm" }
+transiograms-hsmm = { version = "0.1.0", path = "crates/hsmm" }
+transiograms-transiogram = { version = "0.1.0", path = "crates/transiogram" }
+transiograms-tpsim = { version = "0.1.0", path = "crates/tpsim" }
+transiograms-mcrf = { version = "0.1.0", path = "crates/mcrf" }
 
 [workspace.lints.clippy]
 needless_range_loop = "allow"

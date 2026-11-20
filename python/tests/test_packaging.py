@@ -94,3 +94,22 @@ def test_python_floor_matches_requires_python_and_the_abi3_feature():
     assert minors == list(range(minors[0], minors[-1] + 1))
     pyo3 = _toml("Cargo.toml")["workspace"]["dependencies"]["pyo3"]
     assert f"abi3-py{floor.replace('.', '')}" in pyo3["features"]
+
+
+def test_workspace_crates_can_be_packaged_later_and_the_binding_never_is():
+    workspace = _toml("Cargo.toml")["workspace"]
+    version = workspace["package"]["version"]
+    assert workspace["package"]["repository"] == GITHUB
+    assert workspace["package"]["homepage"] == SITE
+    local = {k: v for k, v in workspace["dependencies"].items() if isinstance(v, dict) and "path" in v}
+    assert set(local) == {f"transiograms-{c}" for c in _crates() if c != "py"}
+    for name, dep in local.items():
+        assert dep["version"] == version, name
+    for crate, manifest in _crates().items():
+        package = manifest["package"]
+        assert package["repository"] == {"workspace": True}, crate
+        assert package["homepage"] == {"workspace": True}, crate
+        for name, dep in manifest.get("dependencies", {}).items():
+            if name.startswith("transiograms-"):
+                assert dep == {"workspace": True}, (crate, name)
+    assert _crates()["py"]["package"]["publish"] is False
