@@ -11,17 +11,34 @@ a typical thickness, `tg.HiddenSemiMarkovModel` gives each state an explicit dur
 | `tg.EmpiricalDuration(pmf)` | weights on `1..len(pmf)` | from the weights |
 
 ```python
+import numpy as np
 import transiograms as tg
 
-hsmm = tg.HiddenSemiMarkovModel(3, duration="negative_binomial", max_duration=40, n_init=3)
+d = tg.datasets.electrofacies_logs(seed=0)
+holes = [d["HOLE_ID"] == h for h in np.unique(d["HOLE_ID"])]
+sequences = [np.column_stack([d["GR"][m], d["RHOB"][m]]) for m in holes]
+hsmm = tg.HiddenSemiMarkovModel(3, duration="negative_binomial", max_duration=150, n_init=3, seed=0)
 hsmm.fit(sequences)
-hsmm.durations, hsmm.truncated_mass
+print("mean thickness (samples):", [round(law.mean(150), 1) for law in hsmm.durations])
+print("truncated mass:", np.array2string(hsmm.truncated_mass, precision=1))
+```
+
+```text
+mean thickness (samples): [21.8, 20.4, 16.3]
+truncated mass: [3.4e-05 4.9e-04 1.5e-04]
 ```
 
 The transition matrix has a zero diagonal: a state ends when its duration runs out. The first and
 last segment of each hole are right-censored. `max_duration=None` means the longest sequence, so
-nothing is truncated. The methods and arguments match `HiddenMarkovModel`, with `params` letters
-`s`, `t`, `e` and `d` (durations).
+nothing is truncated, but the forward-backward pass then costs time in proportion to
+`T * K * D` with `D = T`, that is quadratic in the length `T` of the longest sequence (memory
+stays `O(T * K)` and is checked before allocating). On long logs, set `max_duration` to a few
+times the thickest bed you expect, in samples, and check `truncated_mass`, which says how much
+probability the cap cut off: on these 300-sample logs a cap of 150 leaves up to `5e-4`, and a cap
+of 40 leaves 0.2 to 1.0, a sign that the cap is too short for the beds. The runtime of the default on long logs is not measured.
+
+The methods and arguments match `HiddenMarkovModel`, with `params` letters `s`, `t`, `e` and `d`
+(durations).
 
 `HiddenSemiMarkovModel.from_hmm(hmm, max_duration=)` builds the equivalent geometric HSMM; the
 suite checks that it reproduces the HMM's log-likelihood within `1e-10` and its Viterbi path.

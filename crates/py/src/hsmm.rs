@@ -536,7 +536,9 @@ impl Engine for Engined<'_> {
 /// duration : {"geometric", "poisson", "negative_binomial", "empirical"}
 ///     Duration family fitted when ``durations`` is not given.
 /// max_duration : int, sequence of int or None
-///     Longest duration per state; None means the longest sequence (no truncation).
+///     Longest duration per state; None means the longest sequence (no truncation). The
+///     forward-backward time grows with ``T * K * max_duration``, so None makes it quadratic
+///     in the longest length ``T``; on long logs give a cap and check ``truncated_mass``.
 /// params, init_params : str
 ///     Letters of the parts fitted and initialised: s start, t transition, e emissions,
 ///     d durations.
