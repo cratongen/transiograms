@@ -653,12 +653,13 @@ impl PyMarkovChain {
         py: Python<'py>,
         length: f64,
         n: usize,
-        seed: u64,
+        seed: i128,
         hard_from: Option<Bound<'py, PyAny>>,
         hard_to: Option<Bound<'py, PyAny>>,
         hard_codes: Option<Bound<'py, PyAny>>,
         start: Option<Bound<'py, PyAny>>,
     ) -> PyResult<Bound<'py, PyAny>> {
+        let seed = crate::args::seed(seed)?;
         let c = self.fitted()?;
         let mut hard = Self::hard(hard_from.as_ref(), hard_to.as_ref(), hard_codes.as_ref())?;
         let start = match &start {
@@ -730,12 +731,13 @@ impl PyMarkovChain {
         py: Python<'py>,
         n_beds: usize,
         n: usize,
-        seed: u64,
+        seed: i128,
         hard_from: Option<Bound<'py, PyAny>>,
         hard_to: Option<Bound<'py, PyAny>>,
         hard_codes: Option<Bound<'py, PyAny>>,
         start: Option<Bound<'py, PyAny>>,
     ) -> PyResult<Bound<'py, PyAny>> {
+        let seed = crate::args::seed(seed)?;
         let c = self.fitted()?;
         let hard = Self::hard(hard_from.as_ref(), hard_to.as_ref(), hard_codes.as_ref())?;
         let start = match &start {
@@ -874,8 +876,9 @@ impl PySojourn {
         py: Python,
         code: usize,
         n_bootstrap: usize,
-        seed: u64,
+        seed: i128,
     ) -> PyResult<PyTestResult> {
+        let seed = crate::args::seed(seed)?;
         self.check(code)?;
         py.detach(|| self.0.exponential_test(code as Code, n_bootstrap, seed))
             .map(PyTestResult)

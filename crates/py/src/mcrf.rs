@@ -111,13 +111,14 @@ fn mcrf_simulate<'py>(
     coords: &Bound<'py, PyAny>,
     codes: &Bound<'py, PyAny>,
     n: usize,
-    seed: u64,
+    seed: i128,
     mask: Option<&Bound<'py, PyAny>>,
     neighbours: Option<&Bound<'py, PyAny>>,
     closeness_limit: f64,
     memory: Option<u64>,
     data: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<PyRealizations> {
+    let seed = crate::args::seed(seed)?;
     let (h, m) = hard(&model.0, &grid.0, coords, codes, mask, data)?;
     let opts = options(neighbours, closeness_limit, n, seed, memory)?;
     let r = py

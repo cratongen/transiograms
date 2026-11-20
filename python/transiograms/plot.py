@@ -14,7 +14,12 @@ def _pyplot():
 _PALETTE = ["#e69f00", "#56b4e9", "#009e73", "#f0e442", "#0072b2", "#d55e00", "#cc79a7", "#999999"]
 
 
-def _names_colors(categories, k):
+def _names_colors(categories, k, *, exact=False):
+    if categories is not None and (len(categories) < k or (exact and len(categories) != k)):
+        from transiograms.errors import InvalidInput
+
+        need = f"{k}" if exact else f"at least {k}"
+        raise InvalidInput(f"categories has {len(categories)} names but the data needs {need}")
     names = getattr(categories, "names", None) or [str(i) for i in range(k)]
     colors = getattr(categories, "colors", None) or [_PALETTE[i % len(_PALETTE)] for i in range(k)]
     return list(names), list(colors)
@@ -48,7 +53,7 @@ def transition_matrix(matrix, *, categories=None, annotate=True, ax=None, **kwar
 
     m = np.asarray(getattr(matrix, "transition_matrix", matrix), dtype=float)
     fig, ax = _axes(ax)
-    names, _ = _names_colors(categories, len(m))
+    names, _ = _names_colors(categories, len(m), exact=True)
     kwargs.setdefault("cmap", "Blues")
     kwargs.setdefault("vmin", 0.0)
     kwargs.setdefault("vmax", 1.0)
@@ -233,7 +238,7 @@ def transiogram(experimental=None, model=None, *, h=None, categories=None, axes=
     if experimental is None and model is None:
         raise ValueError("give experimental, model or both")
     k = experimental.probabilities.shape[1] if experimental is not None else len(model.proportions)
-    names, colors = _names_colors(categories, k)
+    names, colors = _names_colors(categories, k, exact=True)
     if axes is None:
         fig, axes = plt.subplots(k, k, figsize=(2.4 * k, 2.0 * k), sharex=True, sharey=True, squeeze=False)
     else:

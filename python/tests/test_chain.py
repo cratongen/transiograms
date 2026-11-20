@@ -221,7 +221,7 @@ def test_json_pickle_and_errors():
         m1_chain().symmetry_test()
     with pytest.raises(tg.InvalidInput):
         tg.MarkovChain("sideways")
-    with pytest.raises(ValueError, match="codes must be integers"):
+    with pytest.raises(ValueError, match="codes must be integers in 0..k-1"):
         tg.MarkovChain().fit([0, 1.5, 2])
     with pytest.raises(tg.InvalidInput, match="not fitted"):
         _ = tg.MarkovChain().transition_matrix

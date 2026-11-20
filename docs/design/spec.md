@@ -188,7 +188,7 @@ maturin `>=1.10,<2` backend; `[tool.maturin] manifest-path = "crates/py/Cargo.to
   `transiograms_core::MISSING = u32::MAX`.
 - Python gives and receives codes as `int64` with `-1` for missing. Float input is accepted when
   every finite value is an integer; `NaN` means missing (boitata's `Categories.encode` output).
-  Any other value raises `InvalidInput` ("codes must be integers in 0..k-1 or -1 for missing").
+  Any other value raises `InvalidInput` ("codes must be integers in 0..k-1, with -1 or NaN for missing"; text labels add a hint to encode them with `Categories.from_labels(labels).encode(labels)`).
 - `k` (number of categories) is the `categories` argument when given (an `int` or a
   `Categories`), otherwise `max(code) + 1`.
 - A `Categories` value is a code table: `names` and optional `colors`. Its JSON form

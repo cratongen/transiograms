@@ -40,3 +40,12 @@ def test_every_plot_returns_a_figure():
     tg.plot.transiogram(model=tg.TransitionModel.from_json(l["model"]), h=np.linspace(0, 20, 50))
     tg.plot.grid_slice(l["field"], grid, axis="y", index=5)
     tg.plot.grid_slice(np.linspace(0, 1, grid.n_cells), grid)
+
+
+def test_categories_of_the_wrong_length_name_the_mismatch():
+    cats = tg.Categories(["a", "b"])
+    with pytest.raises(tg.InvalidInput, match="categories has 2 names but the data needs 3"):
+        tg.plot.transition_matrix(np.eye(3), categories=cats)
+    with pytest.raises(tg.InvalidInput, match="needs at least 3"):
+        tg.plot.strip_log(np.array([0, 1, 2]), categories=cats)
+    tg.plot.strip_log(np.array([0, 0, 1]), categories=tg.Categories(["a", "b", "c"]))

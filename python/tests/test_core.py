@@ -33,7 +33,7 @@ def test_categories_encode_decode_round_trip():
     assert c.decode(np.array([1.0, np.nan])).tolist() == ["silt", None]
     with pytest.raises(tg.InvalidInput, match="gravel"):
         c.encode(["gravel"])
-    with pytest.raises(tg.InvalidInput, match="codes must be integers"):
+    with pytest.raises(tg.InvalidInput, match="codes must be integers in 0..k-1"):
         c.decode([0.5])
     with pytest.raises(tg.InvalidInput):
         c.decode([3])
@@ -98,7 +98,7 @@ def test_sequence_args_intervals_and_row_order():
     assert up == [(0, [0, 2], [1, 0]), (1, [1], [0])]
     with pytest.raises(tg.InvalidInput, match="not both"):
         _transiograms._sequence_runs([0, 1], from_=[0, 1], to=[1, 2], depth=[0, 1])
-    with pytest.raises(tg.InvalidInput, match="codes must be integers"):
+    with pytest.raises(tg.InvalidInput, match="codes must be integers in 0..k-1"):
         _transiograms._sequence_runs([0, 1.5])
     with pytest.raises(tg.InvalidInput, match="data"):
         _transiograms._sequence_runs("CODE")
@@ -130,3 +130,19 @@ def test_submodules_import():
     assert tg.plot.__name__ == "transiograms.plot"
     assert tg.datasets.__name__ == "transiograms.datasets"
     assert tg.checks.__name__ == "transiograms.checks"
+
+
+def test_text_labels_as_codes_point_to_categories_encode():
+    with pytest.raises(tg.InvalidInput, match=r"codes must be integers .*Categories\.from_labels"):
+        tg.MarkovChain().fit(np.array(["sand", "clay", "sand"]))
+
+
+@pytest.mark.parametrize("seed", [-1, 2**64])
+def test_out_of_range_seed_raises_invalid_input_naming_seed(seed):
+    c = tg.MarkovChain.from_matrix([[0.9, 0.1], [0.2, 0.8]])
+    with pytest.raises(tg.InvalidInput, match=f"seed must be an integer in 0..2\\*\\*64-1, not {seed}"):
+        c.simulate(5, seed=seed)
+    with pytest.raises(tg.InvalidInput, match="seed must be"):
+        tg.Poisson([1.0]).sample(3, seed=seed)
+    with pytest.raises(tg.InvalidInput, match="seed must be"):
+        tg.HiddenMarkovModel(2, seed=seed)

@@ -207,7 +207,8 @@ impl PyCategorical {
     }
     /// ``n`` seeded draws, int64 ``(n,)``.
     #[pyo3(signature = (n, *, seed=0))]
-    fn sample<'py>(&self, py: Python<'py>, n: usize, seed: u64) -> PyResult<Bound<'py, PyAny>> {
+    fn sample<'py>(&self, py: Python<'py>, n: usize, seed: i128) -> PyResult<Bound<'py, PyAny>> {
+        let seed = crate::args::seed(seed)?;
         sample(py, &Emission::Categorical(self.0.clone()), n, seed)
     }
     fn to_json(&self) -> PyResult<String> {
@@ -286,7 +287,8 @@ impl PyGaussian {
     }
     /// ``n`` seeded draws, ``(n, d)``.
     #[pyo3(signature = (n, *, seed=0))]
-    fn sample<'py>(&self, py: Python<'py>, n: usize, seed: u64) -> PyResult<Bound<'py, PyAny>> {
+    fn sample<'py>(&self, py: Python<'py>, n: usize, seed: i128) -> PyResult<Bound<'py, PyAny>> {
+        let seed = crate::args::seed(seed)?;
         sample(py, &Emission::Gaussian(self.0.clone()), n, seed)
     }
     fn to_json(&self) -> PyResult<String> {
@@ -346,7 +348,8 @@ impl PyPoisson {
     }
     /// ``n`` seeded draws, ``(n, d)``.
     #[pyo3(signature = (n, *, seed=0))]
-    fn sample<'py>(&self, py: Python<'py>, n: usize, seed: u64) -> PyResult<Bound<'py, PyAny>> {
+    fn sample<'py>(&self, py: Python<'py>, n: usize, seed: i128) -> PyResult<Bound<'py, PyAny>> {
+        let seed = crate::args::seed(seed)?;
         sample(py, &Emission::Poisson(self.0.clone()), n, seed)
     }
     fn to_json(&self) -> PyResult<String> {
@@ -481,7 +484,8 @@ impl PyGaussianMixture {
     }
     /// ``n`` seeded draws, ``(n, d)``.
     #[pyo3(signature = (n, *, seed=0))]
-    fn sample<'py>(&self, py: Python<'py>, n: usize, seed: u64) -> PyResult<Bound<'py, PyAny>> {
+    fn sample<'py>(&self, py: Python<'py>, n: usize, seed: i128) -> PyResult<Bound<'py, PyAny>> {
+        let seed = crate::args::seed(seed)?;
         sample(py, &Emission::Mixture(self.0.clone()), n, seed)
     }
     fn to_json(&self) -> PyResult<String> {
@@ -1179,7 +1183,7 @@ impl PyHiddenMarkovModel {
         max_iter: usize,
         tol: f64,
         n_init: usize,
-        seed: u64,
+        seed: i128,
         params: &str,
         init_params: Option<String>,
         start_prior: f64,
@@ -1190,6 +1194,7 @@ impl PyHiddenMarkovModel {
         implementation: &str,
         ordering: &str,
     ) -> PyResult<Self> {
+        let seed = crate::args::seed(seed)?;
         let (k, emissions) = self::distributions(distributions)?;
         if !matches!(implementation, "log" | "scaled") {
             return Err(invalid(format!(
@@ -1453,8 +1458,9 @@ impl PyHiddenMarkovModel {
         &self,
         py: Python<'py>,
         lengths: &Bound<'py, PyAny>,
-        seed: u64,
+        seed: i128,
     ) -> PyResult<Bound<'py, PyTuple>> {
+        let seed = crate::args::seed(seed)?;
         sample_of(
             py,
             &Engined(self.fitted()?),
@@ -1472,12 +1478,13 @@ impl PyHiddenMarkovModel {
         py: Python<'py>,
         sequences: &Bound<'py, PyAny>,
         n: usize,
-        seed: u64,
+        seed: i128,
         holes: Option<&Bound<'py, PyAny>>,
         labels: Option<&Bound<'py, PyAny>>,
         allowed: Option<&Bound<'py, PyAny>>,
         data: Option<&Bound<'py, PyAny>>,
     ) -> PyResult<Bound<'py, PyAny>> {
+        let seed = crate::args::seed(seed)?;
         let inp = self.input(sequences, holes, labels, allowed, data)?;
         sample_posterior_of(py, &Engined(self.fitted()?), &inp, n, seed)
     }

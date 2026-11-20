@@ -511,7 +511,7 @@ impl PyHiddenSemiMarkovModel {
         max_iter: usize,
         tol: f64,
         n_init: usize,
-        seed: u64,
+        seed: i128,
         params: &str,
         init_params: Option<String>,
         start_prior: f64,
@@ -521,6 +521,7 @@ impl PyHiddenSemiMarkovModel {
         direction: &str,
         ordering: &str,
     ) -> PyResult<Self> {
+        let seed = crate::args::seed(seed)?;
         let (k, emissions) = self::distributions(distributions)?;
         duration_family(duration)?;
         let emission = match &emissions {
@@ -898,8 +899,9 @@ impl PyHiddenSemiMarkovModel {
         &self,
         py: Python<'py>,
         lengths: &Bound<'py, PyAny>,
-        seed: u64,
+        seed: i128,
     ) -> PyResult<Bound<'py, PyTuple>> {
+        let seed = crate::args::seed(seed)?;
         sample_of(
             py,
             &Engined(self.fitted()?),
@@ -941,12 +943,13 @@ impl PyHiddenSemiMarkovModel {
         py: Python<'py>,
         sequences: &Bound<'py, PyAny>,
         n: usize,
-        seed: u64,
+        seed: i128,
         holes: Option<&Bound<'py, PyAny>>,
         labels: Option<&Bound<'py, PyAny>>,
         allowed: Option<&Bound<'py, PyAny>>,
         data: Option<&Bound<'py, PyAny>>,
     ) -> PyResult<Bound<'py, PyAny>> {
+        let seed = crate::args::seed(seed)?;
         let inp = self.input(sequences, holes, labels, allowed, data)?;
         sample_posterior_of(py, &Engined(self.fitted()?), &inp, n, seed)
     }
@@ -1180,11 +1183,12 @@ fn select_states<'py>(
     max_duration: Option<usize>,
     cv_folds: Option<usize>,
     n_init: usize,
-    seed: u64,
+    seed: i128,
     max_iter: usize,
     tol: f64,
     direction: &str,
 ) -> PyResult<Bound<'py, PyDict>> {
+    let seed = crate::args::seed(seed)?;
     let states = states.unwrap_or_else(|| (1..7).collect());
     let clamped = labels.is_some_and(|o| !o.is_none()) || allowed.is_some_and(|o| !o.is_none());
     if clamped && states.len() != 1 {

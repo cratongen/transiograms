@@ -10,7 +10,8 @@ use transiograms_hmm::Sequence;
 use crate::core::PyCategories;
 use crate::{convergence, invalid};
 
-const BAD_CODES: &str = "codes must be integers in 0..k-1 or -1 for missing";
+const BAD_CODES: &str = "must be integers in 0..k-1, with -1 or NaN for missing";
+const FROM_LABELS: &str = "for text labels, encode them first with tg.Categories.from_labels(labels).encode(labels)";
 
 fn asarray<'py>(obj: &Bound<'py, PyAny>, dtype: &str) -> PyResult<Bound<'py, PyAny>> {
     obj.py()
@@ -49,12 +50,12 @@ pub fn column<'py>(
 /// Codes from int (-1 missing) or float (NaN missing) arrays.
 pub fn codes(obj: &Bound<PyAny>, what: &str) -> PyResult<Vec<Code>> {
     floats(obj, what)
-        .map_err(|_| invalid(format!("{what}: {BAD_CODES}")))?
+        .map_err(|_| invalid(format!("{what} {BAD_CODES}; {FROM_LABELS}")))?
         .into_iter()
         .map(|c| match c {
             c if c.is_nan() || c == -1.0 => Ok(MISSING),
             c if c >= 0.0 && c.fract() == 0.0 && c < MISSING as f64 => Ok(c as Code),
-            c => Err(invalid(format!("{what}: {BAD_CODES}, found {c}"))),
+            c => Err(invalid(format!("{what} {BAD_CODES}, found {c}"))),
         })
         .collect()
 }
@@ -443,4 +444,10 @@ pub fn mask(obj: Option<&Bound<PyAny>>, n: usize) -> PyResult<Option<Vec<bool>>>
         )));
     }
     Ok(Some(m))
+}
+
+/// A `seed` argument as u64, or InvalidInput naming it when it is outside `0..2**64`.
+pub fn seed(seed: i128) -> PyResult<u64> {
+    u64::try_from(seed)
+        .map_err(|_| invalid(format!("seed must be an integer in 0..2**64-1, not {seed}")))
 }
