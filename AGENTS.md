@@ -27,7 +27,15 @@ mise run docs       # mkdocs serve
 mise run docs-build # mkdocs build --strict
 mise run changelog  # git-cliff -o CHANGELOG.md
 mise run compat     # install the wheel via pip, uv, pixi and conda (mode: all, venv, uv, pixi, conda)
+mise run wheel      # release abi3 wheel for this platform into dist/ (Python 3.11 floor)
+mise run sdist      # sdist into dist/
+mise run test-wheel # fresh 3.11 venv (or `mise run test-wheel 3.15`): install the wheel, run pytest
+mise run test-sdist # build the sdist from source in a fresh 3.11 venv and import it
+mise run check-dist # twine check --strict and abi3audit --strict of dist/; uploads nothing
 ```
+
+`mise.toml` pins Python 3.13 (development), 3.11 (the floor) and 3.15 (the newest classifier).
+Rust comes from rustup through `rust-toolchain.toml` (1.97.1), not from mise.
 
 A single crate: `mise exec -- cargo test -p transiograms-<short>`.
 

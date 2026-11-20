@@ -1,7 +1,10 @@
 """Release metadata checks on the source checkout: licence, URLs, classifiers, crates and tasks."""
 
+import os
 import re
+import tarfile
 import tomllib
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -20,7 +23,9 @@ def _toml(path: str) -> dict:
 
 
 def _crates() -> dict[str, dict]:
-    return {p.parent.name: _toml(p.relative_to(ROOT).as_posix()) for p in (ROOT / "crates").glob("*/Cargo.toml")}
+    return {
+        p.parent.name: _toml(p.relative_to(ROOT).as_posix()) for p in (ROOT / "crates").glob("*/Cargo.toml")
+    }
 
 
 def test_licence_is_mit_or_apache_everywhere():
@@ -67,7 +72,9 @@ def test_readme_names_the_docs_and_links_work_on_pypi():
 
 def _python_classifiers() -> list[str]:
     prefix = "Programming Language :: Python :: 3."
-    return [c.removeprefix("Programming Language :: Python :: ") for c in _classifiers() if c.startswith(prefix)]
+    return [
+        c.removeprefix("Programming Language :: Python :: ") for c in _classifiers() if c.startswith(prefix)
+    ]
 
 
 def _classifiers() -> list[str]:
@@ -76,7 +83,9 @@ def _classifiers() -> list[str]:
 
 def test_classifiers_match_a_first_public_release_of_binary_wheels():
     classifiers = _classifiers()
-    assert [c for c in classifiers if c.startswith("Development Status")] == ["Development Status :: 3 - Alpha"]
+    assert [c for c in classifiers if c.startswith("Development Status")] == [
+        "Development Status :: 3 - Alpha"
+    ]
     assert "Operating System :: OS Independent" not in classifiers
     assert {
         "Operating System :: MacOS",
@@ -113,3 +122,60 @@ def test_workspace_crates_can_be_packaged_later_and_the_binding_never_is():
             if name.startswith("transiograms-"):
                 assert dep == {"workspace": True}, (crate, name)
     assert _crates()["py"]["package"]["publish"] is False
+
+
+def test_mise_pins_the_python_floor_and_the_newest_classifier():
+    pins = _toml("mise.toml")["tools"]["python"]
+    minors = sorted(int(v.split(".")[1]) for v in pins)
+    versions = _python_classifiers()
+    assert f"3.{minors[0]}" == versions[0]
+    assert f"3.{minors[-1]}" == versions[-1]
+
+
+def test_rust_toolchain_pin_meets_the_declared_rust_version():
+    channel = _toml("rust-toolchain.toml")["toolchain"]["channel"]
+    msrv = _toml("Cargo.toml")["workspace"]["package"]["rust-version"]
+    assert tuple(map(int, channel.split("."))) >= tuple(map(int, msrv.split(".")))
+    assert msrv in (ROOT / "docs" / "install.md").read_text(encoding="utf-8")
+    assert _toml("mise.toml")["tasks"]["test-sdist"]["env"]["RUSTUP_TOOLCHAIN"] == channel
+
+
+def test_release_tasks_build_and_check_without_uploading():
+    tasks = _toml("mise.toml")["tasks"]
+    assert {"wheel", "sdist", "check-dist", "test-wheel", "test-sdist"} <= set(tasks)
+    assert "--interpreter python3.11" in " ".join(tasks["wheel"]["run"])
+    commands = " ".join(
+        " ".join(t["run"]) if isinstance(t.get("run"), list) else t.get("run", "") for t in tasks.values()
+    )
+    assert not re.search(r"\b(upload|publish)\b", commands)
+
+
+def _dist(pattern: str) -> Path | None:
+    found = sorted((ROOT / "dist").glob(pattern))
+    if not found:
+        if os.environ.get("TG_REQUIRE_DIST"):
+            pytest.fail(f"no dist/{pattern}: run mise run wheel")
+        pytest.skip(f"no dist/{pattern} (mise run wheel, mise run sdist)")
+    return found[-1]
+
+
+def test_built_wheel_metadata_names_urls_licence_and_classifiers():
+    wheel = _dist("transiograms-*.whl")
+    with zipfile.ZipFile(wheel) as z:
+        names = z.namelist()
+        metadata = z.read(next(n for n in names if n.endswith(".dist-info/METADATA"))).decode()
+    assert "-cp311-abi3-" in wheel.name
+    assert f"License-Expression: {LICENSE}\n" in metadata
+    assert f"Project-URL: Repository, {GITHUB}\n" in metadata
+    assert f"Project-URL: Documentation, {SITE}\n" in metadata
+    assert "Author: " in metadata
+    assert "Classifier: Programming Language :: Python :: 3.11\n" in metadata
+    assert "Classifier: Operating System :: OS Independent" not in metadata
+    for name in ("LICENSE-MIT", "LICENSE-APACHE"):
+        assert any(n.endswith(f".dist-info/licenses/{name}") for n in names), name
+
+
+def test_built_sdist_carries_the_licences_and_the_lockfile():
+    with tarfile.open(_dist("transiograms-*.tar.gz")) as t:
+        names = {n.split("/", 1)[1] for n in t.getnames() if "/" in n}
+    assert {"LICENSE-MIT", "LICENSE-APACHE", "Cargo.lock", "pyproject.toml", "crates/py/Cargo.toml"} <= names

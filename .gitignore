@@ -13,3 +13,5 @@ pixi.lock
 /.codegraph/
 /.pytest_cache/
 /.ruff_cache/
+/.venv-wheel/
+/.venv-sdist/

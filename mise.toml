@@ -3,7 +3,7 @@ _.path = ["~/.cargo/bin"]
 UV_PYTHON = "3.13"
 
 [tools]
-python = "3.13"
+python = ["3.13", "3.11", "3.15"]
 uv = "0.12"
 pixi = "0.81"
 micromamba = "2.9"
@@ -57,3 +57,47 @@ run = "git-cliff -o CHANGELOG.md"
 depends = ["py:sync"]
 usage = 'arg "[mode]" default="all" help="all, venv, uv, pixi or conda"'
 run = "uv run --no-sync python ci/compat.py ${usage_mode}"
+
+[tasks.wheel]
+description = "The release abi3 wheel for this platform into dist/, built with the Python 3.11 floor"
+depends = ["py:sync"]
+run = [
+  "rm -f dist/transiograms-*.whl",
+  "uv run --no-sync maturin build --release --locked --strip --out dist --interpreter python3.11",
+]
+
+[tasks.sdist]
+description = "The sdist into dist/"
+depends = ["py:sync"]
+run = ["rm -f dist/transiograms-*.tar.gz", "uv run --no-sync maturin sdist --out dist"]
+
+[tasks.check-dist]
+description = "twine check --strict and abi3audit --strict of dist/ (metadata, README rendering, stable ABI); uploads nothing"
+run = [
+  "uv tool run --python 3.13 twine==6.2.0 check --strict dist/*.whl dist/*.tar.gz",
+  "uv tool run --python 3.13 abi3audit==0.0.25 --strict --report dist/*.whl",
+]
+
+[tasks.test-wheel]
+description = "Install dist/'s wheel in a fresh venv (default: the 3.11 floor) and run pytest against it"
+depends = ["wheel", "sdist"]
+usage = 'arg "[python]" default="3.11" help="a Python pinned in [tools]"'
+env = { UV_PYTHON_DOWNLOADS = "never" }
+run = [
+  "rm -rf .venv-wheel",
+  "uv venv -q --python ${usage_python} .venv-wheel",
+  "uv pip install -q --python .venv-wheel/bin/python dist/transiograms-*.whl pytest scipy matplotlib",
+  ".venv-wheel/bin/python -c \"import sys, transiograms; assert 'site-packages' in transiograms.__file__, transiograms.__file__; print(sys.version.split()[0], transiograms.__file__)\"",
+  "TG_REQUIRE_DIST=1 .venv-wheel/bin/python -m pytest -q -p no:cacheprovider python/tests",
+]
+
+[tasks.test-sdist]
+description = "Build dist/'s sdist from source in a fresh Python 3.11 venv (no wheel) and run a smoke check"
+depends = ["sdist"]
+env = { UV_PYTHON_DOWNLOADS = "never", RUSTUP_TOOLCHAIN = "1.97.1" }
+run = [
+  "rm -rf .venv-sdist",
+  "uv venv -q --python 3.11 .venv-sdist",
+  "uv pip install -q --python .venv-sdist/bin/python --no-cache --no-binary transiograms dist/transiograms-*.tar.gz",
+  ".venv-sdist/bin/python -c \"import transiograms as tg; c = tg.MarkovChain.from_matrix([[0.9, 0.1], [0.2, 0.8]]); assert abs(c.proportions[0] - 2 / 3) < 1e-12; print(tg.__version__)\"",
+]
