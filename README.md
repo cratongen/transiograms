@@ -39,6 +39,9 @@ The API draws inspiration from the compositional design of the original `pomegra
 3. **Markov chain random fields (MCRF) and Markov-type categorical prediction (MCP)**:
    - Conditional probability estimation of categories at unsampled grid nodes from nearest directional neighbours under Bayesian Markov conditional independence.
    - Deterministic MCP most-probable category maps, classification entropy, and seeded sequential MCRF categorical simulation conditioned to drillholes.
+4. **Fit-quality report**:
+   - `tg.fit_quality` (Rust `transiograms_transiogram::fit_quality`) compares T-PROGS or MCRF realizations with their model: proportions per realization and for the ensemble, and grid transiograms per lag with standard errors from the spread across realizations.
+   - Both simulators have a measured gap to their model, kept as a documented limit of the method: MCRF without hard data drifts 0.038 from the target proportions and misses transiograms by up to 0.19; T-PROGS with the default quench misses mid-lag transiograms by up to 0.026 (see the T-PROGS and MCRF guides).
 
 ## Non-goals
 
@@ -57,9 +60,9 @@ Status as of 2026-11-18 (`mise run verify` passes; each milestone's acceptance t
 | M2 | done | `crates/hmm/tests/theory.rs::m2_gaussian_k4_t8_matches_brute_force` | none known |
 | M3 | done | `crates/hsmm/tests/model.rs::m3_bic_selects_three_states_hmm` | `HiddenSemiMarkovModel.fit` stores `n_init` but runs a single initialisation |
 | M4 | done | `crates/transiogram/tests/theory.rs::m4_lag_grid_validity` | none known |
-| M5 | done, with a size change | `crates/tpsim/tests/theory.rs::m5_acceptance`, `m5_spec_cell_reproduces_hard_data_and_auto_transiograms` | the proportion check runs at cell 6 x 6 x 1 because 3 sigma is 0.194 at the spec cell; spec.md does not record this yet; the x RMSE at the spec cell is three times the y RMSE (within 0.05, cause not investigated) |
-| M6 | done, with a size change | `crates/mcrf/tests/acceptance.rs::m6_acceptance`, `m6_acceptance_spec_grid` | the proportion check runs on 96 x 96 x 32 with 4 x 4 x 1 cells because 3 sigma is 0.118 to 0.180 on the spec grid |
-| M7 | partial | `python/tests/test_integration.py` | T-PROGS meets every check; MCRF on the 32 x 32 x 30 integration grid honours every hard datum but misses the 0.02 proportion bound (largest gap about 0.04 over 20 realizations, 3 sigma 0.013), so the test asserts proportions for T-PROGS only |
+| M5 | done, with a size change | `crates/tpsim/tests/theory.rs::m5_acceptance`, `m5_spec_cell_reproduces_hard_data_and_auto_transiograms` | the proportion check runs at cell 6 x 6 x 1 because 3 sigma is 0.194 at the spec cell; spec.md does not record this yet; the x RMSE at the spec cell is three times the y RMSE (within 0.05, cause not investigated); the 0.05 RMSE is a fixed tolerance, and auto- and cross-transiograms miss the model by up to 0.026 (15 standard errors) at mid lags, a documented method limit pinned by `crates/tpsim/tests/limits.rs` |
+| M6 | done, with a size change | `crates/mcrf/tests/acceptance.rs::m6_acceptance`, `m6_acceptance_spec_grid` | the proportion check runs on 96 x 96 x 32 with 4 x 4 x 1 cells because 3 sigma is 0.118 to 0.180 on the spec grid; the 0.02 bound holds with 16 conditioning holes only: unconditional ensembles miss it (0.038) and miss the transiograms by up to 0.19, a documented method limit pinned by `crates/mcrf/tests/limits.rs` |
+| M7 | partial | `python/tests/test_integration.py` | T-PROGS meets every check; MCRF on the 32 x 32 x 30 integration grid honours every hard datum but misses the 0.02 proportion bound (largest gap about 0.04 over 20 realizations, 3 sigma 0.013), so the test asserts proportions for T-PROGS only; this is the MCRF limit described in `docs/guide/mcrf-mcp.md` |
 
 ### M1: Markov chains on sequences
 
