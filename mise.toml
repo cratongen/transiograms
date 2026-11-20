@@ -8,6 +8,7 @@ uv = "0.12"
 pixi = "0.81"
 micromamba = "2.9"
 git-cliff = "2.13"
+"github:EmbarkStudios/cargo-about" = "0.9.3"
 
 [tasks.build]
 run = "cargo build --workspace"
@@ -49,6 +50,10 @@ run = "uv run --no-sync mkdocs serve"
 [tasks.docs-build]
 depends = ["py:build"]
 run = "uv run --no-sync mkdocs build --strict"
+
+[tasks.third-party-licenses]
+description = "Regenerate THIRD-PARTY-LICENSES.txt (cargo-about over the about.toml targets) after a Cargo.lock change"
+run = "cargo-about generate --locked -m crates/py/Cargo.toml about.hbs -o THIRD-PARTY-LICENSES.txt"
 
 [tasks.changelog]
 run = "git-cliff -o CHANGELOG.md"

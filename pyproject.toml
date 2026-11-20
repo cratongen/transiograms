@@ -8,7 +8,7 @@ description = "Markov models for geostatistics: chains, hidden Markov models, tr
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT OR Apache-2.0"
-license-files = ["LICENSE-MIT", "LICENSE-APACHE"]
+license-files = ["LICENSE-MIT", "LICENSE-APACHE", "THIRD-PARTY-LICENSES.txt"]
 authors = [{ name = "Gustavo Pretto Scholze" }]
 keywords = ["geostatistics", "markov chain", "hidden markov model", "transiogram", "t-progs", "geology"]
 classifiers = [

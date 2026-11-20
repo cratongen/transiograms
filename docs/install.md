@@ -56,3 +56,18 @@ mise run check-dist        # twine check --strict and abi3audit --strict of dist
 
 `test-wheel` sets `TG_REQUIRE_DIST=1`, so the wheel and sdist checks in `test_packaging.py` fail
 instead of skipping when `dist/` is empty.
+
+### Licences in the packages
+
+The extension links its Rust dependencies statically, so the wheel carries their licences:
+`THIRD-PARTY-LICENSES.txt` sits beside `LICENSE-MIT` and `LICENSE-APACHE` in `license-files` and
+lands in the wheel's `.dist-info/licenses/` and in the sdist. cargo-about writes it from
+`Cargo.lock`, `about.toml` and `about.hbs` over the six release targets:
+
+```sh
+mise run third-party-licenses   # after any Cargo.lock change, then commit the file
+```
+
+`test_third_party_licences_name_every_crate_the_extension_links` fails when a crate linked on any
+release target (from `cargo tree`) is missing from the file. Crates that ship no licence file of
+their own get the standard licence text with their authors and source from their `Cargo.toml`.

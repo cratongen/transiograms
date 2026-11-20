@@ -12,7 +12,7 @@ codes, and grids with boitata through NumPy arrays.
 
 ## Commands
 
-Tasks live in `mise.toml` (Python, uv, pixi, micromamba, git-cliff) and
+Tasks live in `mise.toml` (Python, uv, pixi, micromamba, git-cliff, cargo-about) and
 `rust-toolchain.toml` (Rust):
 
 ```sh
@@ -26,6 +26,7 @@ mise run examples   # rerun examples/*/*/example_*.py and rewrite their README.m
 mise run docs       # mkdocs serve
 mise run docs-build # mkdocs build --strict
 mise run changelog  # git-cliff -o CHANGELOG.md
+mise run third-party-licenses # cargo-about: regenerate THIRD-PARTY-LICENSES.txt after a Cargo.lock change
 mise run compat     # install the wheel via pip, uv, pixi and conda (mode: all, venv, uv, pixi, conda)
 mise run wheel      # release abi3 wheel for this platform into dist/ (Python 3.11 floor)
 mise run sdist      # sdist into dist/

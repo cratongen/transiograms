@@ -2,6 +2,8 @@
 
 import os
 import re
+import shutil
+import subprocess
 import tarfile
 import tomllib
 import zipfile
@@ -11,6 +13,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 LICENSE = "MIT OR Apache-2.0"
+THIRD_PARTY = "THIRD-PARTY-LICENSES.txt"
+LICENSE_FILES = ["LICENSE-MIT", "LICENSE-APACHE", THIRD_PARTY]
 
 pytestmark = pytest.mark.skipif(
     not (ROOT / "pyproject.toml").is_file() or not (ROOT / "Cargo.toml").is_file(),
@@ -31,7 +35,7 @@ def _crates() -> dict[str, dict]:
 def test_licence_is_mit_or_apache_everywhere():
     project = _toml("pyproject.toml")["project"]
     assert project["license"] == LICENSE
-    assert project["license-files"] == ["LICENSE-MIT", "LICENSE-APACHE"]
+    assert project["license-files"] == LICENSE_FILES
     for name in project["license-files"]:
         assert (ROOT / name).is_file(), name
     assert not (ROOT / "LICENSE").exists()
@@ -39,6 +43,50 @@ def test_licence_is_mit_or_apache_everywhere():
     assert _toml("Cargo.toml")["workspace"]["package"]["license"] == LICENSE
     for crate, manifest in _crates().items():
         assert manifest["package"]["license"] == {"workspace": True}, crate
+
+
+RELEASE_TARGETS = [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-unknown-linux-musl",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+]
+
+
+def test_cargo_about_covers_the_release_targets_and_build_dependencies():
+    about = _toml("about.toml")
+    assert sorted(about["targets"]) == sorted(RELEASE_TARGETS)
+    assert about["ignore-build-dependencies"] is False
+    assert about["ignore-dev-dependencies"] is True
+    assert (
+        "cargo-about generate --locked -m crates/py/Cargo.toml"
+        in _toml("mise.toml")["tasks"]["third-party-licenses"]["run"]
+    )
+
+
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="needs cargo (mise install)")
+def test_third_party_licences_name_every_crate_the_extension_links():
+    """The extension links its Rust dependencies statically, so MIT, BSD and Apache notices must ship
+    beside it; rerun `mise run third-party-licenses` after a Cargo.lock change."""
+    text = (ROOT / THIRD_PARTY).read_text(encoding="utf-8")
+    targets = [arg for t in RELEASE_TARGETS for arg in ("--target", t)]
+    out = subprocess.run(
+        ["cargo", "tree", "-p", "transiograms-py", "-e", "normal,build", *targets]
+        + ["--prefix", "none", "--offline", "--locked"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    linked = {tuple(line.split(" ")[:2]) for line in out.stdout.splitlines() if line.strip()}
+    assert len(linked) > 40
+    missing = sorted(f"{n} {v}" for n, v in linked if f"\n  {n} {v.lstrip('v')}\n" not in text)
+    assert not missing, f"{THIRD_PARTY} lacks {missing[:10]}"
+    for spdx in ("MIT", "Apache-2.0", "BSD-2-Clause", "Unicode-3.0"):
+        assert f"({spdx})" in text, spdx
+    assert str(Path.home()) not in text
 
 
 SITE = "https://cratongen.github.io/transiograms/"
@@ -171,14 +219,18 @@ def test_built_wheel_metadata_names_urls_licence_and_classifiers():
     assert "Author: " in metadata
     assert "Classifier: Programming Language :: Python :: 3.11\n" in metadata
     assert "Classifier: Operating System :: OS Independent" not in metadata
-    for name in ("LICENSE-MIT", "LICENSE-APACHE"):
+    for name in LICENSE_FILES:
         assert any(n.endswith(f".dist-info/licenses/{name}") for n in names), name
+        assert f"License-File: {name}\n" in metadata, name
+    with zipfile.ZipFile(wheel) as z:
+        shipped = z.read(next(n for n in names if n.endswith(f".dist-info/licenses/{THIRD_PARTY}")))
+    assert shipped == (ROOT / THIRD_PARTY).read_bytes()
 
 
 def test_built_sdist_carries_the_licences_and_the_lockfile():
     with tarfile.open(_dist("transiograms-*.tar.gz")) as t:
         names = {n.split("/", 1)[1] for n in t.getnames() if "/" in n}
-    assert {"LICENSE-MIT", "LICENSE-APACHE", "Cargo.lock", "pyproject.toml", "crates/py/Cargo.toml"} <= names
+    assert {*LICENSE_FILES, "Cargo.lock", "pyproject.toml", "crates/py/Cargo.toml"} <= names
 
 
 def test_release_checklist_names_the_minetypes_gate_and_the_types_it_replaces():

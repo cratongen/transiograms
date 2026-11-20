@@ -26,6 +26,14 @@ No new container type that duplicates a `minetypes` type may be added before the
 
 - [x] Licence `MIT OR Apache-2.0` in `pyproject.toml` and every `Cargo.toml`, with `LICENSE-MIT`
       and `LICENSE-APACHE` in the wheel and the sdist.
+- [x] `THIRD-PARTY-LICENSES.txt` in the wheel's `.dist-info/licenses/` and in the sdist: the
+      extension links its Rust dependencies statically (MIT, Apache-2.0, BSD-2-Clause, Zlib,
+      Unicode-3.0 and others, all compatible with `MIT OR Apache-2.0`), and those licences ask for
+      their notices in binary distributions. cargo-about writes the file from `Cargo.lock`,
+      `about.toml` and `about.hbs` over the six release targets; run
+      `mise run third-party-licenses` after any `Cargo.lock` change and commit the file. The
+      packaging tests fail when a crate linked on any release target is missing from it. No
+      vendored or ported third-party code or data is in the repository.
 - [x] Project URLs (Homepage, Documentation, Repository, Issues, Changelog) and an author in the
       PyPI metadata; `site_url`, `repo_url` and `repo_name` in `mkdocs.yml`.
 - [x] Classifiers: `3 - Alpha`, Linux, macOS and Windows, CPython 3.11 to 3.15.
@@ -40,7 +48,8 @@ No new container type that duplicates a `minetypes` type may be added before the
 - [ ] Adopt `minetypes` (the gate above).
 - [ ] A release workflow that builds the wheels in manylinux and musllinux containers and on
       macOS and Windows, guarded by `if: github.repository == 'cratongen/transiograms'` as in
-      boitata. None exists yet: `mise run wheel` builds a `manylinux_2_35` wheel for this machine
+      boitata, over the six targets of `about.toml` (`RELEASE_TARGETS` in
+      `python/tests/test_packaging.py`). None exists yet: `mise run wheel` builds a `manylinux_2_35` wheel for this machine
       only, which is not the tag to upload.
 - [ ] A docs workflow that deploys `mise run docs-build` to <https://cratongen.github.io/transiograms/>
       once the repository is public.
