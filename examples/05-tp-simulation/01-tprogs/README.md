@@ -93,4 +93,18 @@ save(fig, "reproduction")
 
 ![reproduction](reproduction.png)
 
+`tg.fit_quality` puts the reproduction in numbers: ensemble proportions against the model, and
+the largest gap between ensemble and model transiograms at lags 1 to 6 along +x, +y, +z and -z,
+also in standard errors of the ensemble mean. The quench holds the proportions; the
+transiogram gap is the limit described in the T-PROGS guide.
+
+```python
+q = tg.fit_quality(model, grid, real)
+print(q)
+```
+
+```text
+FitQuality(n=10, k=3, offsets=24, proportion_error=0.0006, transiogram_error=0.1480, max_standard_errors=42.6)
+```
+
 Full script: [`example_05_01.py`](example_05_01.py)

@@ -80,3 +80,13 @@ b.plot(lags, model.transition(np.outer(lags, [0.0, 0.0, 1.0]))[:, 1, 1], color=A
 b.set(xlabel="vertical lag (m)", ylabel="t_sand,sand", title="Sand auto-transiogram")
 b.legend()
 save(fig, "reproduction")
+
+# %% [markdown]
+# `tg.fit_quality` puts the reproduction in numbers: ensemble proportions against the model, and
+# the largest gap between ensemble and model transiograms at lags 1 to 6 along +x, +y, +z and -z,
+# also in standard errors of the ensemble mean. The quench holds the proportions; the
+# transiogram gap is the limit described in the T-PROGS guide.
+
+# %%
+q = tg.fit_quality(model, grid, real)
+print(q)

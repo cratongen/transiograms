@@ -85,6 +85,14 @@ fails, and records the change under "Implementer decisions".
 
 ## Implementer decisions
 
+- Known limit, kept. SIS from cokriging plus the quench does not reproduce the transiograms at
+  lags the quench does not target. Unconditional M5 (48 x 48 x 32, cell 3 x 3 x 0.5, n = 10,
+  seed 1), default quench: proportions within 0.0001, lag 1 within 0.001, lags 2 to 4 up to
+  0.026 off (13 to 15 standard errors), minority categories too continuous; without quench 0.075
+  and proportions 0.018 off. `tests/limits.rs` pins these; `transiograms_transiogram::fit_quality`
+  reports them; `docs/guide/tp-simulation.md` documents them. The strict sampling-bound test in
+  `audit.rs` stays ignored as the record of the unmet target.
+
 - M5 sizes (section 6): cell (6, 6, 1) instead of (1, 1, 0.25), same 64 x 64 x 32 count. At
   the spec sizes the untruncated section 5 bound is 3 sigma = 0.194 for category 0, far above
   0.02. At (6, 6, 1) it is 0.0199, 0.0151 and 0.0124 for categories 0, 1 and 2 (test

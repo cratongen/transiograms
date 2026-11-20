@@ -87,7 +87,7 @@ fn axes() -> Vec<(&'static str, Vec<[i64; 3]>)> {
 /// default quench, 0.075 (about 20 standard errors) without; minority categories come out too
 /// continuous at mid lags.
 #[test]
-#[ignore = "release audit: tpsim ensemble transiograms (auto and cross) miss the model by up to 0.026 abs, 13-15 standard errors, with default quench; 0.075 without"]
+#[ignore = "method limit, documented in docs/guide/tp-simulation.md and pinned by tests/limits.rs: tpsim ensemble transiograms (auto and cross) miss the model by up to 0.026 abs, 13-15 standard errors, with default quench; 0.075 without"]
 fn unconditional_ensemble_transiograms_match_the_model_within_sampling_error() {
     let model = m5_model();
     let grid = Grid::new([0.0; 3], [3.0, 3.0, 0.5], [48, 48, 32]).unwrap();
