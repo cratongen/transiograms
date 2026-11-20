@@ -173,7 +173,13 @@ impl Model1D {
                 .sum()
         };
         let m = (k - 1) * (k - 1);
-        let (x, _) = nelder_mead(objective, &x0, 0.2, 1e-10, 2000 * m);
+        let max_eval = 2000 * m;
+        let (x, _, converged) = nelder_mead(objective, &x0, 0.2, 1e-10, max_eval);
+        if !converged {
+            return convergence(format!(
+                "the Markov fit did not converge in {max_eval} evaluations: pass start= (for example the rates of a fit with proportions=) or fewer lags"
+            ));
+        }
         let rates = build(&x)?;
         Ok(Model1D::Markov {
             proportions: p,

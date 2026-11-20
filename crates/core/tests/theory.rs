@@ -433,11 +433,13 @@ fn minimisers() {
     let (x, f) = golden_section(|x| (x - 2.0).powi(2) + 1.0, 0.0, 5.0, 1e-10);
     assert!((x - 2.0).abs() < 1e-6 && (f - 1.0).abs() < 1e-12);
     let rosen = |v: &[f64]| (1.0 - v[0]).powi(2) + 100.0 * (v[1] - v[0] * v[0]).powi(2);
-    let (x, f) = nelder_mead(rosen, &[-1.2, 1.0], 0.5, 1e-16, 10_000);
+    let (x, f, converged) = nelder_mead(rosen, &[-1.2, 1.0], 0.5, 1e-16, 10_000);
     assert!(
-        (x[0] - 1.0).abs() < 1e-4 && (x[1] - 1.0).abs() < 1e-4 && f < 1e-8,
+        converged && (x[0] - 1.0).abs() < 1e-4 && (x[1] - 1.0).abs() < 1e-4 && f < 1e-8,
         "{x:?} {f}"
     );
+    let (_, _, converged) = nelder_mead(rosen, &[-1.2, 1.0], 0.5, 1e-16, 20);
+    assert!(!converged, "20 evaluations cannot meet tol 1e-16 on Rosenbrock");
 }
 
 #[test]

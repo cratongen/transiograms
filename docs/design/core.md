@@ -115,8 +115,9 @@ Targets `rows` and `cols` (same total; zero-margin categories give zero rows and
 ### golden_section, nelder_mead
 Golden section: standard bracketing on `[a, b]`, stop when `b - a < tol (|x| + 1e-12)`.
 Nelder-Mead: coefficients 1, 2, 0.5, 0.5; initial simplex `x0 + step e_i`; stop when the spread
-of function values is below `tol (|f_best| + 1e-12)` or after `max_eval` evaluations; ties in
-ordering broken by vertex index.
+of function values is below `tol (|f_best| + 1e-12)` (converged) or after `max_eval` evaluations
+(not converged; the flag is the third element of the result); ties in ordering broken by vertex
+index.
 
 ## 4. Special functions
 

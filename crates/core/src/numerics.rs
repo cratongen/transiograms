@@ -379,14 +379,15 @@ pub fn golden_section(f: impl Fn(f64) -> f64, a: f64, b: f64, tol: f64) -> (f64,
 }
 
 /// Nelder-Mead simplex minimiser (reflection 1, expansion 2, contraction 0.5, shrink 0.5):
-/// `(x, f(x))`.
+/// `(x, f(x), converged)`, where `converged` is false when it stopped on `max_eval` before the
+/// simplex values met `tol`.
 pub fn nelder_mead(
     f: impl Fn(&[f64]) -> f64,
     x0: &[f64],
     step: f64,
     tol: f64,
     max_eval: usize,
-) -> (Vec<f64>, f64) {
+) -> (Vec<f64>, f64, bool) {
     let n = x0.len();
     let evals = std::cell::Cell::new(0usize);
     let eval = |x: &[f64]| {
@@ -406,8 +407,11 @@ pub fn nelder_mead(
         simplex = order.iter().map(|&i| simplex[i].clone()).collect();
         values = order.iter().map(|&i| values[i]).collect();
         let (best, worst) = (values[0], values[n]);
-        if n == 0 || worst - best <= tol * (best.abs() + 1e-12) || evals.get() >= max_eval {
-            return (simplex[0].clone(), best);
+        if n == 0 || worst - best <= tol * (best.abs() + 1e-12) {
+            return (simplex[0].clone(), best, true);
+        }
+        if evals.get() >= max_eval {
+            return (simplex[0].clone(), best, false);
         }
         let centroid: Vec<f64> = (0..n)
             .map(|d| simplex[..n].iter().map(|v| v[d]).sum::<f64>() / n as f64)

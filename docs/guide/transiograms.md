@@ -20,7 +20,11 @@ as `(n_lags, k, k)` arrays. A direction is `(azimuth, dip)` in degrees; dip -90 
 `tg.TransiogramModel` models one direction:
 
 - `TransiogramModel.markov(rates)`: `T(h) = exp(R h)`; `fit_markov(experimental, proportions=)`
-  fits `R` by weighted least squares, optionally with fixed sills.
+  fits `R` by weighted least squares. Pass the sample proportions to fix the sills there: without
+  them the sills are the stationary proportions of the starting rates, which on 40 seeded
+  5 x 60 m logs differ from the data proportions by up to 0.046 (the data proportions miss the
+  truth by up to 0.107; `crates/transiogram/tests/audit.rs`). A fit that does not converge
+  raises `ConvergenceError` instead of returning the last simplex point.
 - `TransiogramModel.entrywise(proportions, structures, ranges)`: one exponential, spherical or
   Gaussian curve per entry, with a complement entry per row that closes it to 1 (Li 2007);
   `fit_entrywise` fits the ranges. Construction raises if any entry goes negative, naming it.

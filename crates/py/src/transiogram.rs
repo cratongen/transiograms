@@ -557,7 +557,10 @@ impl PyTransiogramModel {
     /// ----------
     /// experimental : ExperimentalTransiogram
     /// proportions : array_like, optional
-    ///     Sills to honour; free otherwise.
+    ///     Sills to honour. By default the sills are the stationary proportions of the starting
+    ///     rates (``start``, or the rates read off the first lag where every category is a tail),
+    ///     which can differ from the data proportions; pass the sample proportions to hold the
+    ///     sills there.
     /// background : int
     ///     Category whose rates are filled from the others; -1 means the last.
     /// start : array_like, optional
@@ -574,7 +577,8 @@ impl PyTransiogramModel {
     ///     When the proportions do not sum to 1, ``background`` is not a category, or no lag has
     ///     every category as a tail and ``start`` is not given.
     /// ConvergenceError
-    ///     When no valid starting rates exist for these proportions.
+    ///     When no valid starting rates exist for these proportions, or the simplex search does
+    ///     not converge within its evaluation budget.
     #[staticmethod]
     #[pyo3(
         signature = (experimental, *, proportions=None, background=-1, start=None),

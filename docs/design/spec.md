@@ -496,7 +496,7 @@ pub fn logm_stochastic(p: &Mat) -> Result<Mat>;       // inverse scaling and squ
 pub fn quasi_independence(rows: &[f64], cols: &[f64], tol: f64, max_iter: usize) -> Result<Mat>;
 pub fn fundamental_matrix(p: &Mat, pi: &[f64]) -> Result<Mat>; // (I - P + 1 pi^T)^-1
 pub fn golden_section(f: impl Fn(f64) -> f64, a: f64, b: f64, tol: f64) -> (f64, f64); // minimiser
-pub fn nelder_mead(f: impl Fn(&[f64]) -> f64, x0: &[f64], step: f64, tol: f64, max_eval: usize) -> (Vec<f64>, f64);
+pub fn nelder_mead(f: impl Fn(&[f64]) -> f64, x0: &[f64], step: f64, tol: f64, max_eval: usize) -> (Vec<f64>, f64, bool);
 ```
 
 `special.rs`: `ln_gamma(x)`, `digamma(x)`, `gamma_q(a, x)` (regularized upper incomplete gamma),

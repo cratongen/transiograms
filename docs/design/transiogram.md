@@ -59,7 +59,8 @@ row and column q come from the background fill (core.md section 6) with the give
 (default: stationary of the start). Objective
 `sum_l sum_i N_i(l) sum_j (t_hat_ij(l) - t_ij(h_l))^2` over non-NaN rows; an invalid fill gives
 `+inf`. Start: `start` if given, else `RateMatrix::from_transition(T_hat(first lag), lag)`
-projected and refilled. `nelder_mead(step = 0.2, tol = 1e-10, max_eval = 2000 (K-1)^2)`.
+projected and refilled. `nelder_mead(step = 0.2, tol = 1e-10, max_eval = 2000 (K-1)^2)`; reaching `max_eval` before `tol`
+raises `ConvergenceError`.
 
 ## 4. Entrywise models (Li 2007)
 
