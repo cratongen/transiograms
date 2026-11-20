@@ -179,3 +179,18 @@ def test_built_sdist_carries_the_licences_and_the_lockfile():
     with tarfile.open(_dist("transiograms-*.tar.gz")) as t:
         names = {n.split("/", 1)[1] for n in t.getnames() if "/" in n}
     assert {"LICENSE-MIT", "LICENSE-APACHE", "Cargo.lock", "pyproject.toml", "crates/py/Cargo.toml"} <= names
+
+
+def test_release_checklist_names_the_minetypes_gate_and_the_types_it_replaces():
+    text = (ROOT / "docs" / "release-checklist.md").read_text(encoding="utf-8")
+    assert "The one remaining gate: minetypes adoption" in text
+    for name in (
+        "`tg.Categories`",
+        "`tg.Grid`",
+        "`transiograms_core::Categories`",
+        "`transiograms_core::Grid`",
+    ):
+        assert name in text, name
+    assert "release-checklist.md" in (ROOT / "mkdocs.yml").read_text(encoding="utf-8")
+    assert "minetypes" not in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert "minetypes" not in (ROOT / "Cargo.toml").read_text(encoding="utf-8")

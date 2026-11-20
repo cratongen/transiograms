@@ -29,6 +29,7 @@ plugins:
 nav:
   - Home: index.md
   - Install: install.md
+  - Release checklist: release-checklist.md
   - Guide:
       - Markov chains: guide/markov-chains.md
       - Hidden Markov models: guide/hidden-markov.md
