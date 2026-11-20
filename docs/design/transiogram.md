@@ -116,6 +116,18 @@ only `d` with positive lexicographic sign and filling `-d` by the reversal ident
 - Lag grid: 200 lags from 0 to `20 max L` plus `10^4 max L`; assertions as spec section 7.
 - On a grid, a 1D Markov chain sampled at Delta is exact (`T(n Delta) = T(Delta)^n`).
 
+## 7. Fit-quality report
+
+`fit_quality(model, grid, mask, realizations, directions, n_lags)` returns `FitQuality`. For
+each realization: proportions over its active cells, and the grid estimator of section 2.3 at
+offsets `l * d`, `l = 1..=n_lags`, for each direction `d`. Over realizations, per offset and
+entry: the mean of the finite values, and the standard error `s / sqrt(c)` with `s` the sample
+standard deviation of the `c` finite values (NaN when `c < 2`). `proportion_error` and
+`transiogram_error` are the largest absolute gaps to the model; `max_standard_errors` divides
+each gap by `max(se, 1e-3)`, so entries pinned exactly (hard data, quenched lags) do not
+dominate. Realizations are processed in order, so the report does not depend on thread count.
+Memory: `(n + 4)` matrices of `K^2` floats per offset, checked before allocating.
+
 ## Implementer decisions
 
 (empty)
