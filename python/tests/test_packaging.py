@@ -63,3 +63,34 @@ def test_readme_names_the_docs_and_links_work_on_pypi():
     assert SITE in text and GITHUB in text
     targets = re.findall(r"\]\(([^)\s]+)\)", text) + re.findall(r'(?:src|srcset)="([^"]+)"', text)
     assert not [t for t in targets if not t.startswith(("https://", "#"))]
+
+
+def _python_classifiers() -> list[str]:
+    prefix = "Programming Language :: Python :: 3."
+    return [c.removeprefix("Programming Language :: Python :: ") for c in _classifiers() if c.startswith(prefix)]
+
+
+def _classifiers() -> list[str]:
+    return _toml("pyproject.toml")["project"]["classifiers"]
+
+
+def test_classifiers_match_a_first_public_release_of_binary_wheels():
+    classifiers = _classifiers()
+    assert [c for c in classifiers if c.startswith("Development Status")] == ["Development Status :: 3 - Alpha"]
+    assert "Operating System :: OS Independent" not in classifiers
+    assert {
+        "Operating System :: MacOS",
+        "Operating System :: Microsoft :: Windows",
+        "Operating System :: POSIX :: Linux",
+        "Programming Language :: Python :: Implementation :: CPython",
+    } <= set(classifiers)
+
+
+def test_python_floor_matches_requires_python_and_the_abi3_feature():
+    floor = _toml("pyproject.toml")["project"]["requires-python"].removeprefix(">=")
+    versions = _python_classifiers()
+    assert versions[0] == floor
+    minors = [int(v.split(".")[1]) for v in versions]
+    assert minors == list(range(minors[0], minors[-1] + 1))
+    pyo3 = _toml("Cargo.toml")["workspace"]["dependencies"]["pyo3"]
+    assert f"abi3-py{floor.replace('.', '')}" in pyo3["features"]
