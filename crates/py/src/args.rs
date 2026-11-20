@@ -11,7 +11,8 @@ use crate::core::PyCategories;
 use crate::{convergence, invalid};
 
 const BAD_CODES: &str = "must be integers in 0..k-1, with -1 or NaN for missing";
-const FROM_LABELS: &str = "for text labels, encode them first with tg.Categories.from_labels(labels).encode(labels)";
+const FROM_LABELS: &str =
+    "for text labels, encode them first with tg.Categories.from_labels(labels).encode(labels)";
 
 fn asarray<'py>(obj: &Bound<'py, PyAny>, dtype: &str) -> PyResult<Bound<'py, PyAny>> {
     obj.py()
