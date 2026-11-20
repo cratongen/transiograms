@@ -89,7 +89,7 @@ class TransiogramModel:
         experimental: ExperimentalTransiogram,
         proportions: ArrayLike,
         *,
-        structures: str | Sequence[str] = "exponential",
+        structures: str | Sequence[str] | None = None,
         complement: ArrayLike | None = None,
     ) -> TransiogramModel: ...
     @property

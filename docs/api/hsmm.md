@@ -207,7 +207,7 @@ def select_states(
     data: Mapping[str, ArrayLike] | None = None,
     labels: ArrayLike | str | None = None,
     allowed: ArrayLike | None = None,
-    states: Sequence[int] = ...,
+    states: Sequence[int] | None = None,
     model: Literal["hmm", "hsmm"] = "hmm",
     emission: Literal["gaussian", "categorical", "poisson", "mixture"] = "gaussian",
     covariance_type: Literal["full", "diag", "spherical"] = "diag",

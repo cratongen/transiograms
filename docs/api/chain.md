@@ -121,7 +121,7 @@ class MarkovChain:
         hard_from: ArrayLike | None = None,
         hard_to: ArrayLike | None = None,
         hard_codes: ArrayLike | None = None,
-        start: int | Literal["stationary"] = "stationary",
+        start: int | Literal["stationary"] | None = None,
     ) -> NDArray[np.int64] | dict[str, NDArray]: ...
     def simulate_beds(
         self,
@@ -132,7 +132,7 @@ class MarkovChain:
         hard_from: ArrayLike | None = None,
         hard_to: ArrayLike | None = None,
         hard_codes: ArrayLike | None = None,
-        start: int | Literal["stationary"] = "stationary",
+        start: int | Literal["stationary"] | None = None,
     ) -> NDArray[np.int64]: ...
     def to_json(self) -> str: ...
     @staticmethod

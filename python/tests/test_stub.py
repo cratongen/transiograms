@@ -1,5 +1,6 @@
 import ast
 import inspect
+import re
 from pathlib import Path
 
 import pytest
@@ -71,6 +72,41 @@ def test_stub_and_runtime_export_the_same_names():
     assert {n for n in stubbed if not n.startswith("_")} - STUB_ONLY == runtime
     for node in STUB.body:
         if isinstance(node, ast.ClassDef):
-            members = {m.name for m in node.body if isinstance(m, ast.FunctionDef) and not m.name.startswith("_")}
+            members = {
+                m.name for m in node.body if isinstance(m, ast.FunctionDef) and not m.name.startswith("_")
+            }
             public = {a for a in vars(getattr(tg, node.name)) if not a.startswith("_")}
             assert members == public, node.name
+
+
+def api_page_nodes():
+    root = Path(__file__).resolve().parents[2] / "docs" / "api"
+    for page in sorted(root.glob("*.md")):
+        for block in re.findall(r"```python\n(.*?)\n```", page.read_text(encoding="utf-8"), re.DOTALL):
+            for node in ast.parse(block).body:
+                if isinstance(node, ast.FunctionDef):
+                    yield page.name, node.name, node
+                elif isinstance(node, ast.ClassDef):
+                    for m in node.body:
+                        if isinstance(m, ast.FunctionDef):
+                            yield page.name, f"{node.name}.{m.name}", m
+
+
+def stub_nodes():
+    out = {}
+    for node in STUB.body:
+        if isinstance(node, ast.FunctionDef):
+            out[node.name] = node
+        elif isinstance(node, ast.ClassDef):
+            out.update({f"{node.name}.{m.name}": m for m in node.body if isinstance(m, ast.FunctionDef)})
+    return out
+
+
+def test_api_pages_copy_the_stub_signatures():
+    stub = stub_nodes()
+    differ = [
+        f"{page}: {name}"
+        for page, name, node in api_page_nodes()
+        if name not in stub or ast.dump(node.args) != ast.dump(stub[name].args)
+    ]
+    assert differ == []
