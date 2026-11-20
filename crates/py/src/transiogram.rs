@@ -1,12 +1,12 @@
 //! Experimental transiograms, `TransiogramModel` (1D) and `TransitionModel` (3D).
 
-use numpy::ndarray::Array3;
+use numpy::ndarray::{Array2, Array3};
 use numpy::{IntoPyArray, PyArray1, PyArray2, PyArray3};
 use pyo3::prelude::*;
 use transiograms_core::{Mat, RateMatrix, memory};
 use transiograms_transiogram::{
-    Entry, Experimental, Model1D, PairFilter, PairSpec, Structure, TransitionModel, downhole,
-    experimental, on_grid,
+    Entry, Experimental, FitQuality, Model1D, PairFilter, PairSpec, Structure, TransitionModel,
+    downhole, experimental, fit_quality, on_grid,
 };
 
 use crate::args::{
@@ -16,6 +16,7 @@ use crate::args::{
 use crate::chain::{PyMarkovChain, background_index};
 use crate::core::{PyGrid, json, unjson};
 use crate::invalid;
+use crate::tpsim::PyRealizations;
 
 /// Experimental transition probabilities per lag.
 ///
@@ -716,7 +717,165 @@ impl PyTransitionModel {
     }
 }
 
+/// How far an ensemble of realizations sits from its model's proportions and transiograms.
+///
+/// Attributes
+/// ----------
+/// target_proportions : numpy.ndarray
+///     ``(k,)`` model proportions.
+/// proportions : numpy.ndarray
+///     ``(n, k)`` proportions of each realization over its active cells.
+/// mean_proportions : numpy.ndarray
+///     ``(k,)`` ensemble proportions.
+/// offsets : numpy.ndarray
+///     ``(m, 3)`` cell offsets ``l * direction`` for ``l = 1..n_lags``, direction-major.
+/// model, mean, standard_error : numpy.ndarray
+///     ``(m, k, k)`` model ``t_ij``, ensemble mean ``t_ij`` and its standard error (spread
+///     across realizations over the square root of their number); NaN where a tail category
+///     has no pair, and standard errors are NaN with one realization.
+/// proportion_error : float
+///     Largest ``|mean proportion - target|``.
+/// transiogram_error : float
+///     Largest ``|mean t_ij - model t_ij|`` over every entry and offset.
+/// max_standard_errors : float
+///     Largest ``|mean t_ij - model t_ij| / se``, with standard errors below 0.001 counted as
+///     0.001; NaN with one realization. Values above about 4 mean the ensemble misses the
+///     model by more than sampling error.
+#[pyclass(module = "transiograms", name = "FitQuality", frozen)]
+pub struct PyFitQuality(pub FitQuality);
+
+#[pymethods]
+impl PyFitQuality {
+    #[getter]
+    fn target_proportions<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        vec1(py, self.0.target_proportions.clone())
+    }
+    #[getter]
+    fn proportions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {
+        let shape = (self.0.n_realizations, self.0.k);
+        Array2::from_shape_vec(shape, self.0.proportions.clone())
+            .map(|a| a.into_pyarray(py))
+            .map_err(invalid)
+    }
+    #[getter]
+    fn mean_proportions<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        vec1(py, self.0.mean_proportions())
+    }
+    #[getter]
+    fn offsets<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<i64>> {
+        let o = &self.0.offsets;
+        Array2::from_shape_fn((o.len(), 3), |(i, a)| o[i][a]).into_pyarray(py)
+    }
+    #[getter]
+    fn model<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray3<f64>> {
+        mat3(py, &self.0.model, self.0.k, self.0.k)
+    }
+    #[getter]
+    fn mean<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray3<f64>> {
+        mat3(py, &self.0.mean, self.0.k, self.0.k)
+    }
+    #[getter]
+    fn standard_error<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray3<f64>> {
+        mat3(py, &self.0.standard_error, self.0.k, self.0.k)
+    }
+    #[getter]
+    fn proportion_error(&self) -> f64 {
+        self.0.proportion_error()
+    }
+    #[getter]
+    fn transiogram_error(&self) -> f64 {
+        self.0.transiogram_error()
+    }
+    #[getter]
+    fn max_standard_errors(&self) -> f64 {
+        self.0.max_standard_errors()
+    }
+    fn to_json(&self) -> PyResult<String> {
+        json(&self.0)
+    }
+    #[staticmethod]
+    fn from_json(text: &str) -> PyResult<Self> {
+        let q: FitQuality = unjson(text, "FitQuality")?;
+        let (k, m) = (q.k, q.offsets.len());
+        let square = |ms: &[transiograms_core::Mat]| {
+            ms.len() == m && ms.iter().all(|t| t.nrows() == k && t.ncols() == k)
+        };
+        if k == 0
+            || q.target_proportions.len() != k
+            || q.n_realizations.checked_mul(k) != Some(q.proportions.len())
+            || !square(&q.model)
+            || !square(&q.mean)
+            || !square(&q.standard_error)
+        {
+            return Err(invalid(
+                "FitQuality JSON needs k >= 1, k target proportions, n * k proportions and one k x k model, mean and standard_error per offset",
+            ));
+        }
+        Ok(Self(q))
+    }
+    fn __repr__(&self) -> String {
+        format!(
+            "FitQuality(n={}, k={}, offsets={}, proportion_error={:.4}, transiogram_error={:.4}, max_standard_errors={:.1})",
+            self.0.n_realizations,
+            self.0.k,
+            self.0.offsets.len(),
+            self.0.proportion_error(),
+            self.0.transiogram_error(),
+            self.0.max_standard_errors()
+        )
+    }
+}
+
+/// Fit-quality report: ensemble proportions and grid transiograms of ``realizations`` against
+/// ``model``, per realization and on average, with standard errors from the spread across
+/// realizations.
+///
+/// Parameters
+/// ----------
+/// model : TransitionModel
+/// grid : Grid
+/// realizations : Realizations
+///     From ``tprogs_simulate`` or ``mcrf_simulate`` on ``grid``.
+/// directions : sequence of (int, int, int)
+///     Cell steps of lag 1; +x, +y, +z and -z by default.
+/// n_lags : int
+///     Lags ``1..n_lags`` along each direction.
+/// mask : array_like, optional
+///     Active cells.
+///
+/// Returns
+/// -------
+/// FitQuality
+#[pyfunction]
+#[pyo3(name = "fit_quality", signature = (model, grid, realizations, *, directions=None, n_lags=6, mask=None))]
+fn fit_quality_report<'py>(
+    py: Python<'py>,
+    model: &PyTransitionModel,
+    grid: &PyGrid,
+    realizations: &PyRealizations,
+    directions: Option<Vec<[i64; 3]>>,
+    n_lags: usize,
+    mask: Option<&Bound<'py, PyAny>>,
+) -> PyResult<PyFitQuality> {
+    let dirs = directions.unwrap_or_else(|| vec![[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, -1]]);
+    let m = self::mask(mask, grid.0.n_cells())?;
+    py.detach(|| {
+        fit_quality(
+            &model.0,
+            &grid.0,
+            m.as_deref(),
+            &realizations.r,
+            &dirs,
+            n_lags,
+        )
+    })
+    .map(PyFitQuality)
+    .map_err(to_rust)
+}
+
 pub fn register(m: &Bound<PyModule>) -> PyResult<()> {
+    m.add_class::<PyFitQuality>()?;
+    m.add_function(wrap_pyfunction!(fit_quality_report, m)?)?;
     m.add_class::<PyExperimental>()?;
     m.add_class::<PyTransiogramModel>()?;
     m.add_class::<PyTransitionModel>()?;

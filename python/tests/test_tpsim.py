@@ -72,3 +72,16 @@ def test_budgets_and_absurd_requests_raise_before_allocating():
         tg.tp_cokriging(model(), GRID, xyz, codes, max_data=7)
     with pytest.raises(tg.InvalidInput, match="categories"):
         tg.tp_cokriging(model(), GRID, xyz, codes + 5)
+
+
+def test_fit_quality_shows_the_quench_closes_part_of_the_gap():
+    m = model()
+    dirs = [(1, 0, 0), (0, 0, 1)]
+    real = tg.tprogs_simulate(m, GRID, np.empty((0, 3)), [], n=4, seed=3)
+    raw = tg.tprogs_simulate(m, GRID, np.empty((0, 3)), [], n=4, seed=3, quench=False)
+    q, r = (tg.fit_quality(m, GRID, x, directions=dirs, n_lags=3) for x in (real, raw))
+    np.testing.assert_allclose(q.proportions, real.proportions, atol=1e-15)
+    assert q.offsets.shape == (6, 3) and q.mean.shape == (6, 3, 3)
+    assert q.proportion_error < r.proportion_error
+    assert q.transiogram_error < r.transiogram_error
+    assert "FitQuality(n=4, k=3, offsets=6" in repr(q)

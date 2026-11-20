@@ -1,3 +1,5 @@
+import pickle
+
 import numpy as np
 import pytest
 import transiograms as tg
@@ -69,3 +71,53 @@ def test_errors_and_budgets():
         tg.mcrf_simulate(m, GRID2D, np.zeros((0, 3)), [], n=10, memory=100)
     with pytest.raises(tg.InvalidInput):
         tg.mcrf_simulate(m, GRID2D, np.zeros((0, 3)), [], n=2**62)
+
+
+def m5_model():
+    pi_z = [[0.0, 0.6, 0.4], [0.7, 0.0, 0.3], [0.2105263158, 0.7894736842, 0.0]]
+    lengths = [[12.0, 8.0, 6.0], [12.0, 8.0, 6.0], [2.0, 1.0, 0.8]]
+    return tg.TransitionModel.from_geology(P, lengths, embedded_z=pi_z, background=2)
+
+
+def test_fit_quality_matches_numpy_counts():
+    m = m5_model()
+    grid = tg.Grid((0.0, 0.0, 0.0), (3.0, 3.0, 0.5), (12, 10, 8))
+    real = tg.mcrf_simulate(m, grid, np.empty((0, 3)), [], n=3, seed=4)
+    q = tg.fit_quality(m, grid, real, directions=[(1, 0, 0), (0, 0, -1)], n_lags=2)
+    np.testing.assert_allclose(q.proportions, real.proportions, atol=1e-15)
+    np.testing.assert_array_equal(q.offsets, [[1, 0, 0], [2, 0, 0], [0, 0, -1], [0, 0, -2]])
+    per = np.stack(
+        [
+            tg.grid_transiogram(r, grid, offset=(0, 0, -1), n_lags=2, categories=3).probabilities
+            for r in real.realizations
+        ]
+    )
+    np.testing.assert_allclose(q.mean[2:], per.mean(axis=0), atol=1e-14)
+    np.testing.assert_allclose(q.standard_error[2:], per.std(axis=0, ddof=1) / np.sqrt(3), atol=1e-14)
+    np.testing.assert_allclose(q.model[3], m.transition([0.0, 0.0, -1.0]), atol=1e-14)
+    assert q.transiogram_error == pytest.approx(np.nanmax(np.abs(q.mean - q.model)))
+    assert q.proportion_error == pytest.approx(np.max(np.abs(q.mean_proportions - P)))
+    back = pickle.loads(pickle.dumps(q))
+    assert back.to_json() == q.to_json()
+
+
+def test_fit_quality_rejects_a_grid_of_another_size():
+    m = m5_model()
+    grid = tg.Grid((0.0, 0.0, 0.0), (3.0, 3.0, 0.5), (6, 6, 4))
+    real = tg.mcrf_simulate(m, grid, np.empty((0, 3)), [], n=2, seed=0)
+    other = tg.Grid((0.0, 0.0, 0.0), (3.0, 3.0, 0.5), (6, 6, 5))
+    with pytest.raises(tg.InvalidInput):
+        tg.fit_quality(m, other, real)
+    with pytest.raises(tg.InvalidInput):
+        tg.fit_quality(m, grid, real, n_lags=0)
+
+
+def test_unconditional_mcrf_gap_is_reported():
+    """The method limit documented in docs/guide/mcrf-mcp.md, same seed as the Rust test."""
+    m = m5_model()
+    grid = tg.Grid((0.0, 0.0, 0.0), (3.0, 3.0, 0.5), (48, 48, 32))
+    real = tg.mcrf_simulate(m, grid, np.empty((0, 3)), [], n=10, seed=1)
+    q = tg.fit_quality(m, grid, real, directions=[(1, 0, 0), (0, 0, 1), (0, 0, -1)])
+    assert 0.03 < q.proportion_error < 0.05
+    assert 0.17 < q.transiogram_error < 0.21
+    assert q.max_standard_errors > 20

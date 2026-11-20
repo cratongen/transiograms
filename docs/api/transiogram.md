@@ -1,6 +1,6 @@
 # Transiograms
 
-Experimental transiograms, the one-directional `TransiogramModel` and the 3D `TransitionModel`. See the [guide](../guide/transiograms.md).
+Experimental transiograms, the one-directional `TransiogramModel`, the 3D `TransitionModel`, and the `fit_quality` report that compares simulated realizations with their model. See the [guide](../guide/transiograms.md); the report is described in the [T-PROGS](../guide/tp-simulation.md) and [MCP and MCRF](../guide/mcrf-mcp.md) guides.
 
 ```python
 class ExperimentalTransiogram:
@@ -147,4 +147,41 @@ class TransitionModel:
     def to_json(self) -> str: ...
     @staticmethod
     def from_json(text: str) -> TransitionModel: ...
+
+
+class FitQuality:
+    @property
+    def target_proportions(self) -> NDArray[np.float64]: ...
+    @property
+    def proportions(self) -> NDArray[np.float64]: ...
+    @property
+    def mean_proportions(self) -> NDArray[np.float64]: ...
+    @property
+    def offsets(self) -> NDArray[np.int64]: ...
+    @property
+    def model(self) -> NDArray[np.float64]: ...
+    @property
+    def mean(self) -> NDArray[np.float64]: ...
+    @property
+    def standard_error(self) -> NDArray[np.float64]: ...
+    @property
+    def proportion_error(self) -> float: ...
+    @property
+    def transiogram_error(self) -> float: ...
+    @property
+    def max_standard_errors(self) -> float: ...
+    def to_json(self) -> str: ...
+    @staticmethod
+    def from_json(text: str) -> FitQuality: ...
+
+
+def fit_quality(
+    model: TransitionModel,
+    grid: Grid,
+    realizations: Realizations,
+    *,
+    directions: Sequence[tuple[int, int, int]] | None = None,
+    n_lags: int = 6,
+    mask: ArrayLike | None = None,
+) -> FitQuality: ...
 ```
