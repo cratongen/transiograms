@@ -1,4 +1,4 @@
-"""Markov models for geostatistics: chains, hidden Markov models, transiograms and grid simulation."""
+"""Markov models of geological categories: chains, hidden Markov models, transiograms, grid simulation."""
 
 import copyreg as _copyreg
 

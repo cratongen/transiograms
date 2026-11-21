@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "transiograms"
-description = "Markov models for geostatistics: chains, hidden Markov models, transiograms and categorical grid simulation"
+description = "Markov models of geological categories: Markov chains, hidden and semi-Markov models, transiograms and categorical grid simulation"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT OR Apache-2.0"

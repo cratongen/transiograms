@@ -1,5 +1,5 @@
 site_name: transiograms
-site_description: Markov chains, hidden and semi-Markov models, transiograms and categorical simulation for geological facies.
+site_description: Markov models of geological categories, with Markov chains, hidden and semi-Markov models, transiograms and categorical grid simulation.
 site_url: https://cratongen.github.io/transiograms/
 repo_url: https://github.com/cratongen/transiograms
 repo_name: cratongen/transiograms
