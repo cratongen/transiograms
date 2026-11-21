@@ -134,10 +134,17 @@ jobs:
             musllinux-x86_64)  arch=linux/amd64 image=python:${{ matrix.python }}-alpine ;;
             musllinux-aarch64) arch=linux/arm64 image=python:${{ matrix.python }}-alpine ;;
           esac
-          docker run --rm --platform "$arch" -v "$PWD:/src" -w /src "$image" sh -ec '
-            python -m pip install -q --only-binary=:all: dist/transiograms-*.whl pytest scipy matplotlib
+          # matplotlib publishes no musllinux aarch64 wheel, so that platform runs without it and
+          # without the three test files that import it (the plots and the documented code).
+          plot=matplotlib skip=
+          if [ "${{ matrix.platform }}" = musllinux-aarch64 ]; then
+            plot=
+            for f in test_plot test_docstrings test_docs; do skip="$skip --ignore=/src/python/tests/$f.py"; done
+          fi
+          docker run --rm --platform "$arch" -v "$PWD:/src" -w /src -e PLOT="$plot" -e SKIP="$skip" "$image" sh -ec '
+            python -m pip install -q --only-binary=:all: dist/transiograms-*.whl pytest scipy $PLOT
             python -c "import sys, transiograms; print(sys.version, sys.platform, transiograms.__file__)"
-            cd /tmp && python -m pytest -q -p no:cacheprovider --rootdir=/src /src/python/tests
+            cd /tmp && python -m pytest -q -p no:cacheprovider --rootdir=/src $SKIP /src/python/tests
           '
 
   # macOS and Windows: the floor, the development Python and the newest, each in a uv-managed
@@ -171,7 +178,10 @@ jobs:
           uv pip install --python "$py" --only-binary=:all: dist/transiograms-*.whl pytest scipy matplotlib
           "$py" -c "import sys, transiograms; print(sys.version, sys.platform, transiograms.__file__)"
           cd "$RUNNER_TEMP"
-          "$py" -m pytest -q -p no:cacheprovider --rootdir="$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/python/tests"
+          # The licence-list test runs `cargo tree --offline`; these runners have cargo but no
+          # downloaded registry. It checks the source tree, not the wheel, and ci.yml runs it.
+          "$py" -m pytest -q -p no:cacheprovider --rootdir="$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/python/tests" \
+            -k "not test_third_party_licences_name_every_crate_the_extension_links"
 
   # Publishes only from a v* tag push in cratongen/transiograms: never from a fork, a branch, a
   # pull request or a manual run. The `pypi` environment is a second guard (required reviewer).
