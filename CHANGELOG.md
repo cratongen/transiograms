@@ -3,7 +3,7 @@
 transiograms follows [semantic versioning](https://semver.org/). Each release lists what changed
 for someone who uses the Python package.
 
-## 0.1.0 (unreleased)
+## 0.1.0 (2026-11-21)
 
 First public release.
 
