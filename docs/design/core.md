@@ -129,7 +129,10 @@ index.
 
 ## 5. Memory
 
-`available_bytes`: Linux parses `MemAvailable:` (kB) from `/proc/meminfo`; any failure or other
+`available_bytes`: Linux parses `MemAvailable:` (kB) from `/proc/meminfo`; Windows takes the
+smaller of `ullAvailPhys` and `ullAvailPageFile` from `GlobalMemoryStatusEx`; macOS takes the
+installed memory `hw.memsize` from `sysctlbyname`, an upper bound because macOS reports no single
+reclaimable figure. Both calls are declared by hand, with no new dependency. Any failure or other
 OS returns `None`. `check(needed, memory, what)`: `budget = memory.or(available_bytes())`;
 `needed > budget` raises `InvalidInput`
 "{what} needs {needed} bytes but the memory budget is {budget} bytes; pass memory= or use a

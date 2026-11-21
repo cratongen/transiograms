@@ -68,9 +68,10 @@ Each line: the decision, then why.
     Intervals are passed as composited midpoints, which boitata's `composite` already produces.
 21. Grids are axis-aligned. A rotated boitata block model is handled by passing coordinates in
     its local frame. Anisotropy rotation lives in `TransitionModel.rotation`.
-22. Memory budget: Linux reads `MemAvailable` from `/proc/meminfo`; other platforms have no
-    automatic budget and only `memory=` is enforced. A cross-platform query needs a dependency
-    (`sysinfo`) for one number.
+22. Memory budget: Linux reads `MemAvailable` from `/proc/meminfo`, Windows the available physical
+    memory and commit charge from `GlobalMemoryStatusEx`, macOS the installed memory from
+    `sysctlbyname("hw.memsize")` (an upper bound). Other platforms have no automatic budget and
+    only `memory=` is enforced.
 23. Free test functions are named `order_test`, `homogeneity_test` and methods
     `independence_test`, `symmetry_test`: names starting with `test_` would be collected by pytest
     when imported into a test module.
@@ -229,7 +230,8 @@ maturin `>=1.10,<2` backend; `[tool.maturin] manifest-path = "crates/py/Cargo.to
 ### 3.4 Memory
 
 - `transiograms_core::memory::check(needed: u64, memory: Option<u64>, what: &str) -> Result<()>`.
-  The budget is `memory` when given, else `MemAvailable` on Linux, else no check. A request above
+  The budget is `memory` when given, else `available_bytes()` (Linux, Windows and macOS), else
+  no check. A request above
   the budget raises `InvalidInput` before allocating, naming `what`, the bytes needed and the
   budget.
 - Python functions that allocate per cell or per realization take `memory: int | None = None`

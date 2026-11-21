@@ -1,12 +1,26 @@
 use crate::error::{Result, invalid};
 
-/// `MemAvailable` from `/proc/meminfo` on Linux, lowered to the headroom of the tightest cgroup v2
+/// The memory a new allocation can use, or `None` when it cannot be read.
+///
+/// Linux: `MemAvailable` from `/proc/meminfo`, lowered to the headroom of the tightest cgroup v2
 /// `memory.max` above this process and of its own data and address-space limits (`ulimit -d`,
-/// `ulimit -v`); `None` elsewhere or on any failure.
+/// `ulimit -v`). Windows: the smaller of the available physical memory and the remaining commit
+/// charge (`GlobalMemoryStatusEx`). macOS: the installed physical memory (`hw.memsize`), since
+/// macOS reports no single figure for reclaimable memory. `None` on other platforms.
 pub fn available_bytes() -> Option<u64> {
-    if !cfg!(target_os = "linux") {
-        return None;
-    }
+    #[cfg(target_os = "linux")]
+    let bytes = linux_available();
+    #[cfg(windows)]
+    let bytes = windows_available();
+    #[cfg(target_os = "macos")]
+    let bytes = macos_available();
+    #[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
+    let bytes = None;
+    bytes
+}
+
+#[cfg(target_os = "linux")]
+fn linux_available() -> Option<u64> {
     let text = std::fs::read_to_string("/proc/meminfo").ok()?;
     let line = text.lines().find(|l| l.starts_with("MemAvailable:"))?;
     let kb: u64 = line.split_whitespace().nth(1)?.parse().ok()?;
@@ -19,6 +33,62 @@ pub fn available_bytes() -> Option<u64> {
     )
 }
 
+#[cfg(windows)]
+fn windows_available() -> Option<u64> {
+    #[repr(C)]
+    #[derive(Default)]
+    struct MemoryStatusEx {
+        length: u32,
+        memory_load: u32,
+        total_phys: u64,
+        avail_phys: u64,
+        total_page_file: u64,
+        avail_page_file: u64,
+        total_virtual: u64,
+        avail_virtual: u64,
+        avail_extended_virtual: u64,
+    }
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GlobalMemoryStatusEx(buffer: *mut MemoryStatusEx) -> i32;
+    }
+    let mut status = MemoryStatusEx {
+        length: std::mem::size_of::<MemoryStatusEx>() as u32,
+        ..Default::default()
+    };
+    // SAFETY: `status` is a correctly sized MEMORYSTATUSEX with `dwLength` set, as the call requires.
+    let ok = unsafe { GlobalMemoryStatusEx(&mut status) } != 0;
+    (ok && status.avail_phys > 0).then(|| status.avail_phys.min(status.avail_page_file))
+}
+
+#[cfg(target_os = "macos")]
+fn macos_available() -> Option<u64> {
+    use std::ffi::{c_char, c_int, c_void};
+    unsafe extern "C" {
+        fn sysctlbyname(
+            name: *const c_char,
+            oldp: *mut c_void,
+            oldlenp: *mut usize,
+            newp: *mut c_void,
+            newlen: usize,
+        ) -> c_int;
+    }
+    let mut bytes: u64 = 0;
+    let mut len = std::mem::size_of::<u64>();
+    // SAFETY: `hw.memsize` is a 64-bit integer and `len` states the size of the buffer it fills.
+    let rc = unsafe {
+        sysctlbyname(
+            c"hw.memsize".as_ptr(),
+            (&mut bytes as *mut u64).cast(),
+            &mut len,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    (rc == 0 && len == std::mem::size_of::<u64>() && bytes > 0).then_some(bytes)
+}
+
+#[cfg(target_os = "linux")]
 fn rlimit_headroom() -> Option<u64> {
     let limits = std::fs::read_to_string("/proc/self/limits").ok()?;
     let status = std::fs::read_to_string("/proc/self/status").ok()?;
@@ -42,6 +112,7 @@ fn rlimit_headroom() -> Option<u64> {
     .min()
 }
 
+#[cfg(target_os = "linux")]
 fn cgroup_headroom() -> Option<u64> {
     let text = std::fs::read_to_string("/proc/self/cgroup").ok()?;
     let path = text.lines().find_map(|l| l.strip_prefix("0::"))?;
@@ -86,11 +157,15 @@ mod tests {
             e.contains("grid needs 11 bytes") && e.contains("budget is 10 bytes"),
             "{e}"
         );
-        if cfg!(target_os = "linux") {
+        if cfg!(any(target_os = "linux", windows, target_os = "macos")) {
             let available = available_bytes().unwrap();
             assert!(available > 0);
             assert!(check(u64::MAX, None, "grid").is_err());
             assert!(check(1, None, "grid").is_ok());
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let available = available_bytes().unwrap();
             // Other test threads allocate and free between the two reads.
             let slack = 256 << 20;
             if let Some(cgroup) = cgroup_headroom() {

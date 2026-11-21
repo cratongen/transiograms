@@ -33,7 +33,8 @@ fraction of cells whose probabilities needed clipping. `Realizations` holds `rea
 
 ## Memory
 
-Simulation memory is sized from the available memory (`MemAvailable` on Linux), or from
+Simulation memory is sized from the available memory (`MemAvailable` on Linux, the available
+physical memory on Windows, the installed memory on macOS), or from
 `memory=` in bytes. A request that does not fit raises `tg.InvalidInput` naming the bytes it
 needs before anything is allocated.
 
