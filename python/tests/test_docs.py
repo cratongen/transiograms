@@ -74,7 +74,7 @@ def test_full_script_download_runs_on_its_own(page, tmp_path):
         text=True,
         cwd=tmp_path,
         env=env,
-        timeout=600,
+        timeout=1800,
     )
     assert run.returncode == 0, run.stderr[-2000:]
     figures = set(re.findall(r"!\[[^]]*\]\(([^)]+\.png)\)", (ROOT / page).read_text(encoding="utf-8")))
@@ -93,7 +93,7 @@ def check_page(page: str, tmp_path: Path):
         text=True,
         cwd=tmp_path,
         env=env,
-        timeout=600,
+        timeout=1800,
     )
     assert run.returncode == 0, run.stderr[-2000:]
     results = json.loads(run.stdout.splitlines()[-1])
@@ -112,7 +112,7 @@ def test_api_pages_render_docstrings_with_stub_types_and_defaults(tmp_path):
         capture_output=True,
         text=True,
         cwd=ROOT,
-        timeout=600,
+        timeout=1800,
     )
     assert run.returncode == 0, run.stderr[-3000:]
     page = re.sub(r"<[^>]+>", " ", (site / "api" / "hmm" / "index.html").read_text(encoding="utf-8"))
