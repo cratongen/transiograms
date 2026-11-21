@@ -1,5 +1,5 @@
 site_name: transiograms
-site_description: Markov models for geostatistics.
+site_description: Markov chains, hidden and semi-Markov models, transiograms and categorical simulation for geological facies.
 site_url: https://cratongen.github.io/transiograms/
 repo_url: https://github.com/cratongen/transiograms
 repo_name: cratongen/transiograms
@@ -9,10 +9,14 @@ copyright: Copyright 2026 the transiograms authors. MIT OR Apache-2.0.
 
 theme:
   name: material
+  logo: brand/mark-black.svg
+  favicon: brand/favicon.svg
+  # Geist and Geist Mono come from docs/brand/fonts through docs/stylesheets/transiograms.css.
   font: false
   icon:
     repo: fontawesome/brands/github
   features:
+    - navigation.tabs
     - navigation.sections
     - navigation.top
     - navigation.footer
@@ -35,7 +39,15 @@ extra_css:
 
 markdown_extensions:
   - admonition
+  - attr_list
+  - md_in_html
   - tables
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
   - toc:
       permalink: true
 
@@ -73,8 +85,6 @@ plugins:
 nav:
   - Home: index.md
   - Install: install.md
-  - Status: status.md
-  - Release checklist: release-checklist.md
   - Guide:
       - Markov chains: guide/markov-chains.md
       - Hidden Markov models: guide/hidden-markov.md
@@ -95,7 +105,7 @@ nav:
       - T-PROGS: examples/05-tp-simulation/01-tprogs/README.md
       - MCP and MCRF: examples/06-mcrf-mcp/01-mcp-and-mcrf/README.md
       - boitata integration: examples/07-boitata-integration/01-drillholes-to-grid/README.md
-  - API:
+  - API reference:
       - Core: api/core.md
       - Chain: api/chain.md
       - HMM: api/hmm.md
@@ -105,7 +115,8 @@ nav:
       - MCRF and MCP: api/mcrf.md
       - boitata integration: api/integration.md
       - Plots, datasets, checks: api/extras.md
-  - Design:
+  - Design notes:
+      - Status and limits: status.md
       - Contract: design/spec.md
       - Core: design/core.md
       - Chain: design/chain.md
@@ -114,3 +125,8 @@ nav:
       - Transiograms: design/transiogram.md
       - TP simulation: design/tpsim.md
       - MCRF and MCP: design/mcrf.md
+  - Changelog: changelog.md
+  - Contributing:
+      - How to contribute: contributing.md
+      - Release checklist: release-checklist.md
+      - Brand: brand.md
