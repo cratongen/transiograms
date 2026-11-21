@@ -31,3 +31,7 @@ First public release.
   work is sized from the available memory and checked before it allocates.
 - One abi3 wheel per platform for CPython 3.11 and newer; NumPy is the only runtime dependency.
   Licensed under MIT OR Apache-2.0.
+
+Known limits of this release: the API can change between minor versions, `tg.Categories` and
+`tg.Grid` will move to a shared types package, performance is not measured, and the Rust crates
+are not on crates.io.
