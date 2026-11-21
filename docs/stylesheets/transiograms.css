@@ -1,8 +1,23 @@
-/* transiograms docs theme on Material for MkDocs, shared with the cratongen family (segyrs,
-   boitata): black, white and greys, flush left, heavy rules. Links are underlined, emphasis is
-   weight, and syntax highlighting is a grey ramp. Colour belongs to the figures only (category
-   colours in tg.plot), never to the interface. The theme uses the system faces and makes no
-   request to another server. */
+/* transiograms docs theme on Material for MkDocs, ported from segyrs for the cratongen family:
+   black, white and nine greys, flush left, heavy rules. Links are underlined, emphasis is weight,
+   and syntax highlighting is a grey ramp. Hue belongs to the figures only (category colours in
+   tg.plot), never to the interface. The fonts are served from docs/brand/fonts (SIL OFL 1.1,
+   fonts/OFL.txt), so the theme makes no request to another server. */
+
+@font-face {
+  font-family: "Geist";
+  src: url("../brand/fonts/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono";
+  src: url("../brand/fonts/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   --tg-black: #000000;
@@ -14,11 +29,15 @@
   --tg-grey-200: #e5e5e5;
   --tg-grey-100: #f5f5f5;
   --tg-white: #ffffff;
-  --tg-font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --tg-font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  --tg-font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --tg-font-mono: "Geist Mono", ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   --tg-rule-hair: 1px;
   --tg-rule: 3px;
   --tg-rule-heavy: 6px;
+  --tg-space-2: 8px;
+  --tg-space-4: 16px;
+  --md-text-font: "Geist";
+  --md-code-font: "Geist Mono";
   --md-text-font-family: var(--tg-font-sans);
   --md-code-font-family: var(--tg-font-mono);
 }
@@ -30,6 +49,7 @@
   --tg-muted: var(--tg-grey-600);
   --tg-hair: var(--tg-grey-200);
   --tg-rule-color: var(--tg-black);
+  --tg-logo: url("../brand/mark-black.svg");
 }
 
 [data-md-color-scheme="slate"] {
@@ -39,6 +59,7 @@
   --tg-muted: var(--tg-grey-400);
   --tg-hair: var(--tg-grey-800);
   --tg-rule-color: var(--tg-grey-100);
+  --tg-logo: url("../brand/mark-white.svg");
 }
 
 [data-md-color-scheme] {
@@ -107,6 +128,7 @@ body { background: var(--tg-bg); }
 /* Header and tabs: page-colored, closed by a heavy rule like the mark's header block. */
 .md-header, .md-tabs { background-color: var(--tg-bg); color: var(--tg-fg); box-shadow: none; }
 .md-tabs { border-bottom: var(--tg-rule) solid var(--tg-rule-color); }
+.md-header__button.md-logo img { content: var(--tg-logo); height: 1.6rem; }
 .md-header__topic:first-child { font-weight: 800; letter-spacing: -.03em; }
 .md-tabs__link { font-weight: 600; font-size: .7rem; opacity: .7; }
 .md-tabs__item--active .md-tabs__link { opacity: 1; text-decoration: underline var(--tg-rule); text-underline-offset: .5em; }
@@ -118,7 +140,7 @@ body { background: var(--tg-bg); }
 .md-nav__link--active { font-weight: 700; }
 .md-nav__link:is(:hover, :focus) { color: var(--tg-fg); text-decoration: underline; }
 
-/* Type: the system faces. Headings stay upright. */
+/* Type: Geist for prose, Geist Mono for code and figures. Headings stay upright. */
 .md-typeset { font-size: .8rem; line-height: 1.6; counter-reset: tg-h2; }
 .md-typeset h1 {
   font-weight: 800;
@@ -197,3 +219,14 @@ body { background: var(--tg-bg); }
 
 .md-footer { border-top: var(--tg-rule-hair) solid var(--tg-hair); }
 .md-footer-meta { background: var(--tg-bg); }
+
+/* Figures are drawn on white paper; in dark mode they sit on a white mat so axes and labels keep
+   their contrast. */
+.md-typeset img[src$=".png"] { border: var(--tg-rule-hair) solid var(--tg-hair); }
+[data-md-color-scheme="slate"] .md-typeset img[src$=".png"] { background: var(--tg-white); padding: var(--tg-space-2); }
+
+/* Home page hero. The wordmark is the title there, so the generated h1 goes. */
+.md-typeset h1:has(+ .tg-hero) { display: none; }
+.md-typeset .tg-hero { margin: var(--tg-space-4) 0 2.5rem; }
+.md-typeset .tg-hero img { width: min(26rem, 100%); height: auto; }
+.md-typeset .tg-hero p.tg-pitch { font-size: 1.15rem; line-height: 1.4; letter-spacing: -.01em; max-width: 34rem; margin: 1.2rem 0; }

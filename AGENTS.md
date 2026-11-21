@@ -24,7 +24,7 @@ mise run verify     # lint + test (must pass before a PR)
 mise run bench      # cargo bench (no benches yet)
 mise run examples   # rerun examples/*/*/example_*.py and rewrite their README.md and figures
 mise run docs       # mkdocs serve
-mise run docs-build # mkdocs build --strict
+mise run docs-build # mkdocs build --strict, then the theme check (python/tests/test_docs_theme.py)
 mise run changelog  # git-cliff --unreleased: a draft entry since the last tag, edited into CHANGELOG.md by hand
 mise run third-party-licenses # cargo-about: regenerate THIRD-PARTY-LICENSES.txt after a Cargo.lock change
 mise run compat     # install the wheel via pip, uv, pixi and conda (mode: all, venv, uv, pixi, conda)

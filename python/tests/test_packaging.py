@@ -299,7 +299,10 @@ def test_docs_site_uses_the_family_theme_in_both_schemes():
     assert "scheme: default" in text and "scheme: slate" in text
     css = (ROOT / "docs" / "stylesheets" / "transiograms.css").read_text(encoding="utf-8")
     assert '[data-md-color-scheme="default"]' in css and '[data-md-color-scheme="slate"]' in css
-    assert "url(" not in css, "the theme makes no request to another server"
+    urls = re.findall(r"url\(\"?([^\")]+)\"?\)", css)
+    assert "@import" not in css and "//" not in "".join(urls), "the theme makes no request to another server"
+    for url in urls:
+        assert (ROOT / "docs" / "stylesheets" / url).resolve().is_file(), url
 
 
 def test_changelog_has_a_section_for_this_version():

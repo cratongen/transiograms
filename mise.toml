@@ -48,8 +48,13 @@ depends = ["py:build"]
 run = "uv run --no-sync mkdocs serve"
 
 [tasks.docs-build]
+description = "mkdocs build --strict into site/, then check the theme against the built Material CSS"
 depends = ["py:build"]
-run = "uv run --no-sync mkdocs build --strict"
+env = { TG_REQUIRE_SITE = "1" }
+run = [
+  "uv run --no-sync mkdocs build --strict",
+  "uv run --no-sync pytest -q -p no:cacheprovider python/tests/test_docs_theme.py",
+]
 
 [tasks.third-party-licenses]
 description = "Regenerate THIRD-PARTY-LICENSES.txt (cargo-about over the about.toml targets) after a Cargo.lock change"

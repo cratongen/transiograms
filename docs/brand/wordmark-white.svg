@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 262 48" role="img" aria-label="transiograms">
+  <title>transiograms</title>
+  <!-- Monoline letters on a 20-unit x-height (y 10 to 30), drawn as paths so no font is needed. -->
+  <g transform="translate(5 4)" fill="none" stroke="#fff" stroke-width="3.5">
+    <path d="M4 2V25A5 5 0 0 0 9 30H12M0 10H11"/>
+    <path d="M20 30V10M20 19C20 13 24 10 30 10"/>
+    <path d="M54 20A8 10 0 1 1 38 20A8 10 0 1 1 54 20M54 10V30"/>
+    <path d="M62 30V10M62 18A8 8 0 0 1 78 18V30"/>
+    <path d="M99.06 12.5A7 5 0 1 0 93 20A7 5 0 1 1 86.94 27.5"/>
+    <path d="M108 10V30"/>
+    <path d="M132 20A8 10 0 1 1 116 20A8 10 0 1 1 132 20"/>
+    <path d="M156 20A8 10 0 1 1 140 20A8 10 0 1 1 156 20M156 10V35A8 5 0 0 1 141.07 37.5"/>
+    <path d="M164 30V10M164 19C164 13 168 10 174 10"/>
+    <path d="M198 20A8 10 0 1 1 182 20A8 10 0 1 1 198 20M198 10V30"/>
+    <path d="M206 30V10M206 17A6 7 0 0 1 218 17V30M218 17A6 7 0 0 1 230 17V30"/>
+    <path d="M251.06 12.5A7 5 0 1 0 245 20A7 5 0 1 1 238.94 27.5"/>
+  </g>
+  <circle cx="113" cy="6.5" r="2.4" fill="#fff"/>
+</svg>
