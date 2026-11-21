@@ -1,16 +1,31 @@
-# transiograms
+<p>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://cratongen.github.io/transiograms/brand/wordmark-white.svg">
+    <img alt="transiograms" src="https://cratongen.github.io/transiograms/brand/wordmark-black.svg" width="372">
+  </picture>
+</p>
 
-transiograms fits and simulates Markov models of geological categories such as facies and
-lithology. Along drillholes and logs it fits Markov chains, hidden Markov models and hidden
-semi-Markov models. In 3D it measures and models transiograms and simulates categorical grids with
-T-PROGS and Markov chain random fields (MCRF). The core is Rust; the Python package needs only
-NumPy.
+[![PyPI](https://img.shields.io/pypi/v/transiograms?color=black&label=PyPI)](https://pypi.org/project/transiograms/)
+[![Docs](https://img.shields.io/badge/docs-cratongen.github.io-black)](https://cratongen.github.io/transiograms/)
+[![Licence](https://img.shields.io/badge/licence-MIT%20OR%20Apache--2.0-black)](https://github.com/cratongen/transiograms/blob/main/LICENSE-MIT)
 
-The library is named after the transiogram: the probability of finding category `j` at lag `h`
-from a point in category `i`, as a function of `h`.
+**Markov models of geological categories: fit facies and lithology sequences down drillholes,
+model transiograms, and simulate categories on 3D grids. A Rust core with Python bindings.**
 
-Documentation: <https://cratongen.github.io/transiograms/>. Source and issues:
-<https://github.com/cratongen/transiograms>.
+transiograms is for geologists, geostatisticians and resource modellers who log categories
+(facies, lithology, alteration, ore type) and want their spatial structure as numbers they can
+test. Along drillholes and logs it fits Markov chains, hidden Markov models and hidden semi-Markov
+models. On grids it builds 3D transition models from transiograms, simulates them with T-PROGS or
+Markov chain random fields (MCRF), and predicts them with MCP. The name comes from the
+transiogram: the probability of finding category `j` at lag `h` from a point in category `i`, as a
+function of `h`.
+
+[Docs](https://cratongen.github.io/transiograms/) ·
+[Guide](https://cratongen.github.io/transiograms/guide/markov-chains/) ·
+[Examples](https://cratongen.github.io/transiograms/examples/01-markov-chains/01-embedded-chains/) ·
+[API](https://cratongen.github.io/transiograms/api/core/) ·
+[Status](https://cratongen.github.io/transiograms/status/) ·
+[Changelog](https://github.com/cratongen/transiograms/blob/main/CHANGELOG.md)
 
 ## Install
 
@@ -18,10 +33,12 @@ Documentation: <https://cratongen.github.io/transiograms/>. Source and issues:
 pip install transiograms
 ```
 
-transiograms supports CPython 3.11 and newer through one `abi3` wheel per platform. NumPy is the
-only runtime dependency; `pip install "transiograms[plot]"` adds matplotlib for `tg.plot`. A
-platform without a wheel builds from the sdist, which needs Rust 1.97 or newer. See the
-[install page](https://cratongen.github.io/transiograms/install/) for details.
+With uv, `uv add transiograms` in a project or `uv pip install transiograms` in an environment.
+transiograms needs CPython 3.11 or newer and ships one `abi3` wheel per platform: Linux (x86_64
+and aarch64 with glibc, x86_64 with musl), macOS (Intel and Apple silicon) and Windows x86_64.
+NumPy is its only runtime dependency; `pip install "transiograms[plot]"` adds matplotlib for
+`tg.plot`. Other platforms build from the sdist, which needs Rust 1.97 or newer. The
+[install page](https://cratongen.github.io/transiograms/install/) has the details.
 
 ## Quick start
 
@@ -52,9 +69,10 @@ vertical mean lengths (m): [9.43 7.4  5.44]
 largest residual: 0.136
 ```
 
-The first part fits an embedded Markov chain to twelve seeded holes of sand, silt and clay beds.
-The second measures vertical transiograms down 25 seeded drillholes, fits a Markov model with its
-sills at the sample proportions, and reports the misfit. The
+The first part fits an embedded Markov chain to twelve seeded holes of sand, silt and clay beds:
+sand passes up into silt 83% of the time and silt into clay 88% of the time. The second part
+measures vertical transiograms down 25 seeded drillholes, fits a Markov model with its sills at
+the sample proportions, and reports the misfit. The
 [examples](https://cratongen.github.io/transiograms/examples/01-markov-chains/01-embedded-chains/)
 go on to hidden Markov segmentation, 3D transition models and grid simulation.
 
@@ -70,34 +88,73 @@ go on to hidden Markov segmentation, 3D transition models and grid simulation.
   entrywise models whose rows sum to one at every lag; 3D transition models from rates or mean
   lengths.
 - **Grid simulation**: transition-probability cokriging and T-PROGS simulation with quenching;
-  Markov-type categorical prediction (MCP) and MCRF simulation, conditioned to drillholes.
+  MCP prediction and MCRF simulation, conditioned to drillholes.
+- **Fit-quality reports**: `tg.fit_quality` compares T-PROGS or MCRF realizations with their model
+  (proportions, and grid transiograms per lag with standard errors), and
+  `TransiogramModel.residuals` gives the misfit of a 1D fit. The report is the same from Rust
+  and Python.
 
 Every stochastic routine takes a `seed` and gives the same bits on any number of threads. Grid
 work is sized from the available memory and checked before it allocates.
 
-## Fit quality and known limits
+## Status and limits
 
-`tg.fit_quality` compares T-PROGS or MCRF realizations with their model (proportions, and grid
-transiograms per lag with standard errors), and `TransiogramModel.residuals` gives the misfit of a
-1D fit. Both simulators keep a measured gap to their model, documented as a limit of the method:
-MCRF without hard data drifts 0.038 from the target proportions and misses transiograms by up to
-0.19; T-PROGS with the default quench misses mid-lag transiograms by up to 0.026. Seeded tests pin
-these numbers; the
-[T-PROGS](https://cratongen.github.io/transiograms/guide/tp-simulation/) and
-[MCRF](https://cratongen.github.io/transiograms/guide/mcrf-mcp/) guides explain them.
+Version 0.1.0 is the first public release and an alpha: the API can change between minor
+versions. Its known gaps:
 
-## Status
+- **Both simulators keep a measured gap to their model.** This is a limit of the methods, and
+  seeded tests pin each number. MCRF without hard data drifts 0.038 from the target proportions
+  and misses the transiograms by up to 0.19. T-PROGS with the default quench misses mid-lag
+  transiograms by up to 0.026. The
+  [T-PROGS](https://cratongen.github.io/transiograms/guide/tp-simulation/) and
+  [MCRF](https://cratongen.github.io/transiograms/guide/mcrf-mcp/) guides explain both, and
+  `tg.fit_quality` reports the gap for your own model.
+- **The container types will change.** `tg.Categories` and `tg.Grid` move to a shared types
+  package in a later release, and category codes may change from `int64` to `int32`.
+- **It reads no files.** You pass NumPy arrays, or a mapping of column names to arrays, and get
+  NumPy arrays back.
+- **Performance is not measured.** No benchmark has run yet.
+- **PyPI only.** The Rust crates are not on crates.io, and there is no conda-forge package yet;
+  `pip install transiograms` works inside a conda environment.
 
-Version 0.1.0 is an alpha release: the API can change between minor versions. Performance is not
-measured yet. The
-[status page](https://cratongen.github.io/transiograms/status/) lists each milestone, its
+The [status page](https://cratongen.github.io/transiograms/status/) lists each milestone, its
 acceptance test and what is still missing.
+
+## Beside the sibling libraries
+
+transiograms is one of a family of standalone libraries for mining and geoscience. None depends on
+another; they exchange NumPy arrays.
+
+| Library | What it does |
+| --- | --- |
+| [boitata](https://pypi.org/project/boitata/) | Day-to-day geostatistics: drillhole checks, statistics, variograms, kriging and simulation |
+| segyrs | Reading, writing and manipulation of large SEG-Y files |
+| wireframes | Solids, surfaces and strings: read, write, plot, measure and combine |
+| transiograms | Markov models and categorical simulation of facies and lithology |
+| orebodies | Seeded synthetic mineral deposits for testing and teaching |
+| geophysics | Forward geophysical simulation: gravity, magnetics, seismic, DC/IP, EM, MT and GPR |
+
+The [boitata guide](https://cratongen.github.io/transiograms/guide/boitata/) shows how intervals,
+category codes and grids pass between boitata and transiograms.
+
+## Build from source
+
+The repository uses [mise](https://mise.jdx.dev/) for every tool and command. In a clone:
+
+```sh
+mise install          # the pinned Python, uv and helpers; rustup reads rust-toolchain.toml
+mise run py:build     # build the extension into .venv
+mise run verify       # lint, Rust tests and pytest
+mise run docs-build   # the documentation site, built strict
+```
 
 ## Contributing
 
 Issues are open. A code contribution starts with an issue; see
 [CONTRIBUTING.md](https://github.com/cratongen/transiograms/blob/main/CONTRIBUTING.md).
 
-## License
+## Licence
 
-Licensed under either of the [Apache License, Version 2.0](https://github.com/cratongen/transiograms/blob/main/LICENSE-APACHE) or the [MIT licence](https://github.com/cratongen/transiograms/blob/main/LICENSE-MIT), at your option.
+transiograms is dual-licensed under MIT OR Apache-2.0; pick either: [LICENSE-MIT](https://github.com/cratongen/transiograms/blob/main/LICENSE-MIT),
+[LICENSE-APACHE](https://github.com/cratongen/transiograms/blob/main/LICENSE-APACHE). Each wheel
+also carries `THIRD-PARTY-LICENSES.txt`, the licences of the Rust crates linked into it.
