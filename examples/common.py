@@ -2,17 +2,22 @@
 
 import matplotlib as mpl
 
-INK = "#1a1a1a"
-GRAY = "#8c8c8c"
+INK = "#000000"
+GRAY = "#737373"
 ACCENT = "#0072b2"
 HIGHLIGHT = "#d55e00"
-SERIES = [ACCENT, GRAY, HIGHLIGHT, "#009e73", "#e69f00", "#cc79a7", "#56b4e9"]
+SERIES = [INK, GRAY, ACCENT, HIGHLIGHT, "#009e73", "#e69f00", "#cc79a7"]
 
 mpl.rcParams.update(
     {
         "figure.dpi": 110,
         "savefig.dpi": 160,
         "savefig.bbox": "tight",
+        "savefig.facecolor": "white",
+        "text.color": INK,
+        "axes.labelcolor": INK,
+        "xtick.color": INK,
+        "ytick.color": INK,
         "font.size": 9,
         "axes.titlesize": 10,
         "axes.titleweight": "bold",
@@ -22,6 +27,6 @@ mpl.rcParams.update(
         "axes.spines.right": False,
         "axes.prop_cycle": mpl.cycler(color=SERIES),
         "legend.frameon": False,
-        "image.cmap": "cividis",
+        "image.cmap": "Greys",
     }
 )
