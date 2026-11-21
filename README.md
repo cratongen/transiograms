@@ -131,7 +131,6 @@ another; they exchange NumPy arrays.
 | segyrs | Reading, writing and manipulation of large SEG-Y files |
 | wireframes | Solids, surfaces and strings: read, write, plot, measure and combine |
 | transiograms | Markov models and categorical simulation of facies and lithology |
-| orebodies | Seeded synthetic mineral deposits for testing and teaching |
 | geophysics | Forward geophysical simulation: gravity, magnetics, seismic, DC/IP, EM, MT and GPR |
 
 The [boitata guide](https://cratongen.github.io/transiograms/guide/boitata/) shows how intervals,
