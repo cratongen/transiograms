@@ -1,0 +1,199 @@
+/* transiograms docs theme on Material for MkDocs, shared with the cratongen family (segyrs,
+   boitata): black, white and greys, flush left, heavy rules. Links are underlined, emphasis is
+   weight, and syntax highlighting is a grey ramp. Colour belongs to the figures only (category
+   colours in tg.plot), never to the interface. The theme uses the system faces and makes no
+   request to another server. */
+
+:root {
+  --tg-black: #000000;
+  --tg-grey-900: #171717;
+  --tg-grey-800: #262626;
+  --tg-grey-600: #525252;
+  --tg-grey-500: #737373;
+  --tg-grey-400: #a3a3a3;
+  --tg-grey-200: #e5e5e5;
+  --tg-grey-100: #f5f5f5;
+  --tg-white: #ffffff;
+  --tg-font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --tg-font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  --tg-rule-hair: 1px;
+  --tg-rule: 3px;
+  --tg-rule-heavy: 6px;
+  --md-text-font-family: var(--tg-font-sans);
+  --md-code-font-family: var(--tg-font-mono);
+}
+
+[data-md-color-scheme="default"] {
+  --tg-bg: var(--tg-white);
+  --tg-surface: var(--tg-grey-100);
+  --tg-fg: var(--tg-black);
+  --tg-muted: var(--tg-grey-600);
+  --tg-hair: var(--tg-grey-200);
+  --tg-rule-color: var(--tg-black);
+}
+
+[data-md-color-scheme="slate"] {
+  --tg-bg: var(--tg-black);
+  --tg-surface: var(--tg-grey-900);
+  --tg-fg: var(--tg-grey-100);
+  --tg-muted: var(--tg-grey-400);
+  --tg-hair: var(--tg-grey-800);
+  --tg-rule-color: var(--tg-grey-100);
+}
+
+[data-md-color-scheme] {
+  --md-default-bg-color: var(--tg-bg);
+  --md-default-fg-color: var(--tg-fg);
+  --md-default-fg-color--light: var(--tg-muted);
+  --md-default-fg-color--lighter: var(--tg-muted);
+  --md-default-fg-color--lightest: var(--tg-hair);
+  --md-default-bg-color--light: color-mix(in srgb, var(--tg-bg) 70%, transparent);
+  --md-default-bg-color--lighter: color-mix(in srgb, var(--tg-bg) 30%, transparent);
+  --md-default-bg-color--lightest: color-mix(in srgb, var(--tg-bg) 12%, transparent);
+  --md-primary-fg-color: var(--tg-bg);
+  --md-primary-fg-color--light: var(--tg-surface);
+  --md-primary-fg-color--dark: var(--tg-bg);
+  --md-primary-bg-color: var(--tg-fg);
+  --md-primary-bg-color--light: var(--tg-muted);
+  --md-accent-fg-color: var(--tg-fg);
+  --md-accent-fg-color--transparent: var(--tg-hair);
+  --md-accent-bg-color: var(--tg-bg);
+  --md-typeset-color: var(--tg-fg);
+  --md-typeset-a-color: var(--tg-fg);
+  --md-typeset-table-color: var(--tg-hair);
+  --md-typeset-table-color--light: var(--tg-surface);
+  --md-typeset-kbd-color: var(--tg-surface);
+  --md-typeset-kbd-accent-color: var(--tg-bg);
+  --md-typeset-kbd-border-color: var(--tg-muted);
+  --md-typeset-mark-color: var(--tg-hair);
+  --md-typeset-del-color: var(--tg-hair);
+  --md-typeset-ins-color: var(--tg-hair);
+  --md-code-bg-color: var(--tg-surface);
+  --md-code-bg-color--light: color-mix(in srgb, var(--tg-surface) 90%, transparent);
+  --md-code-bg-color--lighter: color-mix(in srgb, var(--tg-surface) 54%, transparent);
+  --md-code-fg-color: var(--tg-fg);
+  --md-code-hl-color: var(--tg-hair);
+  --md-code-hl-color--light: var(--tg-hair);
+  --md-code-hl-keyword-color: var(--tg-fg);
+  --md-code-hl-function-color: var(--tg-fg);
+  --md-code-hl-name-color: var(--tg-fg);
+  --md-code-hl-variable-color: var(--tg-fg);
+  --md-code-hl-constant-color: var(--tg-fg);
+  --md-code-hl-number-color: var(--tg-fg);
+  --md-code-hl-string-color: var(--tg-muted);
+  --md-code-hl-special-color: var(--tg-muted);
+  --md-code-hl-operator-color: var(--tg-muted);
+  --md-code-hl-punctuation-color: var(--tg-muted);
+  --md-code-hl-comment-color: var(--tg-muted);
+  --md-code-hl-generic-color: var(--tg-muted);
+  --md-footer-bg-color: var(--tg-bg);
+  --md-footer-bg-color--dark: var(--tg-bg);
+  --md-footer-fg-color: var(--tg-fg);
+  --md-footer-fg-color--light: var(--tg-muted);
+  --md-footer-fg-color--lighter: var(--tg-muted);
+  --md-admonition-bg-color: var(--tg-surface);
+  --md-admonition-fg-color: var(--tg-fg);
+  --md-warning-fg-color: var(--tg-fg);
+  --md-warning-bg-color: var(--tg-surface);
+  --md-shadow-z1: none;
+  --md-shadow-z2: none;
+  --md-shadow-z3: none;
+}
+
+body { background: var(--tg-bg); }
+::selection { background: var(--tg-fg); color: var(--tg-bg); }
+:focus-visible { outline: 2px solid var(--tg-fg); outline-offset: 2px; }
+
+/* Header and tabs: page-colored, closed by a heavy rule like the mark's header block. */
+.md-header, .md-tabs { background-color: var(--tg-bg); color: var(--tg-fg); box-shadow: none; }
+.md-tabs { border-bottom: var(--tg-rule) solid var(--tg-rule-color); }
+.md-header__topic:first-child { font-weight: 800; letter-spacing: -.03em; }
+.md-tabs__link { font-weight: 600; font-size: .7rem; opacity: .7; }
+.md-tabs__item--active .md-tabs__link { opacity: 1; text-decoration: underline var(--tg-rule); text-underline-offset: .5em; }
+.md-search__form, .md-search__input { background-color: var(--tg-surface); border-radius: 0; }
+.md-search__input::placeholder { color: var(--tg-muted); }
+
+.md-grid { max-width: 66rem; }
+.md-nav__item--section > .md-nav__link { font-weight: 800; font-size: .7rem; }
+.md-nav__link--active { font-weight: 700; }
+.md-nav__link:is(:hover, :focus) { color: var(--tg-fg); text-decoration: underline; }
+
+/* Type: the system faces. Headings stay upright. */
+.md-typeset { font-size: .8rem; line-height: 1.6; counter-reset: tg-h2; }
+.md-typeset h1 {
+  font-weight: 800;
+  font-size: 2.6em;
+  line-height: 1;
+  letter-spacing: -.04em;
+  color: var(--tg-fg);
+  padding-bottom: .35em;
+  border-bottom: var(--tg-rule-heavy) solid var(--tg-rule-color);
+}
+.md-typeset h2 {
+  counter-increment: tg-h2;
+  font-weight: 800;
+  font-size: 1.5em;
+  line-height: 1.1;
+  letter-spacing: -.025em;
+  margin-top: 2.2em;
+  padding-top: .5em;
+  border-top: var(--tg-rule) solid var(--tg-rule-color);
+}
+.md-typeset h2::before {
+  content: counter(tg-h2, decimal-leading-zero);
+  display: block;
+  margin-bottom: .35em;
+  font-family: var(--tg-font-mono);
+  font-size: .5em;
+  font-weight: 500;
+  letter-spacing: .08em;
+  color: var(--tg-muted);
+}
+.md-typeset h3 { font-weight: 700; font-size: 1.1em; letter-spacing: -.01em; }
+.md-typeset h4 { font-weight: 700; }
+
+.md-typeset a { text-decoration: underline; text-decoration-color: var(--tg-grey-500); text-underline-offset: .2em; }
+.md-typeset a:hover { text-decoration-color: currentColor; }
+.md-typeset a.headerlink { text-decoration: none; }
+
+/* Code: flat blocks with a left rule, no radius. */
+.md-typeset code, .md-typeset pre > code { border-radius: 0; }
+.md-typeset .highlight { border-left: var(--tg-rule) solid var(--tg-rule-color); }
+.md-typeset .highlight .k, .md-typeset .highlight .kn, .md-typeset .highlight .kd, .md-typeset .highlight .nf { font-weight: 700; }
+
+/* Tables: figures in mono, heavy rule under the head. */
+.md-typeset table:not([class]) { border: 0; border-radius: 0; font-size: .72rem; box-shadow: none; }
+.md-typeset table:not([class]) th {
+  background: none;
+  border-bottom: var(--tg-rule) solid var(--tg-rule-color);
+  font-weight: 800;
+}
+.md-typeset table:not([class]) td { border-top: var(--tg-rule-hair) solid var(--tg-hair); font-variant-numeric: tabular-nums; }
+
+/* Admonitions: filled, square, a heavy top rule, monotone icon. The scheme attribute lifts these
+   rules above Material's typed ones (.md-typeset .admonition.note and the like), which carry hues. */
+[data-md-color-scheme] .md-typeset :is(.admonition, details),
+[data-md-color-scheme] .md-typeset :is(.admonition, details):focus-within {
+  background: var(--tg-surface);
+  border: 0;
+  border-top: 4px solid var(--tg-rule-color);
+  border-radius: 0;
+  box-shadow: none;
+  font-size: .74rem;
+}
+[data-md-color-scheme] .md-typeset :is(.admonition, details) > :is(.admonition-title, summary) { background: none; font-weight: 800; }
+[data-md-color-scheme] .md-typeset :is(.admonition, details) > :is(.admonition-title, summary)::before { background-color: var(--tg-fg); }
+[data-md-color-scheme] .md-typeset :is(.admonition, details) > :is(.admonition-title, summary)::after { color: var(--tg-fg); }
+[data-md-color-scheme] .md-typeset details > summary::after { background-color: var(--tg-fg); }
+
+/* Buttons: outlined, square; primary is solid ink. */
+.md-typeset .md-button { border-radius: 0; border: 2px solid var(--tg-fg); color: var(--tg-fg); font-weight: 700; text-decoration: none; }
+.md-typeset .md-button--primary { background: var(--tg-fg); color: var(--tg-bg); }
+.md-typeset .md-button:is(:hover, :focus) { background: var(--tg-fg); border-color: var(--tg-fg); color: var(--tg-bg); }
+.md-typeset .md-button--primary:is(:hover, :focus) { background: var(--tg-grey-600); border-color: var(--tg-grey-600); }
+
+/* Lowercase chrome for the theme's own short labels; prose keeps its case. */
+.md-search__input::placeholder, .md-nav__title, .md-top, .md-footer__direction, .md-source__repository { text-transform: lowercase; }
+
+.md-footer { border-top: var(--tg-rule-hair) solid var(--tg-hair); }
+.md-footer-meta { background: var(--tg-bg); }

@@ -5,11 +5,33 @@ repo_url: https://github.com/cratongen/transiograms
 repo_name: cratongen/transiograms
 edit_uri: ""
 
+copyright: Copyright 2026 the transiograms authors. MIT OR Apache-2.0.
+
 theme:
   name: material
+  font: false
+  icon:
+    repo: fontawesome/brands/github
   features:
     - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
     - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle: {icon: material/weather-night, name: Dark mode}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle: {icon: material/weather-sunny, name: Light mode}
+
+extra_css:
+  - stylesheets/transiograms.css
 
 markdown_extensions:
   - admonition

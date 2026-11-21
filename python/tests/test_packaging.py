@@ -291,3 +291,12 @@ def test_contributing_and_issue_templates_say_code_starts_with_an_issue():
         if name != "config.yml":
             assert form["name"] and form["description"] and form["body"], name
     assert "CONTRIBUTING.md" in str(forms["feature-request.yml"]["body"])
+
+
+def test_docs_site_uses_the_family_theme_in_both_schemes():
+    text = (ROOT / "mkdocs.yml").read_text(encoding="utf-8")
+    assert "extra_css:\n  - stylesheets/transiograms.css\n" in text
+    assert "scheme: default" in text and "scheme: slate" in text
+    css = (ROOT / "docs" / "stylesheets" / "transiograms.css").read_text(encoding="utf-8")
+    assert '[data-md-color-scheme="default"]' in css and '[data-md-color-scheme="slate"]' in css
+    assert "url(" not in css, "the theme makes no request to another server"
