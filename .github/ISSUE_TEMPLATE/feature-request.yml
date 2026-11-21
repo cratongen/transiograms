@@ -1,0 +1,36 @@
+name: Feature request
+description: Propose a new method or a change to an existing one. Code contributions start here.
+title: "ENH: <short title>"
+labels: [enhancement]
+
+body:
+- type: markdown
+  attributes:
+    value: >
+      Describe the geological or statistical problem first, then the change you have in mind. A
+      code contribution starts with an accepted issue; see
+      [CONTRIBUTING.md](https://github.com/cratongen/transiograms/blob/main/CONTRIBUTING.md).
+
+- type: textarea
+  attributes:
+    label: "Problem and proposed change"
+    description: >
+      What do you want to fit, simulate or check, and what stops you today? Name the method or
+      the paper if there is one.
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: "Example usage"
+    description: How would you call it from Python?
+    render: python
+
+- type: dropdown
+  attributes:
+    label: "Do you want to implement it?"
+    options:
+      - "No"
+      - "Yes, once the issue is accepted"
+  validations:
+    required: true

@@ -1,0 +1,47 @@
+name: Bug report
+description: Report a crash, a wrong result or an unclear error message.
+title: "BUG: <short title>"
+labels: [bug]
+
+body:
+- type: markdown
+  attributes:
+    value: >
+      Thank you for reporting a bug. Please search the
+      [existing issues](https://github.com/cratongen/transiograms/issues) first. If a simulation
+      misses its model, check the documented limits in the T-PROGS and MCRF guides and the
+      `tg.fit_quality` report first.
+
+- type: textarea
+  attributes:
+    label: "What happened"
+    description: What did you expect, and what happened instead?
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: "Code to reproduce it"
+    description: >
+      A short script we can run as it is, with a fixed `seed`. Use `tg.datasets` or small seeded
+      synthetic data, never client data.
+    placeholder: |
+      import transiograms as tg
+      << your code here >>
+    render: python
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: "Error message"
+    description: The full traceback, if any.
+    render: shell
+
+- type: textarea
+  attributes:
+    label: "Versions and platform"
+    description: >
+      Output of `import sys, platform, numpy, transiograms; print(transiograms.__version__, numpy.__version__, sys.version, platform.platform())`.
+  validations:
+    required: true

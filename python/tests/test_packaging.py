@@ -276,3 +276,18 @@ def test_release_checklist_names_the_minetypes_gate_and_the_types_it_replaces():
     assert "release-checklist.md" in (ROOT / "mkdocs.yml").read_text(encoding="utf-8")
     assert "minetypes" not in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert "minetypes" not in (ROOT / "Cargo.toml").read_text(encoding="utf-8")
+
+
+def test_contributing_and_issue_templates_say_code_starts_with_an_issue():
+    text = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
+    assert "## A code contribution starts with an issue" in text
+    assert "MIT OR Apache-2.0" in text
+    yaml = pytest.importorskip("yaml")
+    templates = ROOT / ".github" / "ISSUE_TEMPLATE"
+    forms = {f.name: yaml.safe_load(f.read_text(encoding="utf-8")) for f in templates.glob("*.yml")}
+    assert {"config.yml", "bug-report.yml", "feature-request.yml"} <= set(forms)
+    assert forms["config.yml"]["blank_issues_enabled"] is False
+    for name, form in forms.items():
+        if name != "config.yml":
+            assert form["name"] and form["description"] and form["body"], name
+    assert "CONTRIBUTING.md" in str(forms["feature-request.yml"]["body"])
