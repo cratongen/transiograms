@@ -17,6 +17,12 @@ Every function takes `ax=None` (or `axes=None`), returns `(fig, ax)` or `(fig, a
 | `transiogram(experimental=None, model=None, *, h=None, categories=None)` | the `k x k` grid of transiograms |
 | `grid_slice(values, grid, *, axis="z", index=0, categories=None)` | one slice of a grid property |
 
+::: transiograms.plot
+    options:
+      show_root_heading: false
+      heading_level: 3
+      members_order: alphabetical
+
 ## tg.datasets
 
 Seeded synthetic data with known parameters; each takes `seed=0` and returns a dict.
@@ -26,6 +32,12 @@ Seeded synthetic data with known parameters; each takes `seed=0` and returns a d
 | `varved_sequence()` | 12 holes of sand, silt and clay intervals: `HOLE_ID`, `FROM`, `TO`, `CODE`, `names`, `generator` |
 | `electrofacies_logs()` | 20 wells x 300 samples from a 3-state Gaussian HMM: `HOLE_ID`, `DEPTH`, `GR`, `RHOB`, `STATE`, `model` |
 | `layered_drillholes()` | 25 vertical holes through an unconditional MCRF field, which departs from its `model` (quantified in the docstring): `X`, `Y`, `Z`, `FROM`, `TO`, `HOLE_ID`, `CODE`, `field`, `model`, `grid` |
+
+::: transiograms.datasets
+    options:
+      show_root_heading: false
+      heading_level: 3
+      members_order: alphabetical
 
 ## tg.checks
 
@@ -39,3 +51,9 @@ Pure NumPy reference implementations the tests compare against.
 | `brute_force_hmm(start, transition, log_b)` | log-likelihood, best path and its log-probability, posteriors and path entropy over all paths |
 | `brute_force_hsmm(start, transition, log_d, log_survivor, log_b)` | the same for a semi-Markov model |
 | `mcp_brute_force(p, T_list, codes)` | the MCP conditional from the maximum-entropy joint table |
+
+::: transiograms.checks
+    options:
+      show_root_heading: false
+      heading_level: 3
+      members_order: alphabetical

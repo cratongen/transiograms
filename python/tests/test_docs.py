@@ -20,13 +20,6 @@ PAGES = sorted(
     if "```python" in p.read_text(encoding="utf-8")
 )
 EXAMPLE_PAGES = [p for p in PAGES if p.startswith("examples/")]
-KNOWN_FAILING = {
-    **{
-        p: "stub signatures in a python fence: NDArray, ArrayLike and class names are undefined"
-        for p in PAGES
-        if p.startswith("docs/api/")
-    },
-}
 BLOCK = re.compile(r"```(python|text)\n(.*?)\n```", re.DOTALL)
 RUNNER = """
 import contextlib, io, json, sys, traceback
@@ -62,13 +55,7 @@ def normalise(text: str) -> str:
     return "\n".join(line.rstrip() for line in text.strip().splitlines())
 
 
-@pytest.mark.parametrize(
-    "page",
-    [
-        pytest.param(p, marks=pytest.mark.skip(reason=KNOWN_FAILING[p])) if p in KNOWN_FAILING else p
-        for p in PAGES
-    ],
-)
+@pytest.mark.parametrize("page", PAGES)
 def test_documented_code_runs_and_prints_what_the_page_says(page, tmp_path):
     check_page(page, tmp_path)
 
@@ -114,3 +101,22 @@ def check_page(page: str, tmp_path: Path):
         assert got["error"] is None, f"{page}: block\n{code}\nraised\n{got['error']}"
         if expected is not None:
             assert normalise(got["stdout"]) == normalise(expected), f"{page}: block\n{code}"
+
+
+def test_api_pages_render_docstrings_with_stub_types_and_defaults(tmp_path):
+    pytest.importorskip("mkdocstrings_handlers.python")
+    site = tmp_path / "site"
+    run = subprocess.run(
+        [sys.executable, "-m", "mkdocs", "build", "--strict", "-q", "-d", str(site)],
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+        timeout=600,
+    )
+    assert run.returncode == 0, run.stderr[-3000:]
+    page = re.sub(r"<[^>]+>", " ", (site / "api" / "hmm" / "index.html").read_text(encoding="utf-8"))
+    page = re.sub(r"\s+", " ", page)
+    assert "Baum-Welch iterations" in page, "runtime docstrings are missing"
+    assert re.search(r"tol float Baum-Welch iterations.*? 1e-06 ", page), "grouped entries lost their own default"
+    assert "Sequences" in page and "ArrayLike" in page, "stub types are missing"

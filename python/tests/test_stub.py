@@ -79,34 +79,21 @@ def test_stub_and_runtime_export_the_same_names():
             assert members == public, node.name
 
 
-def api_page_nodes():
+def api_page_targets():
     root = Path(__file__).resolve().parents[2] / "docs" / "api"
     for page in sorted(root.glob("*.md")):
-        for block in re.findall(r"```python\n(.*?)\n```", page.read_text(encoding="utf-8"), re.DOTALL):
-            for node in ast.parse(block).body:
-                if isinstance(node, ast.FunctionDef):
-                    yield page.name, node.name, node
-                elif isinstance(node, ast.ClassDef):
-                    for m in node.body:
-                        if isinstance(m, ast.FunctionDef):
-                            yield page.name, f"{node.name}.{m.name}", m
+        text = page.read_text(encoding="utf-8")
+        assert "```python" not in text, f"{page.name}: API pages render docstrings, they do not paste code"
+        for name in re.findall(r"^::: transiograms\.(\w+)$", text, re.MULTILINE):
+            yield page.name, name
 
 
-def stub_nodes():
-    out = {}
-    for node in STUB.body:
-        if isinstance(node, ast.FunctionDef):
-            out[node.name] = node
-        elif isinstance(node, ast.ClassDef):
-            out.update({f"{node.name}.{m.name}": m for m in node.body if isinstance(m, ast.FunctionDef)})
-    return out
-
-
-def test_api_pages_copy_the_stub_signatures():
-    stub = stub_nodes()
-    differ = [
-        f"{page}: {name}"
-        for page, name, node in api_page_nodes()
-        if name not in stub or ast.dump(node.args) != ast.dump(stub[name].args)
-    ]
-    assert differ == []
+def test_api_pages_render_every_public_name_from_its_docstring():
+    targets = list(api_page_targets())
+    rendered = {name for _, name in targets}
+    assert set(tg.__all__) - STUB_ONLY <= rendered
+    assert len(targets) == len(rendered), "a name is rendered on two API pages"
+    for page, name in targets:
+        obj = getattr(tg, name, None)
+        assert obj is not None, f"{page}: tg.{name} does not exist"
+        assert inspect.getdoc(obj), f"{page}: tg.{name} has no docstring"
