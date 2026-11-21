@@ -118,5 +118,7 @@ def test_api_pages_render_docstrings_with_stub_types_and_defaults(tmp_path):
     page = re.sub(r"<[^>]+>", " ", (site / "api" / "hmm" / "index.html").read_text(encoding="utf-8"))
     page = re.sub(r"\s+", " ", page)
     assert "Baum-Welch iterations" in page, "runtime docstrings are missing"
-    assert re.search(r"tol float Baum-Welch iterations.*? 1e-06 ", page), "grouped entries lost their own default"
+    assert re.search(r"tol float Baum-Welch iterations.*? 1e-06 ", page), (
+        "grouped entries lost their own default"
+    )
     assert "Sequences" in page and "ArrayLike" in page, "stub types are missing"
