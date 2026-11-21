@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="transiograms">
   <title>transiograms</title>
-  <!-- The letters "tg" of the wordmark, for places where the name is printed beside it. -->
-  <g fill="none" stroke="#000" stroke-width="3.5">
-    <path d="M12 7V27A5 5 0 0 0 17 32H19M7 16H18"/>
-    <path d="M39 24A7 8 0 1 1 25 24A7 8 0 1 1 39 24M39 16V35A7 4.5 0 0 1 26 39.5"/>
+  <!-- A transiogram pair on its axes: the auto curve falls from 1 and the cross curve rises from 0, each to its sill. -->
+  <g fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 5V41H43" stroke-width="2.5"/>
+    <path d="M7 7C12 13.5 20 19 42 19M7 41C12 34.5 20 29 42 29" stroke-width="3.5"/>
   </g>
 </svg>

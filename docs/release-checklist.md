@@ -127,7 +127,7 @@ not a container, and stays.
    `rust-toolchain.toml` (1.97.1), because mise's Rust install on this machine points into segyrs.
 9. The PyPI author field: "Gustavo Pretto Scholze" (as in boitata and `LICENSE-MIT`) or a
    generic "the transiograms authors" (as in segyrs).
-10. The `tg` monogram and wordmark in `docs/brand/`: keep or replace.
+10. The transiogram mark and the wordmark in `docs/brand/`: keep or replace.
 
 ## Publishing by hand
 

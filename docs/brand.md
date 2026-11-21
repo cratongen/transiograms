@@ -2,10 +2,10 @@
 
 transiograms uses the cratongen family look, ported from [segyrs](https://cratongen.github.io/segyrs/):
 black, white and the greys between them, two typefaces, heavy horizontal rules, square flat
-blocks, numbered sections and underlined links. The name is set as a plain typographic wordmark.
-There is no pictorial mark.
+blocks, numbered sections and underlined links. The name is set as a plain typographic wordmark,
+and the mark is a transiogram pair.
 
-## Wordmark and favicon
+## Wordmark, mark and favicon
 
 ![transiograms wordmark](brand/wordmark-black.svg#only-light){ width="372" }
 ![transiograms wordmark](brand/wordmark-white.svg#only-dark){ width="372" }
@@ -14,13 +14,13 @@ There is no pictorial mark.
 | --- | --- |
 | [`brand/wordmark-black.svg`](brand/wordmark-black.svg) | The name in black ink, for a light background. The docs home uses it. |
 | [`brand/wordmark-white.svg`](brand/wordmark-white.svg) | The same in white ink, for a dark background. |
-| [`brand/mark-black.svg`](brand/mark-black.svg) | The letters `tg` alone, black ink. The docs header uses it, beside the printed name. |
+| [`brand/mark-black.svg`](brand/mark-black.svg) | A transiogram pair on its axes, black ink: the auto curve falls from 1, the cross curve rises from 0, each to its sill. The docs header uses it, beside the printed name. |
 | [`brand/mark-white.svg`](brand/mark-white.svg) | The same in white ink; the header swaps to it in dark mode. |
-| [`brand/favicon.svg`](brand/favicon.svg) | White `tg` on a black square, with thicker strokes so it reads at 16 px. |
+| [`brand/favicon.svg`](brand/favicon.svg) | The mark in white on a black square, with thicker strokes so it reads at 16 px. |
 
 Every file is hand-written SVG with no gradient, no filter and no embedded font. The letters are
-monoline paths with round bowls on a 20-unit x-height and a 3.5-unit stroke (4.5 in the favicon),
-so the name renders the same on GitHub, in a browser and in a slide deck.
+monoline paths with round bowls on a 20-unit x-height and a 3.5-unit stroke; the curves of the mark
+use the same stroke (4.5 in the favicon), so the name renders the same on GitHub, in a browser and in a slide deck.
 
 The name is always lowercase: `transiograms`. Set it in code font when you mean the package
 (`import transiograms as tg`) and in the text face when you mean the project.
