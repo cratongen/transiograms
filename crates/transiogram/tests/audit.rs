@@ -76,13 +76,19 @@ fn default_sill_is_the_start_stationary_and_stays_within_sampling_noise() {
         let exp = downhole(&logs, Direction::Down, &lags, 0.0).unwrap();
         let total: f64 = exp.tail_totals[0].iter().sum();
         let emp: Vec<f64> = exp.tail_totals[0].iter().map(|n| n / total).collect();
-        let fit = Model1D::fit_markov(&exp, None, 2, None)
-            .unwrap_or_else(|e| panic!("seed {seed}: {e}"));
+        let fit =
+            Model1D::fit_markov(&exp, None, 2, None).unwrap_or_else(|e| panic!("seed {seed}: {e}"));
         for i in 0..3 {
             to_data = to_data.max((fit.proportions()[i] - emp[i]).abs());
             data_to_truth = data_to_truth.max((emp[i] - P[i]).abs());
         }
     }
-    assert!((to_data - 0.046).abs() < 5e-4, "default sill to data: {to_data}");
-    assert!((data_to_truth - 0.107).abs() < 5e-4, "data to truth: {data_to_truth}");
+    assert!(
+        (to_data - 0.046).abs() < 5e-4,
+        "default sill to data: {to_data}"
+    );
+    assert!(
+        (data_to_truth - 0.107).abs() < 5e-4,
+        "data to truth: {data_to_truth}"
+    );
 }

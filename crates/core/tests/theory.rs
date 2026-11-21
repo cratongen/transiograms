@@ -439,7 +439,10 @@ fn minimisers() {
         "{x:?} {f}"
     );
     let (_, _, converged) = nelder_mead(rosen, &[-1.2, 1.0], 0.5, 1e-16, 20);
-    assert!(!converged, "20 evaluations cannot meet tol 1e-16 on Rosenbrock");
+    assert!(
+        !converged,
+        "20 evaluations cannot meet tol 1e-16 on Rosenbrock"
+    );
 }
 
 #[test]
