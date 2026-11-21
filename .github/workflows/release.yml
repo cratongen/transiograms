@@ -99,12 +99,12 @@ jobs:
           if-no-files-found: error
 
   # Linux wheels run in the official python images: slim (glibc) and alpine (musl). aarch64 runs
-  # under QEMU, so it covers the floor, the development Python and the newest only.
+  # on an arm64 runner and covers the floor, the development Python and the newest only.
   test-linux:
     if: github.repository == 'cratongen/transiograms'
     name: test ${{ matrix.platform }} py${{ matrix.python }}
     needs: wheels
-    runs-on: ubuntu-latest
+    runs-on: ${{ endsWith(matrix.platform, 'aarch64') && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -121,10 +121,6 @@ jobs:
         with:
           name: dist-${{ matrix.platform }}
           path: dist
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
-        if: endsWith(matrix.platform, 'aarch64')
-        with:
-          platforms: arm64
       - name: pytest against the installed wheel
         shell: bash
         run: |

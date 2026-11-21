@@ -114,7 +114,7 @@ development Python only; `release.yml` tests the Windows wheel on 3.11, 3.13 and
 | --- | --- |
 | `sdist` | On a tag, checks that the tag equals the workspace version in `Cargo.toml`, then builds the sdist. |
 | `wheels` | Builds one `cp311-abi3` wheel per platform with `PyO3/maturin-action`, `--locked` against the committed `Cargo.lock`, and fails if the wheel carries a sidecar library. |
-| `test-linux` | Installs each Linux wheel with pytest, SciPy and matplotlib in the official `python:<version>-slim` (glibc) or `-alpine` (musl) image and runs `python/tests`. x86_64 covers 3.11 to 3.15; aarch64 runs under QEMU on 3.11, 3.13 and 3.15. |
+| `test-linux` | Installs each Linux wheel with pytest, SciPy and matplotlib in the official `python:<version>-slim` (glibc) or `-alpine` (musl) image and runs `python/tests`. x86_64 covers 3.11 to 3.15; aarch64 runs on an arm64 runner on 3.11, 3.13 and 3.15. matplotlib has no musllinux aarch64 wheel, so that platform runs without it and without the plot and documented-code tests. |
 | `test-other` | The same for the macOS and Windows wheels on 3.11, 3.13 and 3.15, in a uv-managed CPython. |
 | `publish` | Waits for every job above, checks that `dist/` holds the sdist and exactly one wheel for each of the seven platform tags, then uploads with Trusted Publishing. |
 
