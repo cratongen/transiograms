@@ -942,6 +942,10 @@ fn inner_order_test_huge_order() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "macOS has no address-space cap (ulimit -v) and no timeout(1)"
+)]
 fn order_test_with_huge_order_raises_instead_of_panicking() {
     assert_bounded("inner_order_test_huge_order", 2_000_000);
 }
@@ -960,6 +964,10 @@ fn inner_select_order_huge_order() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "macOS has no address-space cap (ulimit -v) and no timeout(1)"
+)]
 fn select_order_with_huge_order_raises_instead_of_panicking() {
     assert_bounded("inner_select_order_huge_order", 2_000_000);
 }
@@ -982,6 +990,10 @@ fn inner_order_test_order_beyond_the_data() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "macOS has no address-space cap (ulimit -v) and no timeout(1)"
+)]
 fn order_test_with_more_histories_than_transitions_raises_before_allocating() {
     assert_bounded("inner_order_test_order_beyond_the_data", 2_000_000);
 }
@@ -1002,6 +1014,10 @@ fn inner_exponential_test_many_replicates() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "macOS has no address-space cap (ulimit -v) and no timeout(1)"
+)]
 fn exponential_test_replicates_take_constant_memory() {
     assert_bounded("inner_exponential_test_many_replicates", 300_000);
 }
@@ -1026,6 +1042,10 @@ fn inner_simulate_huge_n() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "macOS has no address-space cap (ulimit -v) and no timeout(1)"
+)]
 fn simulate_with_huge_n_raises_instead_of_panicking() {
     assert_bounded("inner_simulate_huge_n", 2_000_000);
 }
@@ -1048,6 +1068,10 @@ fn inner_length_simulation_huge_length() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "macOS has no address-space cap (ulimit -v) and no timeout(1)"
+)]
 fn length_simulation_validates_size_before_allocating() {
     assert_bounded("inner_length_simulation_huge_length", 1_000_000);
 }
@@ -1075,6 +1099,10 @@ fn inner_long_discrete_bridge() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "macOS has no address-space cap (ulimit -v) and no timeout(1)"
+)]
 fn discrete_bridge_reuses_converged_powers() {
     // chain.md 9: P^r stops at convergence and is reused, so a 3e7-step bridge needs the
     // 3e7-entry path buffers (about 360 MB) and not 3e7 stored columns.

@@ -78,6 +78,6 @@ with np.errstate(divide="ignore"):
 log_b = np.column_stack([g.log_density(x) for g in truth.distributions])
 lnl, best, _, gamma, _ = tg.checks.brute_force_hsmm(truth.start, truth.transition, log_d, log_survivor, log_b)
 path, _ = truth.viterbi(x)
-print("log-likelihood gap:", abs(truth.score(x) - lnl))
+print("log-likelihood gap below 1e-12:", abs(truth.score(x) - lnl) < 1e-12)
 print("same Viterbi path:", np.array_equal(path, best))
-print("largest posterior gap:", np.abs(truth.predict_proba(x) - gamma).max())
+print("largest posterior gap below 1e-12:", np.abs(truth.predict_proba(x) - gamma).max() < 1e-12)
