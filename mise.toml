@@ -9,6 +9,8 @@ pixi = "0.81"
 micromamba = "2.9"
 git-cliff = "2.13"
 "github:EmbarkStudios/cargo-about" = "0.9.3"
+actionlint = "1.7.12"
+shellcheck = "0.11.0"
 
 [tasks.build]
 run = "cargo build --workspace"
@@ -33,8 +35,12 @@ run = [
   "uv run --no-sync ruff format --check python examples ci",
 ]
 
+[tasks.lint-ci]
+description = "actionlint (with shellcheck) over .github/workflows"
+run = "actionlint"
+
 [tasks.verify]
-depends = ["lint", "test"]
+depends = ["lint", "lint-ci", "test"]
 
 [tasks.bench]
 run = "cargo bench --workspace --exclude transiograms-py"

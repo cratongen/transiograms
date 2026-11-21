@@ -28,8 +28,10 @@ First public release.
 - `tg.plot` (with the `plot` extra), seeded `tg.datasets`, and NumPy reference checks in
   `tg.checks`.
 - Every stochastic routine takes a `seed` and gives the same bits on any number of threads; grid
-  work is sized from the available memory and checked before it allocates.
-- One abi3 wheel per platform for CPython 3.11 and newer; NumPy is the only runtime dependency.
+  work is sized from the available memory (on Linux, Windows and macOS) and checked before it
+  allocates.
+- One abi3 wheel per platform for CPython 3.11 and newer (Linux x86_64 and aarch64 with glibc
+  and with musl, macOS x86_64 and arm64, Windows x86_64); NumPy is the only runtime dependency.
   Licensed under MIT OR Apache-2.0.
 
 Known limits of this release: the API can change between minor versions, `tg.Categories` and

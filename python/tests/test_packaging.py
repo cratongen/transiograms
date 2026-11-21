@@ -49,6 +49,7 @@ RELEASE_TARGETS = [
     "x86_64-unknown-linux-gnu",
     "aarch64-unknown-linux-gnu",
     "x86_64-unknown-linux-musl",
+    "aarch64-unknown-linux-musl",
     "x86_64-apple-darwin",
     "aarch64-apple-darwin",
     "x86_64-pc-windows-msvc",
@@ -214,7 +215,7 @@ def test_rust_toolchain_pin_meets_the_declared_rust_version():
     channel = _toml("rust-toolchain.toml")["toolchain"]["channel"]
     msrv = _toml("Cargo.toml")["workspace"]["package"]["rust-version"]
     assert tuple(map(int, channel.split("."))) >= tuple(map(int, msrv.split(".")))
-    assert msrv in (ROOT / "docs" / "install.md").read_text(encoding="utf-8")
+    assert msrv in (ROOT / "docs" / "install-and-release.md").read_text(encoding="utf-8")
     assert _toml("mise.toml")["tasks"]["test-sdist"]["env"]["RUSTUP_TOOLCHAIN"] == channel
 
 
@@ -313,3 +314,60 @@ def test_changelog_has_a_section_for_this_version():
     )
     assert text.isascii(), "no emoji or other non-ASCII headings"
     assert (ROOT / "cliff.toml").is_file()
+
+
+WORKFLOWS = ROOT / ".github" / "workflows"
+GUARD = "github.repository == 'cratongen/transiograms'"
+
+
+def _workflow(name: str) -> dict:
+    yaml = pytest.importorskip("yaml")
+    return yaml.safe_load((WORKFLOWS / name).read_text(encoding="utf-8"))
+
+
+def test_every_workflow_job_acts_only_in_this_repository_and_pins_actions_to_a_sha():
+    assert {"ci.yml", "docs.yml", "release.yml"} <= {p.name for p in WORKFLOWS.glob("*.yml")}
+    for path in WORKFLOWS.glob("*.yml"):
+        text = path.read_text(encoding="utf-8")
+        for job, spec in _workflow(path.name)["jobs"].items():
+            assert GUARD in spec.get("if", ""), (path.name, job)
+        for ref in re.findall(r"uses:\s*(\S+)(.*)", text):
+            assert re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}", ref[0]), (path.name, ref)
+            assert re.fullmatch(r"\s+# v\d+\.\d+\.\d+", ref[1]), (path.name, ref)
+        assert "secrets." not in text and "password" not in text, path.name
+
+
+def test_release_publishes_only_what_it_builds_and_tests():
+    jobs = _workflow("release.yml")["jobs"]
+    built = {e["platform"]: e["target"] for e in jobs["wheels"]["strategy"]["matrix"]["include"]}
+    assert sorted(built.values()) == sorted(RELEASE_TARGETS)
+    tested = set(jobs["test-linux"]["strategy"]["matrix"]["platform"]) | set(
+        jobs["test-other"]["strategy"]["matrix"]["platform"]
+    )
+    assert tested == set(built)
+    pythons = jobs["test-linux"]["strategy"]["matrix"]["python"]
+    assert pythons[0] == _python_classifiers()[0] and pythons[-1] == _python_classifiers()[-1]
+    assert all(
+        "--locked" in s["with"]["args"] for s in jobs["wheels"]["steps"] if "maturin" in s.get("uses", "")
+    )
+    publish = jobs["publish"]
+    assert set(publish["needs"]) == {"sdist", "wheels", "test-linux", "test-other"}
+    assert "github.event_name == 'push'" in publish["if"]
+    assert "startsWith(github.ref, 'refs/tags/v')" in publish["if"]
+    assert publish["environment"]["name"] == "pypi"
+    assert publish["permissions"] == {"id-token": "write"}
+    uploads = [s for s in publish["steps"] if "pypi-publish" in s.get("uses", "")]
+    assert len(uploads) == 1 and not uploads[0].get("with"), "trusted publishing to PyPI, no token"
+    assert str(len(built)) in " ".join(s.get("run", "") for s in publish["steps"])
+
+
+def test_ci_and_docs_run_the_developer_tasks():
+    ci = (WORKFLOWS / "ci.yml").read_text(encoding="utf-8")
+    for task in ("lint", "lint-ci", "test", "test-wheel 3.11", "test-wheel 3.15", "test-sdist"):
+        assert f"run: mise run {task}\n" in ci, task
+    oses = _workflow("ci.yml")["jobs"]["test"]["strategy"]["matrix"]["os"]
+    assert {o.split("-")[0] for o in oses} == {"ubuntu", "macos", "windows"}
+    docs = _workflow("docs.yml")["jobs"]
+    assert "run: mise run docs-build\n" in (WORKFLOWS / "docs.yml").read_text(encoding="utf-8")
+    assert docs["deploy"]["environment"]["name"] == "github-pages"
+    assert "refs/heads/main" in docs["deploy"]["if"]

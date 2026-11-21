@@ -35,10 +35,10 @@ pip install transiograms
 
 With uv, `uv add transiograms` in a project or `uv pip install transiograms` in an environment.
 transiograms needs CPython 3.11 or newer and ships one `abi3` wheel per platform: Linux (x86_64
-and aarch64 with glibc, x86_64 with musl), macOS (Intel and Apple silicon) and Windows x86_64.
+and aarch64, each with glibc and with musl), macOS (Intel and Apple silicon) and Windows x86_64.
 NumPy is its only runtime dependency; `pip install "transiograms[plot]"` adds matplotlib for
 `tg.plot`. Other platforms build from the sdist, which needs Rust 1.97 or newer. The
-[install page](https://cratongen.github.io/transiograms/install/) has the details.
+[install page](https://cratongen.github.io/transiograms/install-and-release/) has the details.
 
 ## Quick start
 

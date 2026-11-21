@@ -11,7 +11,7 @@ title: transiograms
 
 <p class="tg-pitch">Markov models of geological categories: fit facies and lithology sequences down drillholes, model transiograms, and simulate categories on 3D grids.</p>
 
-[Install](install.md){ .md-button .md-button--primary }
+[Install](install-and-release.md){ .md-button .md-button--primary }
 [Guide](guide/markov-chains.md){ .md-button }
 [Examples](examples/01-markov-chains/01-embedded-chains/README.md){ .md-button }
 
@@ -62,7 +62,7 @@ into clay 88% of the time, a fining-upward cycle. The independence test rejects 
 
 | Page | What it covers |
 | --- | --- |
-| [Install](install.md) | pip from PyPI, a build from a clone or the sdist, wheels and Python versions |
+| [Install and release](install-and-release.md) | pip from PyPI, a build from a clone or the sdist, wheels and Python versions, the release procedure |
 | [Guide](guide/markov-chains.md) | Each method, its arguments and the theory checks the tests run |
 | [Examples](examples/01-markov-chains/01-embedded-chains/README.md) | Worked pages on seeded data, with figures and downloadable scripts |
 | [API reference](api/core.md) | Every class and function, from the docstrings |

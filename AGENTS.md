@@ -12,7 +12,8 @@ codes, and grids with boitata through NumPy arrays.
 
 ## Commands
 
-Tasks live in `mise.toml` (Python, uv, pixi, micromamba, git-cliff, cargo-about) and
+Tasks live in `mise.toml` (Python, uv, pixi, micromamba, git-cliff, cargo-about, actionlint,
+shellcheck) and
 `rust-toolchain.toml` (Rust):
 
 ```sh
@@ -20,7 +21,8 @@ mise install        # one-time setup
 mise run build      # cargo build --workspace
 mise run test       # rust tests, maturin develop, pytest
 mise run lint       # rustfmt --check, clippy -D warnings, ruff check + format --check
-mise run verify     # lint + test (must pass before a PR)
+mise run lint-ci    # actionlint (with shellcheck) over .github/workflows
+mise run verify     # lint + lint-ci + test (must pass before a PR)
 mise run bench      # cargo bench (no benches yet)
 mise run examples   # rerun examples/*/*/example_*.py and rewrite their README.md and figures
 mise run docs       # mkdocs serve
@@ -58,7 +60,7 @@ The API contract is `docs/design/spec.md`, with one algorithm file per crate bes
 - `python/transiograms/` - Python package (`__init__.py`, `_transiograms.pyi` stub, `plot.py`, `datasets.py`, `checks.py`, `errors.py`).
 - `python/tests/` - pytest suite (`test_<area>.py`).
 - `examples/` - numbered narrative scripts rendered into docs (`mise run examples`).
-- `docs/` - mkdocs site (`index.md`, `install.md`, `api/`, `design/`).
+- `docs/` - mkdocs site (`index.md`, `install-and-release.md`, `api/`, `design/`).
 
 New Rust algorithms go into the matching `crates/` subdomain, their pyo3 bindings
 go into `crates/py/src/<area>.rs`, and the Python wrapper and `.pyi` stub go into `python/transiograms/`.

@@ -30,7 +30,7 @@ No new container type that duplicates a `minetypes` type may be added before the
       extension links its Rust dependencies statically (MIT, Apache-2.0, BSD-2-Clause, Zlib,
       Unicode-3.0 and others, all compatible with `MIT OR Apache-2.0`), and those licences ask for
       their notices in binary distributions. cargo-about writes the file from `Cargo.lock`,
-      `about.toml` and `about.hbs` over the six release targets; run
+      `about.toml` and `about.hbs` over the seven release targets; run
       `mise run third-party-licenses` after any `Cargo.lock` change and commit the file. The
       packaging tests fail when a crate linked on any release target is missing from it. No
       vendored or ported third-party code or data is in the repository.
@@ -62,14 +62,25 @@ No new container type that duplicates a `minetypes` type may be added before the
 
 ## Before the first upload
 
-- [ ] Adopt `minetypes` (the gate above).
-- [ ] A release workflow that builds the wheels in manylinux and musllinux containers and on
-      macOS and Windows, guarded by `if: github.repository == 'cratongen/transiograms'` as in
-      boitata, over the six targets of `about.toml` (`RELEASE_TARGETS` in
-      `python/tests/test_packaging.py`). None exists yet: `mise run wheel` builds a `manylinux_2_35` wheel for this machine
+- [ ] Adopt `minetypes` (the gate above). This is the one remaining gate.
+- [x] `.github/workflows/release.yml` builds the sdist and seven `cp311-abi3` wheels (manylinux
+      and musllinux for x86_64 and aarch64, macOS x86_64 and arm64, Windows x86_64) over the
+      targets of `about.toml`, tests each wheel in a clean environment and publishes to PyPI with
+      Trusted Publishing (environment `pypi`, no token), only from a `v*` tag push in
+      `cratongen/transiograms`. `mise run wheel` builds a `manylinux_2_35` wheel for this machine
       only, which is not the tag to upload.
-- [ ] A docs workflow that deploys `mise run docs-build` to <https://cratongen.github.io/transiograms/>
-      once the repository is public.
+- [x] `.github/workflows/ci.yml` runs `mise run lint`, `test`, `test-wheel` and `test-sdist` on
+      Linux, macOS and Windows (see the [install and release page](install-and-release.md)).
+- [x] `.github/workflows/docs.yml` builds with `mise run docs-build` and deploys to
+      <https://cratongen.github.io/transiograms/> through the `github-pages` environment once the
+      repository is public.
+- [x] Every workflow job is guarded by `if: github.repository == 'cratongen/transiograms'` and
+      every action is pinned to a commit SHA (copied from segyrs and confirmed with
+      `git ls-remote` on 2026-11-20); the packaging tests check both. actionlint reports nothing.
+- [ ] None of the three workflows has run on GitHub yet. The first CI run on `main` and a manual
+      release run (build and test only) are the owner's dry run before the tag.
+- [ ] The owner's one-time setup: the PyPI pending publisher and the `pypi` environment
+      (see [One-time setup](install-and-release.md#one-time-setup-repository-owner)).
 
 ## Later: crates.io
 

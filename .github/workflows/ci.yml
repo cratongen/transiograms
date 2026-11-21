@@ -1,0 +1,76 @@
+# Lint and test on every push to main and every pull request, through the same mise tasks a
+# developer runs. The release wheels are built and tested in release.yml.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MISE_YES: "1"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    if: github.repository == 'cratongen/transiograms'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: rustup toolchain install
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-lint-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: cargo-lint-${{ runner.os }}-
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+        with:
+          install_args: python uv actionlint shellcheck
+      - run: mise run lint
+      - run: mise run lint-ci
+
+  # The development Python (3.13) on each OS: the Rust tests, then pytest against `maturin
+  # develop`. Then the release abi3 wheel, installed in a fresh venv on the floor (3.11) and on
+  # the newest pinned Python (3.15); release.yml runs the same check on Windows.
+  test:
+    if: github.repository == 'cratongen/transiograms'
+    name: test ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-15, windows-latest]
+    env:
+      RUST_TEST_THREADS: "4"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: rustup toolchain install
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-test-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: cargo-test-${{ runner.os }}-
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+        with:
+          install_args: python uv
+      - run: mise run test
+      - if: runner.os != 'Windows'
+        run: mise run test-wheel 3.11
+      - if: runner.os != 'Windows'
+        run: mise run test-wheel 3.15
+      - if: runner.os == 'Linux'
+        run: mise run test-sdist
