@@ -56,7 +56,8 @@ description = "Regenerate THIRD-PARTY-LICENSES.txt (cargo-about over the about.t
 run = "cargo-about generate --locked -m crates/py/Cargo.toml about.hbs -o THIRD-PARTY-LICENSES.txt"
 
 [tasks.changelog]
-run = "git-cliff -o CHANGELOG.md"
+description = "Print a draft entry from the commits since the last v* tag (cliff.toml) to edit into CHANGELOG.md by hand"
+run = "git-cliff --unreleased"
 
 [tasks.compat]
 depends = ["py:sync"]

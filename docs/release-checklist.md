@@ -43,6 +43,23 @@ No new container type that duplicates a `minetypes` type may be added before the
       Linux x86_64 (2026-11-20).
 - [x] Workspace path dependencies carry `version = "0.1.0"`, so every library crate packages.
 
+## Documentation (checked by `python/tests/test_docs.py` and `test_packaging.py`)
+
+- [x] The README (the PyPI description) opens with `pip install transiograms` and a quick start
+      whose printed output the docs test compares; it keeps no roadmap and no text of the old name.
+- [x] The install page gives the Python range, the wheel platforms, the sdist build and a conda
+      note.
+- [x] Every page's code runs in a clean environment with only the package: the guide, the example
+      pages and each example's downloadable script.
+- [x] The API pages render the docstrings with mkdocstrings (types and defaults from the stub);
+      every public name appears once; `mise run docs-build` passes with `--strict`.
+- [x] `CONTRIBUTING.md` (a code contribution starts with an issue) and the issue forms in
+      `.github/ISSUE_TEMPLATE/`.
+- [x] The site uses the family theme (`docs/stylesheets/transiograms.css`), light and dark.
+- [x] `CHANGELOG.md` has a curated `0.1.0 (unreleased)` section. At release, replace
+      `(unreleased)` with the date and tag `v0.1.0`, so that `mise run changelog` (git-cliff with
+      `cliff.toml`) drafts later entries from the commits after that tag.
+
 ## Before the first upload
 
 - [ ] Adopt `minetypes` (the gate above).

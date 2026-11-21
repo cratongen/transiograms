@@ -1,55 +1,33 @@
-## [unreleased]
+# Changelog
 
-### 🚀 Features
+transiograms follows [semantic versioning](https://semver.org/). Each release lists what changed
+for someone who uses the Python package.
 
-- Scaffold workspace with complete core crate and area skeletons
-- *(transiogram)* Implement experimental transiograms, 1D and 3D models
-- *(hmm)* Implement emissions, forward-backward, Viterbi and Baum-Welch
-- *(hsmm)* Implement hidden semi-Markov models and state-count selection
-- *(chain)* Implement Markov chain fits, tests, entropy, sojourns and simulation
-- *(tpsim)* Implement transition-probability cokriging, SIS and quenching
-- *(mcrf)* Implement MCRF simulation and MCP prediction
-- *(py)* Bind chains, HMMs, HSMMs, transiograms and grid simulation
-- *(py)* Serialise Entropy, Sojourn, Prediction and Realizations
+## 0.1.0 (unreleased)
 
-### 🐛 Bug Fixes
+First public release.
 
-- *(core)* Keep expm_rate stochastic at huge lags and round-trip NaN in serde_mat
-- *(chain)* Validate order, simulation and bridge sizes before allocating
-- *(hmm)* Address review findings in emissions, forward-backward, Viterbi and EM
-- *(hsmm)* Reject absurd max_duration and draw counts before allocating
-- *(transiogram)* Bound the table search and cost it before allocating
-- *(tpsim)* Check cokriging and simulation memory before allocating
-- *(mcrf)* Check simulation memory before allocating and test peaks against accepted budgets
-- *(hmm)* Keep categorical pseudocounts when restarts reinitialise emissions
-- *(hsmm)* Keep pseudocounts across restarts and expose Duration::validate
-- *(py)* Freeze the cell that holds a hard point and print test results compactly
-- *(plot)* Put the strip-log legend below the strip
-- *(core)* Lower the available memory to the tightest cgroup v2 headroom
-- *(transiogram)* Raise InvalidInput before allocating an oversized (n, k, k) transition stack
-- *(chain)* Reject order tests beyond the data and bound bootstrap memory
-- *(core)* Budget memory from process limits and check Grid.coords and emission samples
-
-### 📚 Documentation
-
-- Add charter and roadmap
-- Add API contract and per-crate design notes
-- *(spec)* Record the shared hmm helpers and NaN handling in serde_mat
-- *(examples)* Add narrative examples for every area and the boitata integration
-- Add a guide page per capability, API pages and the example pages to the site
-- *(hsmm)* Add NumPy docstrings to HiddenSemiMarkovModel methods and getters
-- *(examples)* Add an HSMM duration-law page with criteria and a brute-force check
-- *(examples)* Add an entrywise transiogram and closeness page
-- *(hmm)* Add a counts and mixtures example and document GaussianMixture.log_density
-- Record the true status of each milestone in the README roadmap
-
-### 🧪 Testing
-
-- *(py)* Cover every binding with theory checks against brute force and closed forms
-- *(hsmm)* Hold brute-force checks to the spec tolerances and test gamma from segment sums
-- *(tpsim)* Run M5 at the spec cell for hard data and full-range auto-transiograms
-- *(integration)* Segment logs with an HMM and check T-PROGS and MCRF grids for M7
-
-### ⚙️ Miscellaneous Tasks
-
-- Add the compat task that installs the wheel via pip, uv, pixi and conda
+- Markov chains along drillholes and logs (`tg.MarkovChain`): embedded and fixed-step transition
+  matrices, continuous-lag generators with `P(h) = exp(Q h)`, independence, order, symmetry and
+  homogeneity tests, entropy, sojourn statistics, and seeded 1D simulation of logs and beds,
+  unconditional or bridged between known endpoints.
+- Hidden Markov models (`tg.HiddenMarkovModel`) with categorical, Gaussian, Poisson and
+  Gaussian-mixture emissions: forward-backward, Viterbi, Baum-Welch with seeded restarts, clamped
+  labels, and AIC, BIC and ICL.
+- Hidden semi-Markov models (`tg.HiddenSemiMarkovModel`) with geometric, shifted Poisson, negative
+  binomial and empirical duration laws, and `tg.select_states` with cross-validated likelihood.
+- Transiograms: experimental transiograms down holes, between points and on grids; Markov and
+  entrywise 1D models whose rows sum to one at every lag; the 3D `tg.TransitionModel` from rates
+  or mean lengths.
+- Grid simulation: transition-probability cokriging and T-PROGS simulation with quenching
+  (`tg.tp_cokriging`, `tg.tprogs_simulate`); MCP prediction and MCRF simulation
+  (`tg.mcp_predict`, `tg.mcrf_simulate`), conditioned to drillholes.
+- Fit-quality reports: `tg.fit_quality` compares realizations with their model, and
+  `TransiogramModel.residuals` gives the misfit of a 1D fit. The measured gaps of MCRF and
+  T-PROGS to their model are documented limits of the methods, pinned by seeded tests.
+- `tg.plot` (with the `plot` extra), seeded `tg.datasets`, and NumPy reference checks in
+  `tg.checks`.
+- Every stochastic routine takes a `seed` and gives the same bits on any number of threads; grid
+  work is sized from the available memory and checked before it allocates.
+- One abi3 wheel per platform for CPython 3.11 and newer; NumPy is the only runtime dependency.
+  Licensed under MIT OR Apache-2.0.

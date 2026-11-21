@@ -300,3 +300,13 @@ def test_docs_site_uses_the_family_theme_in_both_schemes():
     css = (ROOT / "docs" / "stylesheets" / "transiograms.css").read_text(encoding="utf-8")
     assert '[data-md-color-scheme="default"]' in css and '[data-md-color-scheme="slate"]' in css
     assert "url(" not in css, "the theme makes no request to another server"
+
+
+def test_changelog_has_a_section_for_this_version():
+    version = _toml("Cargo.toml")["workspace"]["package"]["version"]
+    text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert re.search(
+        rf"^## {re.escape(version)} \((unreleased|\d{{4}}-\d{{2}}-\d{{2}})\)$", text, re.MULTILINE
+    )
+    assert text.isascii(), "no emoji or other non-ASCII headings"
+    assert (ROOT / "cliff.toml").is_file()
