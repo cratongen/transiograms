@@ -86,6 +86,7 @@ def test_from_json_rejects_inconsistent_shapes():
         )
 
 
+@pytest.mark.skipif(sys.platform != "linux", reason="the process data limit is read from /proc on Linux")
 def test_allocations_follow_the_process_data_limit():
     script = (
         "import resource, numpy as np, transiograms as tg\n"
