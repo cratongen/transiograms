@@ -72,7 +72,7 @@ def transition_matrix(matrix, *, categories=None, annotate=True, ax=None, **kwar
     m = np.asarray(getattr(matrix, "transition_matrix", matrix), dtype=float)
     fig, ax = _axes(ax)
     names, _ = _names_colors(categories, len(m), exact=True)
-    kwargs.setdefault("cmap", "Blues")
+    kwargs.setdefault("cmap", "Greys")
     kwargs.setdefault("vmin", 0.0)
     kwargs.setdefault("vmax", 1.0)
     image = ax.imshow(m, **kwargs)
