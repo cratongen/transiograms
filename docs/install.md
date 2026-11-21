@@ -4,14 +4,27 @@
 pip install transiograms
 ```
 
-Its only runtime dependency is NumPy; `pip install "transiograms[plot]"` adds matplotlib for `tg.plot`.
+or, with uv, `uv pip install transiograms`. transiograms needs CPython 3.11 or newer. Its only
+runtime dependency is NumPy; `pip install "transiograms[plot]"` adds matplotlib for `tg.plot`.
+
+Each release builds one wheel per platform for Linux (x86_64 and aarch64 with glibc, x86_64 with
+musl), macOS (x86_64 and Apple silicon) and Windows (x86_64). Other platforms build from the sdist
+(see below). transiograms is on PyPI only for now; a conda-forge package comes later, and inside a
+conda environment `pip install transiograms` works.
+
+```python
+import transiograms as tg
+
+print(tg.__version__)
+```
 
 The source is at <https://github.com/cratongen/transiograms> and the documentation at
 <https://cratongen.github.io/transiograms/>.
 
 ## From a clone
 
-transiograms builds from source with Rust and maturin. In a clone of the repository:
+To work on transiograms itself, build it from source with Rust and maturin. In a clone of the
+repository:
 
 ```sh
 mise install

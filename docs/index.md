@@ -26,3 +26,6 @@ and returns the same bits on any number of threads.
   seeded synthetic data and draw their figures.
 - The [API](api/core.md) lists every class and function; the [design contract](design/spec.md)
   fixes names, shapes and tolerances.
+- The [status page](status.md) lists each milestone, its acceptance test and the known limits.
+
+Install with `pip install transiograms` (CPython 3.11 or newer; see [Install](install.md)).

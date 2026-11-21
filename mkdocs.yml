@@ -51,6 +51,7 @@ plugins:
 nav:
   - Home: index.md
   - Install: install.md
+  - Status: status.md
   - Release checklist: release-checklist.md
   - Guide:
       - Markov chains: guide/markov-chains.md

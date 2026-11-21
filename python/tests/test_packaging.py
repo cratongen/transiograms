@@ -118,6 +118,36 @@ def test_readme_names_the_docs_and_links_work_on_pypi():
     assert not [t for t in targets if not t.startswith(("https://", "#"))]
 
 
+def test_readme_opens_with_install_and_a_quick_start_not_a_roadmap():
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
+    install, quick = text.find("pip install transiograms"), text.find("```python")
+    assert 0 < install < quick, "the PyPI page shows the install command, then a runnable quick start"
+    for stale in ("## Roadmap", "| Milestone |", "sedimentary rock", "proglacial", "varvite"):
+        assert stale not in text, stale
+
+
+def test_no_shipped_or_documented_text_keeps_the_old_name():
+    files = [
+        ROOT / n for n in ("README.md", "CHANGELOG.md", "CONTRIBUTING.md", "pyproject.toml", "mkdocs.yml")
+    ]
+    for folder in ("docs", "python", "examples", "crates", ".github"):
+        files += [
+            f
+            for f in (ROOT / folder).rglob("*")
+            if f.suffix in {".md", ".py", ".pyi", ".rs", ".toml", ".yml"}
+        ]
+    generated = ROOT / "docs" / "examples"
+    hits = [
+        f.relative_to(ROOT).as_posix()
+        for f in files
+        if f.is_file()
+        and f != Path(__file__).resolve()
+        and generated not in f.parents
+        and "varvite" in f.read_text(encoding="utf-8").lower()
+    ]
+    assert hits == []
+
+
 def _python_classifiers() -> list[str]:
     prefix = "Programming Language :: Python :: 3."
     return [
