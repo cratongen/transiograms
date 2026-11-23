@@ -125,13 +125,12 @@ acceptance test and what is still missing.
 transiograms is one of a family of standalone libraries for mining and geoscience. None depends on
 another; they exchange NumPy arrays.
 
-| Library | What it does |
-| --- | --- |
-| [boitata](https://pypi.org/project/boitata/) | Day-to-day geostatistics: drillhole checks, statistics, variograms, kriging and simulation |
-| segyrs | Reading, writing and manipulation of large SEG-Y files |
-| wireframes | Solids, surfaces and strings: read, write, plot, measure and combine |
-| transiograms | Markov models and categorical simulation of facies and lithology |
-| geophysics | Forward geophysical simulation: gravity, magnetics, seismic, DC/IP, EM, MT and GPR |
+| Library | Import | What it does |
+| --- | --- | --- |
+| [boitata](https://github.com/cratongen/boitata) | `import boitata as bt` | Geostatistics: drill holes, compositing, block models, variograms, kriging, simulation |
+| [segyrs](https://github.com/cratongen/segyrs) | `import segyrs` | Read, write and slice SEG-Y files, including files larger than memory |
+| [transiograms](https://github.com/cratongen/transiograms) | `import transiograms as tg` | Markov chains, hidden Markov models, transiograms and categorical simulation |
+| [wireframes](https://github.com/cratongen/wireframes) | `import wireframes as wf` | Solids, surfaces and strings: read, write, measure and combine |
 
 The [boitata guide](https://cratongen.github.io/transiograms/guide/boitata/) shows how intervals,
 category codes and grids pass between boitata and transiograms.

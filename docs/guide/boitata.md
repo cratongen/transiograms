@@ -1,16 +1,21 @@
 # Working with boitata
 
-transiograms has no dependency on boitata. The two libraries exchange NumPy arrays:
+transiograms is one of a family of standalone libraries for mining and geoscience: boitata,
+segyrs, transiograms and wireframes. None depends on another; they exchange NumPy arrays.
+With boitata the arrays are:
 
 | Exchange | boitata | transiograms |
 | --- | --- | --- |
-| Category tables | `Categories` scheme JSON | `tg.Categories.from_json` (names and colors) |
+| Category tables | `Categories.names`, `Categories.colors` | `tg.Categories(names, colors=colors)` |
 | Intervals | composite table `HOLE_ID`, `FROM`, `TO`, codes | `holes=`, `from_=`, `to=`, `codes`, with `data=` |
 | Points | composite midpoints `(n, 3)` | `coords` of the grid functions |
 | Codes | `Categories.encode` output, float with NaN | int64 with -1, or float with NaN |
-| Grids | `Geometry(origin, size, count)`, zero rotation | `tg.Grid(origin, size, count)`, cells x fastest |
+| Grids | `BlockModel(origin, size, count)`, zero rotation | `tg.Grid(origin, size, count)`, cells x fastest |
 | Realizations | block-model `with_column` | `Realizations.realizations[r]`, int64 per cell |
 | Probabilities | `SIS(proportions=)`, kriging by domain | `probabilities`, `(n_cells, k)` rows summing to 1 |
+
+Pass names and colors into the constructor. boitata's category JSON also carries `mapping` and
+`other`, and `tg.Categories.from_json` rejects those keys.
 
 A rotated boitata block model works through coordinates in its local frame; anisotropy lives in
 `TransitionModel.rotation`. Hard data are points: pass interval midpoints, which boitata's
