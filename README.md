@@ -40,6 +40,35 @@ NumPy is its only runtime dependency; `pip install "transiograms[plot]"` adds ma
 `tg.plot`. Other platforms build from the sdist, which needs Rust 1.97 or newer. The
 [install page](https://cratongen.github.io/transiograms/install-and-release/) has the details.
 
+## Agent plugin
+
+Without help, a coding agent guesses at transiograms calls. The plugin gives it the library's
+rules and tells it to read each signature from the installed package, so the code it writes
+matches your version. One plugin serves Claude, Codex, ChatGPT and Antigravity.
+
+In [Claude Code](https://claude.com/claude-code):
+
+```text
+/plugin marketplace add cratongen/transiograms
+/plugin install transiograms@transiograms
+```
+
+In [Codex](https://developers.openai.com/codex), and from there in the ChatGPT desktop app:
+
+```sh
+codex plugin marketplace add cratongen/transiograms
+codex plugin add transiograms@transiograms
+```
+
+In [Antigravity](https://antigravity.google):
+
+```sh
+agy plugin install https://github.com/cratongen/transiograms/tree/main/packaging/plugin
+```
+
+The rules in the plugin match the installed package. The docs are at
+<https://cratongen.github.io/transiograms/>.
+
 ## Quick start
 
 ```python

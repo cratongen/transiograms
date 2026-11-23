@@ -1,0 +1,10 @@
+{
+  "name": "transiograms",
+  "version": "0.1.0",
+  "description": "How to write correct transiograms code: the kinds of object, the calls each one takes, and where to look up a signature in the installed package.",
+  "author": { "name": "Gustavo Pretto Scholze" },
+  "homepage": "https://cratongen.github.io/transiograms/",
+  "repository": "https://github.com/cratongen/transiograms",
+  "license": "MIT OR Apache-2.0",
+  "keywords": ["geostatistics", "markov", "transiogram", "geology", "python"]
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "transiograms",
+  "displayName": "transiograms",
+  "version": "0.1.0",
+  "description": "How to write correct transiograms code: the kinds of object, the calls each one takes, and where to look up a signature in the installed package.",
+  "author": { "name": "Gustavo Pretto Scholze" },
+  "homepage": "https://cratongen.github.io/transiograms/",
+  "repository": "https://github.com/cratongen/transiograms",
+  "license": "MIT OR Apache-2.0",
+  "keywords": ["geostatistics", "markov", "transiogram", "geology", "python"],
+  "suggestedPrompts": [
+    "Fit an embedded Markov chain to the varved drillholes and test independence",
+    "Segment the electrofacies gamma-ray logs with a Gaussian hidden Markov model",
+    "Simulate facies with T-PROGS and check the result with fit_quality"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "transiograms",
+        "shortDescription": "Markov models of categories",
+        "longDescription": "How to write correct transiograms code: the kinds of object, the calls each one takes, and where to look up a signature in the installed package.",
+        "developerName": "Gustavo Pretto Scholze",
+        "category": "Coding",
+        "websiteURL": "https://cratongen.github.io/transiograms/"
+      }
+    }
+  }
+}

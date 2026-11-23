@@ -1,0 +1,12 @@
+{
+  "name": "transiograms",
+  "description": "Teaches coding agents the transiograms library.",
+  "owner": { "name": "Gustavo Pretto Scholze" },
+  "plugins": [
+    {
+      "name": "transiograms",
+      "source": "./packaging/plugin",
+      "description": "How to write correct transiograms code: the kinds of object, the calls each one takes, and where to look up a signature in the installed package."
+    }
+  ]
+}
