@@ -138,8 +138,9 @@ versions. Its known gaps:
   [T-PROGS](https://cratongen.github.io/transiograms/guide/tp-simulation/) and
   [MCRF](https://cratongen.github.io/transiograms/guide/mcrf-mcp/) guides explain both, and
   `tg.fit_quality` reports the gap for your own model.
-- **The container types will change.** `tg.Categories` and `tg.Grid` move to a shared types
-  package in a later release, and category codes may change from `int64` to `int32`.
+- **The container types will change.** A later release exchanges categories and grids through
+  the `__minetypes__` protocol instead of `tg.Categories` and `tg.Grid`, and category codes may
+  change from `int64` to `int32`.
 - **It reads no files.** You pass NumPy arrays, or a mapping of column names to arrays, and get
   NumPy arrays back.
 - **Performance is not measured.** No benchmark has run yet.

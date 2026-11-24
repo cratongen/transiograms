@@ -264,19 +264,11 @@ def test_built_sdist_carries_the_licences_and_the_lockfile():
     assert {*LICENSE_FILES, "Cargo.lock", "pyproject.toml", "crates/py/Cargo.toml"} <= names
 
 
-def test_release_checklist_names_the_minetypes_gate_and_the_types_it_replaces():
+def test_release_checklist_records_the_lifted_release_gate():
     text = (ROOT / "docs" / "release-checklist.md").read_text(encoding="utf-8")
-    assert "The one remaining gate: minetypes adoption" in text
-    for name in (
-        "`tg.Categories`",
-        "`tg.Grid`",
-        "`transiograms_core::Categories`",
-        "`transiograms_core::Grid`",
-    ):
-        assert name in text, name
+    assert "## Release gate lifted on 2026-11-24" in text
+    assert "local plan issue transiograms L03." in text
     assert "release-checklist.md" in (ROOT / "mkdocs.yml").read_text(encoding="utf-8")
-    assert "minetypes" not in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert "minetypes" not in (ROOT / "Cargo.toml").read_text(encoding="utf-8")
 
 
 def test_contributing_and_issue_templates_say_code_starts_with_an_issue():
