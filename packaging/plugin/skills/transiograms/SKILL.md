@@ -209,8 +209,8 @@ publishes no benchmark number.
 ## Hand it to a sibling
 
 transiograms is one of a family of standalone libraries for mining and geoscience at https://github.com/cratongen.
-None imports another. They pass NumPy arrays, and tables pass through Arrow, so pandas, polars and pyarrow
-work in between.
+None imports another. They exchange objects through the `__minetypes__` protocol, Arrow (`__arrow_c_stream__`) for
+tables, and NumPy arrays.
 
 | Library | Import | What it does |
 | --- | --- | --- |
@@ -224,17 +224,15 @@ Only calls that exist today in both libraries, checked against ../<sibling>/pyth
 
 ### boitata
 
-`Drillholes.composite` returns a `PointSet`. Its columns come out with `composites["HOLE_ID"]`,
-`composites["FROM"]`, `composites["TO"]` and the code column, and the midpoints are `composites.coords`,
-shape `(n, 3)`. Pass those arrays as `data=` and as `coords`. `Categories.encode` returns float64 with NaN
-for a missing label. transiograms accepts that, and it accepts int64 with -1. Copy `Categories.names` and
-`Categories.colors` into `tg.Categories(names, colors=colors)`. boitata's category JSON also has `mapping`
-and `other`, which `tg.Categories.from_json` rejects.
+Sequence functions (`MarkovChain.fit`, `downhole_transiogram`, `sojourn`, `order_test`, `select_order`,
+`homogeneity_test`) and hidden Markov models accept `drillholes`, `intervals` and `composites` protocol objects
+directly: hole indices, `from_depth` and `to_depth` are read automatically without column plumbing. Spatial
+functions (`experimental_transiogram`, `tp_cokriging`, `tprogs_simulate`, `mcp_predict`, `mcrf_simulate`,
+`grid_transiogram`, `fit_quality`) accept `grid` and `block_model` targets and `point_set` and `composites` data.
 
-A realization goes back on a block model. `BlockModel(origin, size, count)` takes the same three arguments
-as `tg.Grid` when the rotation is `(0, 0, 0)`. `with_column("FACIES", real.realizations[0])` takes one int64
-code per cell. `probabilities` has shape `(n_cells, k)` and its rows sum to 1. `SIS.fit` and `SIS.simulate`
-accept that array as `proportions=`.
+`tg.Categories`, `tg.Grid` and `tg.Realizations` implement `__minetypes__()`. Category codes cross the protocol
+boundary as `int32` with `-1` for missing values (`Realizations.__minetypes__()` produces `kind="grid"` with
+`int32` realization columns `realization_0 .. realization_{n-1}`).
 
 ```python
 import numpy as np
@@ -249,13 +247,10 @@ model = tg.TransitionModel.from_geology(
 real = tg.mcrf_simulate(
     model, grid, np.empty((0, 3)), np.empty(0, dtype=np.int64), n=2, seed=0
 )
-codes = real.realizations[0]
-assert codes.shape == (grid.n_cells,)
-assert real.probabilities.shape == (grid.n_cells, chain.n_categories)
+proto = real.__minetypes__()
+assert proto["kind"] == "grid"
+assert proto["columns"]["realization_0"].dtype == np.int32
 ```
-
-The arrays in that block are what `composites["CODE"]` and `block.with_column("FACIES", codes)` exchange.
-`tg.datasets.varved_sequence` stands in for the composite table so the block runs without boitata installed.
 
 ### segyrs
 

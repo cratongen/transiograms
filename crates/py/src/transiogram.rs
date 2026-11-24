@@ -11,10 +11,10 @@ use transiograms_transiogram::{
 
 use crate::args::{
     SequenceArgs, categories_k, codes, column, coords, direction, floats, hole_ids, hole_indices,
-    lags3, mask, mat, mat2, mat3, scalar_or_floats, sequence_set, to_rust, vec1,
+    lags3, mat, mat2, mat3, scalar_or_floats, sequence_set, to_rust, vec1,
 };
 use crate::chain::{PyMarkovChain, background_index};
-use crate::core::{PyGrid, json, unjson};
+use crate::core::{json, unjson};
 use crate::invalid;
 use crate::tpsim::PyRealizations;
 
@@ -177,12 +177,12 @@ impl PyExperimental {
 /// >>> exp.probabilities.shape, exp.directed
 /// ((3, 2, 2), False)
 #[pyfunction]
-#[pyo3(signature = (coords, codes, *, holes=None, direction=None, lag, n_lags, lag_tolerance=None, angle_tolerance=22.5, bandwidth=f64::INFINITY, vertical_bandwidth=f64::INFINITY, directed=true, pairs="all", categories=None, data=None))]
+#[pyo3(signature = (coords, codes=None, *, holes=None, direction=None, lag, n_lags, lag_tolerance=None, angle_tolerance=22.5, bandwidth=f64::INFINITY, vertical_bandwidth=f64::INFINITY, directed=true, pairs="all", categories=None, data=None))]
 #[allow(clippy::too_many_arguments)]
 fn experimental_transiogram<'py>(
     py: Python<'py>,
     coords: &Bound<'py, PyAny>,
-    codes: &Bound<'py, PyAny>,
+    codes: Option<&Bound<'py, PyAny>>,
     holes: Option<&Bound<'py, PyAny>>,
     direction: Option<(f64, f64)>,
     lag: f64,
@@ -196,18 +196,35 @@ fn experimental_transiogram<'py>(
     categories: Option<&Bound<'py, PyAny>>,
     data: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<PyExperimental> {
-    let xyz = self::coords(coords, "coords")?;
-    let c = self::codes(&column(data, codes, "codes")?, "codes")?;
-    let k = categories_k(categories, &c)?;
-    let holes = holes
-        .filter(|o| !o.is_none())
-        .map(|h| -> PyResult<Vec<u32>> {
-            Ok(hole_indices(&hole_ids(
-                Some(&column(data, h, "holes")?),
-                c.len(),
-            )?))
-        })
-        .transpose()?;
+    let (xyz, c, k, holes) = if crate::protocol::is_protocol(coords)?
+        || data
+            .filter(|d| !d.is_none())
+            .map(crate::protocol::is_protocol)
+            .transpose()?
+            .unwrap_or(false)
+    {
+        let pts = crate::protocol::points_from_protocol(coords, codes, holes, categories, data)?;
+        (pts.coords, pts.codes, pts.k, pts.hole_indices)
+    } else {
+        let Some(codes) = codes else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "experimental_transiogram() missing 1 required positional argument: 'codes'",
+            ));
+        };
+        let xyz = self::coords(coords, "coords")?;
+        let c = self::codes(&column(data, codes, "codes")?, "codes")?;
+        let k = categories_k(categories, &c)?;
+        let holes = holes
+            .filter(|o| !o.is_none())
+            .map(|h| -> PyResult<Vec<u32>> {
+                Ok(hole_indices(&hole_ids(
+                    Some(&column(data, h, "holes")?),
+                    c.len(),
+                )?))
+            })
+            .transpose()?;
+        (xyz, c, k, holes)
+    };
     let pairs = match pairs {
         "all" => PairFilter::All,
         "same_hole" => PairFilter::SameHole,
@@ -332,20 +349,59 @@ fn downhole_transiogram<'py>(
 ///        [0. , 0.5, 0.5],
 ///        [0. , 0. , 1. ]])
 #[pyfunction]
-#[pyo3(signature = (codes, grid, *, offset, n_lags, mask=None, categories=None))]
+#[pyo3(signature = (codes, grid=None, *, offset, n_lags, mask=None, categories=None))]
 fn grid_transiogram<'py>(
     py: Python<'py>,
     codes: &Bound<'py, PyAny>,
-    grid: &PyGrid,
+    grid: Option<&Bound<'py, PyAny>>,
     offset: [i64; 3],
     n_lags: usize,
     mask: Option<&Bound<'py, PyAny>>,
     categories: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<PyExperimental> {
-    let c = self::codes(codes, "codes")?;
-    let k = categories_k(categories, &c)?;
-    let m = self::mask(mask, grid.0.n_cells())?;
-    py.detach(|| on_grid(&c, &grid.0, m.as_deref(), offset, n_lags, k))
+    let expand_masked = |vals: Vec<u32>, idx: Option<Vec<u64>>, n_cells: usize| -> Vec<u32> {
+        match idx {
+            Some(indices) if vals.len() == indices.len() => {
+                let mut full = vec![transiograms_core::MISSING; n_cells];
+                for (&cell, &v) in indices.iter().zip(&vals) {
+                    full[cell as usize] = v;
+                }
+                full
+            }
+            _ => vals,
+        }
+    };
+    let (g, c, k, m) = if grid.is_none() && crate::protocol::is_protocol(codes)? {
+        let (g, proto_mask, _, _, proto_dict, idx) = crate::protocol::resolve_grid_target(codes)?;
+        let (vals, k, _) =
+            crate::protocol::resolve_code_column(&proto_dict.unwrap(), None, categories)?;
+        let c = expand_masked(vals, idx, g.n_cells());
+        let m = crate::protocol::merge_masks(proto_mask, mask, g.n_cells())?;
+        (g, c, k, m)
+    } else if let Some(grid_obj) = grid {
+        let (g, proto_mask, _, _, proto_dict, idx) =
+            crate::protocol::resolve_grid_target(grid_obj)?;
+        let (c, k) = if codes.cast::<pyo3::types::PyString>().is_ok() {
+            let Some(d) = proto_dict else {
+                return Err(invalid(
+                    "codes names a column; pass a grid or block_model protocol object with columns",
+                ));
+            };
+            let (vals, k, _) = crate::protocol::resolve_code_column(&d, Some(codes), categories)?;
+            (expand_masked(vals, idx, g.n_cells()), k)
+        } else {
+            let vals = self::codes(codes, "codes")?;
+            let k = categories_k(categories, &vals)?;
+            (expand_masked(vals, idx, g.n_cells()), k)
+        };
+        let m = crate::protocol::merge_masks(proto_mask, mask, g.n_cells())?;
+        (g, c, k, m)
+    } else {
+        return Err(pyo3::exceptions::PyTypeError::new_err(
+            "grid_transiogram() missing 1 required positional argument: 'grid'",
+        ));
+    };
+    py.detach(|| on_grid(&c, &g, m.as_deref(), offset, n_lags, k))
         .map(PyExperimental)
         .map_err(to_rust)
 }
@@ -1305,26 +1361,18 @@ impl PyFitQuality {
 fn fit_quality_report<'py>(
     py: Python<'py>,
     model: &PyTransitionModel,
-    grid: &PyGrid,
+    grid: &Bound<'py, PyAny>,
     realizations: &PyRealizations,
     directions: Option<Vec<[i64; 3]>>,
     n_lags: usize,
     mask: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<PyFitQuality> {
     let dirs = directions.unwrap_or_else(|| vec![[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, -1]]);
-    let m = self::mask(mask, grid.0.n_cells())?;
-    py.detach(|| {
-        fit_quality(
-            &model.0,
-            &grid.0,
-            m.as_deref(),
-            &realizations.r,
-            &dirs,
-            n_lags,
-        )
-    })
-    .map(PyFitQuality)
-    .map_err(to_rust)
+    let (g, proto_mask, _, _, _, _) = crate::protocol::resolve_grid_target(grid)?;
+    let m = crate::protocol::merge_masks(proto_mask, mask, g.n_cells())?;
+    py.detach(|| fit_quality(&model.0, &g, m.as_deref(), &realizations.r, &dirs, n_lags))
+        .map(PyFitQuality)
+        .map_err(to_rust)
 }
 
 pub fn register(m: &Bound<PyModule>) -> PyResult<()> {

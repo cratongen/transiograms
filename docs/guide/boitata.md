@@ -1,17 +1,27 @@
 # Working with boitata
 
 transiograms is one of a family of standalone libraries for mining and geoscience: boitata,
-segyrs, transiograms and wireframes. None depends on another; they exchange NumPy arrays.
-With boitata the arrays are:
+segyrs, transiograms and wireframes. None depends on another; they exchange objects through the
+`__minetypes__` protocol and NumPy arrays.
+
+Sequence functions (`MarkovChain.fit`, `downhole_transiogram`, `sojourn`, `order_test`,
+`select_order`, `homogeneity_test`) and hidden Markov models accept `drillholes`, `intervals` and
+`composites` protocol objects directly (hole index, `from_depth` and `to_depth` are read
+automatically). Spatial functions (`experimental_transiogram`, `tp_cokriging`, `tprogs_simulate`,
+`mcp_predict`, `mcrf_simulate`, `grid_transiogram`, `fit_quality`) accept `grid` and `block_model`
+targets and `point_set` and `composites` data. `tg.Categories`, `tg.Grid` and `tg.Realizations`
+implement `__minetypes__()`, with category codes crossing the protocol boundary as `int32`.
+
+With boitata the exchanges are:
 
 | Exchange | boitata | transiograms |
 | --- | --- | --- |
-| Category tables | `Categories.names`, `Categories.colors` | `tg.Categories(names, colors=colors)` |
-| Intervals | composite table `HOLE_ID`, `FROM`, `TO`, codes | `holes=`, `from_=`, `to=`, `codes`, with `data=` |
-| Points | composite midpoints `(n, 3)` | `coords` of the grid functions |
-| Codes | `Categories.encode` output, float with NaN | int64 with -1, or float with NaN |
-| Grids | `BlockModel(origin, size, count)`, zero rotation | `tg.Grid(origin, size, count)`, cells x fastest |
-| Realizations | block-model `with_column` | `Realizations.realizations[r]`, int64 per cell |
+| Category tables | `Categories` (`__minetypes__` kind `"categories"`) | `tg.Categories(cats)` or `categories=cats` |
+| Intervals | `Drillholes`, `intervals`, `composites` protocol objects | `MarkovChain().fit(dh)` or `fit("CODE", data=dh)` |
+| Points | `PointSet` or `composites` protocol objects, or `(n, 3)` midpoints | `coords` of the grid functions |
+| Codes | `int32` protocol codes (`-1` missing), or float with NaN | `int32` at the protocol boundary; `int64` with -1 or float with NaN |
+| Grids | `BlockModel(origin, size, count)`, zero rotation | `tg.Grid(block_model)` or `grid=block_model`, cells x fastest |
+| Realizations | block-model `with_column` or protocol consumer | `Realizations.__minetypes__()` (`int32` columns) or `Realizations.realizations[r]` |
 | Probabilities | `SIS(proportions=)`, kriging by domain | `probabilities`, `(n_cells, k)` rows summing to 1 |
 
 Pass names and colors into the constructor. boitata's category JSON also carries `mapping` and

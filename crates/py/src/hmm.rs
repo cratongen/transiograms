@@ -989,10 +989,23 @@ pub(crate) fn input<'py>(
     }
     let n = map.n_rows;
     let listed = map.list.is_some();
+    let proto_cols = if let Some(d_obj) = data.filter(|d| !d.is_none())
+        && crate::protocol::is_protocol(d_obj)?
+    {
+        Some(crate::protocol::table_columns_from_protocol(d_obj, None)?.0)
+    } else if crate::protocol::is_protocol(sequences_)? {
+        Some(crate::protocol::table_columns_from_protocol(sequences_, None)?.0)
+    } else {
+        None
+    };
+    let effective_data = proto_cols.as_ref().map(|c| c.as_any()).or(data);
     let labels = labels
         .filter(|o| !o.is_none())
         .map(|o| -> PyResult<Vec<f64>> {
-            floats(&per_row(&column(data, o, "labels")?, listed)?, "labels")
+            floats(
+                &per_row(&column(effective_data, o, "labels")?, listed)?,
+                "labels",
+            )
         })
         .transpose()?;
     if let Some(l) = &labels {
@@ -1014,7 +1027,7 @@ pub(crate) fn input<'py>(
     let allowed = allowed
         .filter(|o| !o.is_none())
         .map(|o| -> PyResult<Vec<bool>> {
-            let a = per_row(&column(data, o, "allowed")?, listed)?;
+            let a = per_row(&column(effective_data, o, "allowed")?, listed)?;
             let a = o
                 .py()
                 .import("numpy")?

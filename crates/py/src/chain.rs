@@ -1495,6 +1495,80 @@ fn homogeneity_test<'py>(
     data: Option<Bound<'py, PyAny>>,
 ) -> PyResult<PyTestResult> {
     let np = py.import("numpy")?;
+    let codes_is_proto = crate::protocol::is_protocol(&codes)?;
+    let data_is_proto = data
+        .as_ref()
+        .filter(|d| !d.is_none())
+        .map(crate::protocol::is_protocol)
+        .transpose()?
+        .unwrap_or(false);
+    if codes_is_proto || data_is_proto {
+        if gap.is_nan() || gap < 0.0 {
+            return Err(invalid(format!("gap must be >= 0, got {gap}")));
+        }
+        let (proto_obj, code_arg) = if codes_is_proto {
+            if data.as_ref().is_some_and(|d| !d.is_none()) {
+                return Err(invalid(
+                    "give a protocol object as codes or as data=, not both",
+                ));
+            }
+            (&codes, None)
+        } else {
+            (data.as_ref().unwrap(), Some(&codes))
+        };
+        let p = crate::protocol::sequence_from_protocol(proto_obj, code_arg, categories.as_ref())?;
+        let n = p.codes.len();
+        let labels = if let Ok(gs) = groups.cast::<pyo3::types::PyString>() {
+            let gname = gs.to_str()?;
+            if let Some(gcol) = p.iv_columns.get_item(gname)? {
+                hole_ids(Some(&gcol), n)?
+            } else if let Some(ccols) = &p.collar_columns
+                && let Some(ccol) = ccols.get_item(gname)?
+            {
+                let h_labels = hole_ids(
+                    Some(&ccol),
+                    p.hole_index
+                        .iter()
+                        .map(|&i| i as usize + 1)
+                        .max()
+                        .unwrap_or(0),
+                )?;
+                p.hole_index
+                    .iter()
+                    .map(|&hi| h_labels[hi as usize].clone())
+                    .collect()
+            } else {
+                return Err(invalid(format!(
+                    "groups names column {gname:?}, which data does not have"
+                )));
+            }
+        } else {
+            hole_ids(Some(&groups), n)?
+        };
+        let mut order: Vec<String> = Vec::new();
+        for g in &labels {
+            if !order.contains(g) {
+                order.push(g.clone());
+            }
+        }
+        let mut sets: Vec<SequenceSet> = Vec::new();
+        for g in &order {
+            let (mut gh, mut gf, mut gt, mut gc) = (vec![], vec![], vec![], vec![]);
+            for i in (0..n).filter(|&i| &labels[i] == g) {
+                gh.push(p.holes_per_row[i].clone());
+                gf.push(p.from[i]);
+                gt.push(p.to[i]);
+                gc.push(p.codes[i]);
+            }
+            sets.push(SequenceSet::from_intervals(&gh, &gf, &gt, &gc, p.k).map_err(to_rust)?);
+        }
+        let opts = options(kind, direction, gap, step)?;
+        let m = self::method(method)?;
+        return py
+            .detach(|| transiograms_chain::homogeneity_test(&sets, &opts, m))
+            .map(PyTestResult)
+            .map_err(to_rust);
+    }
     let d = data.as_ref();
     let col = |o: &Bound<'py, PyAny>, what: &str| crate::args::column(d, o, what);
     let all = crate::args::codes(&col(&codes, "codes")?, "codes")?;

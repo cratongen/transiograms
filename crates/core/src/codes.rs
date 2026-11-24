@@ -36,14 +36,19 @@ impl Categories {
                 return invalid(format!("category name {name:?} appears twice"));
             }
         }
-        if let Some(colors) = &colors
-            && colors.len() != names.len()
-        {
-            return invalid(format!(
-                "give one color per category: {} colors for {} names",
-                colors.len(),
-                names.len()
-            ));
+        if let Some(colors) = &colors {
+            if colors.len() != names.len() {
+                return invalid(format!(
+                    "give one color per category: {} colors for {} names",
+                    colors.len(),
+                    names.len()
+                ));
+            }
+            for (i, color) in colors.iter().enumerate() {
+                if color.is_empty() {
+                    return invalid(format!("category color {i} is empty"));
+                }
+            }
         }
         Ok(Self { names, colors })
     }

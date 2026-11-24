@@ -138,9 +138,11 @@ versions. Its known gaps:
   [T-PROGS](https://cratongen.github.io/transiograms/guide/tp-simulation/) and
   [MCRF](https://cratongen.github.io/transiograms/guide/mcrf-mcp/) guides explain both, and
   `tg.fit_quality` reports the gap for your own model.
-- **The container types will change.** A later release exchanges categories and grids through
-  the `__minetypes__` protocol instead of `tg.Categories` and `tg.Grid`, and category codes may
-  change from `int64` to `int32`.
+- **Grids are axis-aligned.** `tg.Categories`, `tg.Grid` and `tg.Realizations` implement the
+  `__minetypes__` protocol (with `int32` category codes at the protocol boundary), and sequence and
+  spatial routines consume `drillholes`, `intervals`, `composites`, `point_set`, `grid` and
+  `block_model` protocol objects. A rotated `grid` or `block_model` target is rejected; anisotropy
+  rotation lives in `TransitionModel.rotation`.
 - **It reads no files.** You pass NumPy arrays, or a mapping of column names to arrays, and get
   NumPy arrays back.
 - **Performance is not measured.** No benchmark has run yet.

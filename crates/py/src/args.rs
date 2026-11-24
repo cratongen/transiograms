@@ -61,16 +61,22 @@ pub fn codes(obj: &Bound<PyAny>, what: &str) -> PyResult<Vec<Code>> {
         .collect()
 }
 
-/// `k` from `categories` (an int or a Categories), else `max(code) + 1`; codes are checked.
+/// `k` from `categories` (an int, a Categories, or a `categories` protocol object), else
+/// `max(code) + 1`; codes are checked.
 pub fn categories_k(obj: Option<&Bound<PyAny>>, codes: &[Code]) -> PyResult<usize> {
     let k = match obj {
         None => transiograms_core::codes::n_categories(codes),
         Some(o) if o.is_none() => transiograms_core::codes::n_categories(codes),
         Some(o) => match o.cast::<PyCategories>() {
             Ok(c) => c.get().0.len(),
-            Err(_) => o
-                .extract::<usize>()
-                .map_err(|_| invalid("categories must be an int or a Categories"))?,
+            Err(_) => {
+                if crate::protocol::is_protocol(o)? {
+                    crate::protocol::categories_from_protocol(o)?.len()
+                } else {
+                    o.extract::<usize>()
+                        .map_err(|_| invalid("categories must be an int or a Categories"))?
+                }
+            }
         },
     };
     transiograms_core::codes::check_codes(codes, k).map_err(to_rust)?;
@@ -157,6 +163,68 @@ pub fn sequence_set(a: SequenceArgs) -> PyResult<SequenceSet> {
 /// `sequence_set` and the sampling step: `step`, inferred from `depth`, 1 for unit-step codes,
 /// None for intervals without `step`.
 pub fn sequence_set_step(a: SequenceArgs) -> PyResult<(SequenceSet, Option<f64>)> {
+    if a.gap.is_nan() || a.gap < 0.0 {
+        return Err(invalid(format!("gap must be >= 0, got {}", a.gap)));
+    }
+    let codes_is_proto = crate::protocol::is_protocol(&a.codes)?;
+    let data_is_proto = a
+        .data
+        .as_ref()
+        .filter(|d| !d.is_none())
+        .map(crate::protocol::is_protocol)
+        .transpose()?
+        .unwrap_or(false);
+    if codes_is_proto || data_is_proto {
+        let (proto_obj, code_arg) = if codes_is_proto {
+            if a.data.as_ref().is_some_and(|d| !d.is_none()) {
+                return Err(invalid(
+                    "give a protocol object as codes or as data=, not both",
+                ));
+            }
+            (&a.codes, None)
+        } else {
+            (a.data.as_ref().unwrap(), Some(&a.codes))
+        };
+        let p =
+            crate::protocol::sequence_from_protocol(proto_obj, code_arg, a.categories.as_ref())?;
+        let n = p.codes.len();
+        let iv_data = Some(p.iv_columns.as_any());
+        let holes = match a.holes.as_ref().filter(|o| !o.is_none()) {
+            Some(h) => hole_ids(Some(&column(iv_data, h, "holes")?), n)?,
+            None => p.holes_per_row,
+        };
+        let col = |o: &Option<Bound<'_, PyAny>>, what: &str| -> PyResult<Option<Vec<f64>>> {
+            o.as_ref()
+                .filter(|o| !o.is_none())
+                .map(|o| floats(&column(iv_data, o, what)?, what))
+                .transpose()
+        };
+        let (u_from, u_to, u_depth) = (
+            col(&a.from_, "from_")?,
+            col(&a.to, "to")?,
+            col(&a.depth, "depth")?,
+        );
+        if let Some(d) = u_depth {
+            if u_from.is_some() || u_to.is_some() {
+                return Err(invalid("give either from_ and to, or depth, not both"));
+            }
+            let step = match a.step {
+                Some(s) => s,
+                None => infer_step(&holes, &d)?,
+            };
+            let set =
+                SequenceSet::from_samples(&holes, &d, &p.codes, step, p.k).map_err(to_rust)?;
+            return Ok((set, Some(step)));
+        }
+        if u_from.is_some() != u_to.is_some() {
+            return Err(invalid("give from_ and to together"));
+        }
+        let from = u_from.unwrap_or(p.from);
+        let to = u_to.unwrap_or(p.to);
+        let set =
+            SequenceSet::from_intervals(&holes, &from, &to, &p.codes, p.k).map_err(to_rust)?;
+        return Ok((set, a.step));
+    }
     let data = a.data.as_ref();
     let col = |o: &Option<Bound<'_, PyAny>>, what: &str| -> PyResult<Option<Vec<f64>>> {
         o.as_ref()
@@ -171,9 +239,6 @@ pub fn sequence_set_step(a: SequenceArgs) -> PyResult<(SequenceSet, Option<f64>)
         Some(h) => hole_ids(Some(&column(data, h, "holes")?), n)?,
         None => hole_ids(None, n)?,
     };
-    if a.gap.is_nan() || a.gap < 0.0 {
-        return Err(invalid(format!("gap must be >= 0, got {}", a.gap)));
-    }
     let (from, to, depth) = (
         col(&a.from_, "from_")?,
         col(&a.to, "to")?,
@@ -246,7 +311,8 @@ pub fn matrix(obj: &Bound<PyAny>, what: &str) -> PyResult<(usize, usize, Vec<f64
     Ok((t, d, view.iter().copied().collect()))
 }
 
-/// HMM input: a list of arrays (one per hole) or one array plus per-row `holes`.
+/// HMM input: a list of arrays (one per hole) or one array plus per-row `holes`, or a protocol
+/// object.
 pub fn sequences(
     obj: &Bound<PyAny>,
     holes: Option<&Bound<PyAny>>,
@@ -254,7 +320,45 @@ pub fn sequences(
     direction: Direction,
     d_expected: Option<usize>,
 ) -> PyResult<(Vec<Sequence>, RowMap)> {
-    let obj = column(data, obj, "sequences")?;
+    let obj_is_proto = crate::protocol::is_protocol(obj)?;
+    let data_is_proto = data
+        .filter(|d| !d.is_none())
+        .map(crate::protocol::is_protocol)
+        .transpose()?
+        .unwrap_or(false);
+    let mut proto_holes: Option<Vec<String>> = None;
+    let mut proto_cols = None;
+    let obj = if obj_is_proto {
+        let (cols, dh) = crate::protocol::table_columns_from_protocol(obj, None)?;
+        proto_holes = dh;
+        let py = obj.py();
+        let np = py.import("numpy")?;
+        let mut arrays = Vec::new();
+        for (ck, cv) in cols.iter() {
+            let name = ck.cast::<PyString>()?.to_str()?;
+            if !name.ends_with("_length") {
+                arrays.push(cv);
+            }
+        }
+        if arrays.is_empty() {
+            return Err(invalid("protocol object has no columns"));
+        }
+        proto_cols = Some(cols);
+        if arrays.len() == 1 {
+            arrays.pop().unwrap()
+        } else {
+            np.call_method1("column_stack", (arrays,))?
+        }
+    } else if data_is_proto {
+        let (cols, dh) = crate::protocol::table_columns_from_protocol(data.unwrap(), Some(obj))?;
+        proto_holes = dh;
+        let resolved = column(Some(cols.as_any()), obj, "sequences")?;
+        proto_cols = Some(cols);
+        resolved
+    } else {
+        column(data, obj, "sequences")?
+    };
+    let effective_data = proto_cols.as_ref().map(|c| c.as_any()).or(data);
     let mut pieces: Vec<(usize, Vec<f64>, Vec<usize>)> = Vec::new();
     let mut d_seen = None;
     let mut list = None;
@@ -289,8 +393,11 @@ pub fn sequences(
         check_d(d)?;
         n_rows = t;
         let ids = match holes.filter(|h| !h.is_none()) {
-            Some(h) => hole_ids(Some(&column(data, h, "holes")?), t)?,
-            None => hole_ids(None, t)?,
+            Some(h) => hole_ids(Some(&column(effective_data, h, "holes")?), t)?,
+            None => match proto_holes {
+                Some(ph) if ph.len() == t => ph,
+                _ => hole_ids(None, t)?,
+            },
         };
         let mut order: std::collections::HashMap<&str, usize> = Default::default();
         let mut groups: Vec<Vec<usize>> = Vec::new();

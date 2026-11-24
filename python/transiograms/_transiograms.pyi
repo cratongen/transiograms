@@ -8,7 +8,7 @@ __version__: str
 
 # >>> core
 class Categories:
-    def __init__(self, names: Sequence[str], *, colors: Sequence[str] | None = None) -> None: ...
+    def __init__(self, names: Sequence[str] | object, *, colors: Sequence[str] | None = None) -> None: ...
     @staticmethod
     def from_labels(labels: ArrayLike) -> Categories: ...
     @property
@@ -21,9 +21,15 @@ class Categories:
     def to_json(self) -> str: ...
     @staticmethod
     def from_json(text: str) -> Categories: ...
+    def __minetypes__(self) -> dict[str, object]: ...
 
 class Grid:
-    def __init__(self, origin: Sequence[float], size: Sequence[float], count: Sequence[int]) -> None: ...
+    def __init__(
+        self,
+        origin: Sequence[float] | object,
+        size: Sequence[float] | None = None,
+        count: Sequence[int] | None = None,
+    ) -> None: ...
     @property
     def origin(self) -> tuple[float, float, float]: ...
     @property
@@ -37,14 +43,19 @@ class Grid:
     @property
     def coords(self) -> NDArray[np.float64]: ...
     def snap(
-        self, coords: ArrayLike, codes: ArrayLike, *, mask: ArrayLike | None = None
+        self,
+        coords: ArrayLike | object,
+        codes: ArrayLike | str | None = None,
+        *,
+        mask: ArrayLike | None = None,
     ) -> tuple[NDArray[np.uint64], NDArray[np.int64]]: ...
     def to_json(self) -> str: ...
     @staticmethod
     def from_json(text: str) -> Grid: ...
+    def __minetypes__(self) -> dict[str, object]: ...
 
 def _sequence_runs(
-    codes: ArrayLike | str,
+    codes: ArrayLike | str | object,
     *,
     holes: ArrayLike | str | None = None,
     from_: ArrayLike | str | None = None,
@@ -52,15 +63,15 @@ def _sequence_runs(
     depth: ArrayLike | str | None = None,
     step: float | None = None,
     gap: float = 1e-6,
-    categories: Categories | int | None = None,
-    data: Mapping[str, ArrayLike] | None = None,
+    categories: Categories | int | object | None = None,
+    data: Mapping[str, ArrayLike] | object | None = None,
     direction: str = "up",
 ) -> list[tuple[int, list[int], list[int]]]: ...
 def _sequences(
-    sequences: ArrayLike | list[ArrayLike] | str,
+    sequences: ArrayLike | list[ArrayLike] | str | object,
     *,
     holes: ArrayLike | str | None = None,
-    data: Mapping[str, ArrayLike] | None = None,
+    data: Mapping[str, ArrayLike] | object | None = None,
     direction: str = "up",
 ) -> tuple[list[tuple[int, int, list[float], list[int]]], int]: ...
 
@@ -116,7 +127,7 @@ class MarkovChain:
     ) -> None: ...
     def fit(
         self,
-        codes: ArrayLike | str,
+        codes: ArrayLike | str | object,
         *,
         holes: ArrayLike | str | None = None,
         from_: ArrayLike | str | None = None,
@@ -124,8 +135,8 @@ class MarkovChain:
         depth: ArrayLike | str | None = None,
         step: float | None = None,
         gap: float = 1e-6,
-        categories: Categories | int | None = None,
-        data: Mapping[str, ArrayLike] | None = None,
+        categories: Categories | int | object | None = None,
+        data: Mapping[str, ArrayLike] | object | None = None,
     ) -> MarkovChain: ...
     @staticmethod
     def from_matrix(
@@ -220,7 +231,7 @@ class Sojourn:
     def from_json(text: str) -> Sojourn: ...
 
 def order_test(
-    codes: ArrayLike | str,
+    codes: ArrayLike | str | object,
     *,
     order: int = 2,
     kind: Literal["embedded", "fixed"] = "fixed",
@@ -232,11 +243,11 @@ def order_test(
     depth: ArrayLike | str | None = None,
     step: float | None = None,
     gap: float = 1e-6,
-    categories: Categories | int | None = None,
-    data: Mapping[str, ArrayLike] | None = None,
+    categories: Categories | int | object | None = None,
+    data: Mapping[str, ArrayLike] | object | None = None,
 ) -> TestResult: ...
 def select_order(
-    codes: ArrayLike | str,
+    codes: ArrayLike | str | object,
     *,
     max_order: int = 3,
     direction: Literal["up", "down"] = "up",
@@ -246,11 +257,11 @@ def select_order(
     depth: ArrayLike | str | None = None,
     step: float | None = None,
     gap: float = 1e-6,
-    categories: Categories | int | None = None,
-    data: Mapping[str, ArrayLike] | None = None,
+    categories: Categories | int | object | None = None,
+    data: Mapping[str, ArrayLike] | object | None = None,
 ) -> dict[str, NDArray]: ...
 def homogeneity_test(
-    codes: ArrayLike | str,
+    codes: ArrayLike | str | object,
     groups: ArrayLike | str,
     *,
     kind: Literal["embedded", "fixed"] = "embedded",
@@ -262,11 +273,11 @@ def homogeneity_test(
     depth: ArrayLike | str | None = None,
     step: float | None = None,
     gap: float = 1e-6,
-    categories: Categories | int | None = None,
-    data: Mapping[str, ArrayLike] | None = None,
+    categories: Categories | int | object | None = None,
+    data: Mapping[str, ArrayLike] | object | None = None,
 ) -> TestResult: ...
 def sojourn(
-    codes: ArrayLike | str,
+    codes: ArrayLike | str | object,
     *,
     direction: Literal["up", "down"] = "up",
     holes: ArrayLike | str | None = None,
@@ -275,14 +286,14 @@ def sojourn(
     depth: ArrayLike | str | None = None,
     step: float | None = None,
     gap: float = 1e-6,
-    categories: Categories | int | None = None,
-    data: Mapping[str, ArrayLike] | None = None,
+    categories: Categories | int | object | None = None,
+    data: Mapping[str, ArrayLike] | object | None = None,
 ) -> Sojourn: ...
 
 # <<< chain
 
 # >>> hmm
-Sequences: TypeAlias = ArrayLike | list[ArrayLike] | str
+Sequences: TypeAlias = ArrayLike | list[ArrayLike] | str | object
 Rows: TypeAlias = NDArray | list[NDArray]
 
 class Categorical:
@@ -733,8 +744,8 @@ class ExperimentalTransiogram:
     def from_json(text: str) -> ExperimentalTransiogram: ...
 
 def experimental_transiogram(
-    coords: ArrayLike | str,
-    codes: ArrayLike | str,
+    coords: ArrayLike | str | object,
+    codes: ArrayLike | str | None = None,
     *,
     holes: ArrayLike | str | None = None,
     direction: tuple[float, float] | None = None,
@@ -746,11 +757,11 @@ def experimental_transiogram(
     vertical_bandwidth: float = ...,
     directed: bool = True,
     pairs: Literal["all", "same_hole", "different_hole"] = "all",
-    categories: Categories | int | None = None,
-    data: Mapping[str, ArrayLike] | None = None,
+    categories: Categories | int | object | None = None,
+    data: Mapping[str, ArrayLike] | object | None = None,
 ) -> ExperimentalTransiogram: ...
 def downhole_transiogram(
-    codes: ArrayLike | str,
+    codes: ArrayLike | str | object,
     *,
     lags: ArrayLike,
     direction: Literal["up", "down"] = "up",
@@ -760,17 +771,17 @@ def downhole_transiogram(
     depth: ArrayLike | str | None = None,
     step: float | None = None,
     gap: float = 1e-6,
-    categories: Categories | int | None = None,
-    data: Mapping[str, ArrayLike] | None = None,
+    categories: Categories | int | object | None = None,
+    data: Mapping[str, ArrayLike] | object | None = None,
 ) -> ExperimentalTransiogram: ...
 def grid_transiogram(
-    codes: ArrayLike,
-    grid: Grid,
+    codes: ArrayLike | str | object,
+    grid: Grid | object | None = None,
     *,
     offset: tuple[int, int, int],
     n_lags: int,
     mask: ArrayLike | None = None,
-    categories: Categories | int | None = None,
+    categories: Categories | int | object | None = None,
 ) -> ExperimentalTransiogram: ...
 
 class TransiogramModel:
@@ -885,7 +896,7 @@ class FitQuality:
 
 def fit_quality(
     model: TransitionModel,
-    grid: Grid,
+    grid: Grid | object,
     realizations: Realizations,
     *,
     directions: Sequence[tuple[int, int, int]] | None = None,
@@ -928,12 +939,13 @@ class Realizations:
     def to_json(self) -> str: ...
     @staticmethod
     def from_json(text: str) -> Realizations: ...
+    def __minetypes__(self) -> dict[str, object]: ...
 
 def tp_cokriging(
     model: TransitionModel,
-    grid: Grid,
-    coords: ArrayLike | str,
-    codes: ArrayLike | str,
+    grid: Grid | object,
+    coords: ArrayLike | str | object,
+    codes: ArrayLike | str | None = None,
     *,
     mask: ArrayLike | None = None,
     max_data: int = 12,
@@ -941,13 +953,13 @@ def tp_cokriging(
     max_per_octant: int = 0,
     svd_cutoff: float = 1e-8,
     memory: int | None = None,
-    data: Mapping[str, ArrayLike] | None = None,
+    data: Mapping[str, ArrayLike] | object | None = None,
 ) -> Prediction: ...
 def tprogs_simulate(
     model: TransitionModel,
-    grid: Grid,
-    coords: ArrayLike | str,
-    codes: ArrayLike | str,
+    grid: Grid | object,
+    coords: ArrayLike | str | object,
+    codes: ArrayLike | str | None = None,
     *,
     n: int = 1,
     seed: int = 0,
@@ -962,7 +974,7 @@ def tprogs_simulate(
     quench_tol: float = 1e-3,
     proportion_weight: float = 1.0,
     memory: int | None = None,
-    data: Mapping[str, ArrayLike] | None = None,
+    data: Mapping[str, ArrayLike] | object | None = None,
 ) -> Realizations: ...
 
 # <<< tpsim
@@ -970,21 +982,21 @@ def tprogs_simulate(
 # >>> mcrf
 def mcp_predict(
     model: TransitionModel,
-    grid: Grid,
-    coords: ArrayLike | str,
-    codes: ArrayLike | str,
+    grid: Grid | object,
+    coords: ArrayLike | str | object,
+    codes: ArrayLike | str | None = None,
     *,
     mask: ArrayLike | None = None,
     neighbours: Literal["sectors"] | int | None = None,
     closeness_limit: float = 0.01,
     memory: int | None = None,
-    data: Mapping[str, ArrayLike] | None = None,
+    data: Mapping[str, ArrayLike] | object | None = None,
 ) -> Prediction: ...
 def mcrf_simulate(
     model: TransitionModel,
-    grid: Grid,
-    coords: ArrayLike | str,
-    codes: ArrayLike | str,
+    grid: Grid | object,
+    coords: ArrayLike | str | object,
+    codes: ArrayLike | str | None = None,
     *,
     n: int = 1,
     seed: int = 0,
@@ -992,7 +1004,7 @@ def mcrf_simulate(
     neighbours: Literal["sectors"] | int | None = None,
     closeness_limit: float = 0.01,
     memory: int | None = None,
-    data: Mapping[str, ArrayLike] | None = None,
+    data: Mapping[str, ArrayLike] | object | None = None,
 ) -> Realizations: ...
 
 # <<< mcrf

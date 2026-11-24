@@ -17,6 +17,14 @@ _PALETTE = ["#e69f00", "#56b4e9", "#009e73", "#f0e442", "#0072b2", "#d55e00", "#
 
 
 def _names_colors(categories, k, *, exact=False):
+    import transiograms as tg
+
+    if (
+        categories is not None
+        and not isinstance(categories, tg.Categories)
+        and (hasattr(categories, "__minetypes__") or isinstance(categories, dict))
+    ):
+        categories = tg.Categories(categories)
     if categories is not None and (len(categories) < k or (exact and len(categories) != k)):
         need = f"{k}" if exact else f"at least {k}"
         raise InvalidInput(f"categories has {len(categories)} names but the data needs {need}")
@@ -396,6 +404,13 @@ def grid_slice(values, grid, *, axis="z", index=0, categories=None, ax=None, **k
     """
     import numpy as np
 
+    import transiograms as tg
+
+    if isinstance(values, str) and (hasattr(grid, "__minetypes__") or isinstance(grid, dict)):
+        d = grid.__minetypes__() if hasattr(grid, "__minetypes__") else grid
+        values = d["columns"][values]
+    if not isinstance(grid, tg.Grid):
+        grid = tg.Grid(grid)
     fig, ax = _axes(ax)
     cube = np.asarray(values).reshape(grid.shape)
     (ox, oy, oz), (sx, sy, sz), (nx, ny, nz) = grid.origin, grid.size, grid.count

@@ -2,27 +2,57 @@
 
 use numpy::{PyArray1, PyArray2, PyArrayMethods};
 use pyo3::prelude::*;
-use pyo3::types::PyList;
-use transiograms_core::{Grid, MISSING, Prediction, Realizations, Snapped, memory};
+use pyo3::types::{PyDict, PyList};
+use transiograms_core::{Categories, Grid, MISSING, Prediction, Realizations, Snapped, memory};
 use transiograms_tpsim::{Options, QuenchOptions};
 use transiograms_transiogram::TransitionModel;
 
-use crate::args::{codes, column, coords, mask, to_rust, vec1};
-use crate::core::{PyGrid, json, same_json, unjson};
+use crate::args::{codes, column, coords, to_rust, vec1};
+use crate::core::{json, same_json, unjson};
 use crate::invalid;
 use crate::transiogram::PyTransitionModel;
+
+pub(crate) struct HardResolved {
+    pub grid: Grid,
+    pub snapped: Snapped,
+    pub mask: Option<Vec<bool>>,
+    pub categories: Option<Categories>,
+    pub crs: Option<String>,
+    pub length_unit: Option<String>,
+}
 
 /// Hard data snapped to the grid and the mask, checked against the model.
 pub(crate) fn hard<'py>(
     model: &TransitionModel,
-    grid: &Grid,
+    grid: &Bound<'py, PyAny>,
     xyz: &Bound<'py, PyAny>,
-    codes: &Bound<'py, PyAny>,
+    codes: Option<&Bound<'py, PyAny>>,
     mask: Option<&Bound<'py, PyAny>>,
     data: Option<&Bound<'py, PyAny>>,
-) -> PyResult<(Snapped, Option<Vec<bool>>)> {
-    let xyz = self::coords(&column(data, xyz, "coords")?, "coords")?;
-    let c = self::codes(&column(data, codes, "codes")?, "codes")?;
+) -> PyResult<HardResolved> {
+    let (g, proto_mask, grid_crs, grid_lu, _, _) = crate::protocol::resolve_grid_target(grid)?;
+    let (xyz, c, categories, crs, length_unit) = if crate::protocol::is_protocol(xyz)?
+        || data
+            .filter(|d| !d.is_none())
+            .map(crate::protocol::is_protocol)
+            .transpose()?
+            .unwrap_or(false)
+    {
+        let pts = crate::protocol::points_from_protocol(xyz, codes, None, None, data)?;
+        let crs = crate::protocol::combine_crs(grid_crs.as_deref(), pts.crs.as_deref())?;
+        let lu =
+            crate::protocol::combine_length_unit(grid_lu.as_deref(), pts.length_unit.as_deref())?;
+        (pts.coords, pts.codes, pts.categories, crs, lu)
+    } else {
+        let Some(codes) = codes else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "missing 1 required positional argument: 'codes'",
+            ));
+        };
+        let xyz = self::coords(&column(data, xyz, "coords")?, "coords")?;
+        let c = self::codes(&column(data, codes, "codes")?, "codes")?;
+        (xyz, c, None, grid_crs, grid_lu)
+    };
     if xyz.len() != c.len() {
         return Err(invalid(format!(
             "{} coordinates but {} codes",
@@ -36,9 +66,17 @@ pub(crate) fn hard<'py>(
             "code {bad} is not one of the model's {k} categories"
         )));
     }
-    let m = self::mask(mask, grid.n_cells())?;
-    let s = grid.snap(&xyz, &c, m.as_deref()).map_err(to_rust)?;
-    Ok((s, m))
+    let m = crate::protocol::merge_masks(proto_mask, mask, g.n_cells())?;
+    let s = g.snap(&xyz, &c, m.as_deref()).map_err(to_rust)?;
+    let categories = categories.filter(|cat| cat.len() == k);
+    Ok(HardResolved {
+        grid: g,
+        snapped: s,
+        mask: m,
+        categories,
+        crs,
+        length_unit,
+    })
 }
 
 fn probabilities<'py>(py: Python<'py>, k: usize, p: &[f64]) -> PyResult<Bound<'py, PyArray2<f64>>> {
@@ -202,6 +240,10 @@ impl PyPrediction {
 pub struct PyRealizations {
     pub r: Realizations,
     pub memory: Option<u64>,
+    pub grid: Grid,
+    pub categories: Option<Categories>,
+    pub crs: Option<String>,
+    pub length_unit: Option<String>,
 }
 
 impl PyRealizations {
@@ -326,7 +368,16 @@ impl PyRealizations {
             )));
         }
         valid_codes(&r.codes, r.k, "codes")?;
-        Ok(Self { r, memory: None })
+        let grid = Grid::new([0.0, 0.0, 0.0], [1.0, 1.0, 1.0], [r.n_cells.max(1), 1, 1])
+            .map_err(to_rust)?;
+        Ok(Self {
+            r,
+            memory: None,
+            grid,
+            categories: None,
+            crs: None,
+            length_unit: None,
+        })
     }
     fn __eq__(&self, other: PyRef<Self>) -> PyResult<bool> {
         same_json(&self.r, &other.r)
@@ -336,6 +387,54 @@ impl PyRealizations {
             "Realizations(n={}, n_cells={}, k={})",
             self.r.n, self.r.n_cells, self.r.k
         )
+    }
+
+    /// Protocol v1 dictionary of these realizations on their grid (``kind="grid"``).
+    ///
+    /// Each realization column ``realization_0 .. realization_{n-1}`` is a 1D ``int32`` copy of the
+    /// stored codes, with ``-1`` for inactive cells.
+    ///
+    /// Returns
+    /// -------
+    /// dict
+    fn __minetypes__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let (n, cells, k) = (self.r.n, self.r.n_cells, self.r.k);
+        memory::check(
+            (n as u64).saturating_mul(cells as u64 * 4),
+            self.memory,
+            "int32 realizations protocol",
+        )
+        .map_err(to_rust)?;
+        let (names, colors): (Vec<String>, Option<Vec<String>>) = match &self.categories {
+            Some(c) if c.len() == k => (c.names.clone(), c.colors.clone()),
+            _ => ((0..k).map(|i| i.to_string()).collect(), None),
+        };
+        let columns = PyDict::new(py);
+        let categories = PyDict::new(py);
+        for i in 0..n {
+            let col_name = format!("realization_{i}");
+            let slice = &self.r.codes[i * cells..(i + 1) * cells];
+            let arr = crate::protocol::readonly_i32(py, slice)?;
+            columns.set_item(&col_name, arr)?;
+            let cat_entry = crate::protocol::category_entry_dict(py, &names, colors.as_deref())?;
+            categories.set_item(&col_name, cat_entry)?;
+        }
+        let d = PyDict::new(py);
+        d.set_item("protocol", 1)?;
+        d.set_item("kind", "grid")?;
+        let o = self.grid.origin;
+        let s = self.grid.size;
+        let c = self.grid.count;
+        d.set_item("origin", (o[0], o[1], o[2]))?;
+        d.set_item("size", (s[0], s[1], s[2]))?;
+        d.set_item("count", (c[0], c[1], c[2]))?;
+        d.set_item("rotation", (0.0, 0.0, 0.0))?;
+        d.set_item("columns", columns)?;
+        d.set_item("units", PyDict::new(py))?;
+        d.set_item("categories", categories)?;
+        d.set_item("crs", self.crs.as_deref())?;
+        d.set_item("length_unit", self.length_unit.as_deref())?;
+        Ok(d)
     }
 }
 
@@ -389,14 +488,14 @@ impl PyRealizations {
 /// >>> bool(np.allclose(pred.probabilities.sum(axis=1), 1.0))
 /// True
 #[pyfunction]
-#[pyo3(signature = (model, grid, coords, codes, *, mask=None, max_data=12, closeness_limit=0.01, max_per_octant=0, svd_cutoff=1e-8, memory=None, data=None))]
+#[pyo3(signature = (model, grid, coords, codes=None, *, mask=None, max_data=12, closeness_limit=0.01, max_per_octant=0, svd_cutoff=1e-8, memory=None, data=None))]
 #[allow(clippy::too_many_arguments)]
 fn tp_cokriging<'py>(
     py: Python<'py>,
     model: &PyTransitionModel,
-    grid: &PyGrid,
+    grid: &Bound<'py, PyAny>,
     coords: &Bound<'py, PyAny>,
-    codes: &Bound<'py, PyAny>,
+    codes: Option<&Bound<'py, PyAny>>,
     mask: Option<&Bound<'py, PyAny>>,
     max_data: usize,
     closeness_limit: f64,
@@ -405,7 +504,7 @@ fn tp_cokriging<'py>(
     memory: Option<u64>,
     data: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<PyPrediction> {
-    let (h, m) = hard(&model.0, &grid.0, coords, codes, mask, data)?;
+    let h = hard(&model.0, grid, coords, codes, mask, data)?;
     let opts = Options {
         max_data,
         closeness_limit,
@@ -415,9 +514,11 @@ fn tp_cokriging<'py>(
         memory,
         ..Options::default()
     };
-    py.detach(|| transiograms_tpsim::predict(&model.0, &grid.0, m.as_deref(), &h, &opts))
-        .map(PyPrediction)
-        .map_err(to_rust)
+    py.detach(|| {
+        transiograms_tpsim::predict(&model.0, &h.grid, h.mask.as_deref(), &h.snapped, &opts)
+    })
+    .map(PyPrediction)
+    .map_err(to_rust)
 }
 
 /// T-PROGS simulation: sequential indicator simulation with transition-probability cokriging,
@@ -469,14 +570,14 @@ fn tp_cokriging<'py>(
 /// >>> bool(np.all(real.realizations[:, cells] == hard))
 /// True
 #[pyfunction]
-#[pyo3(signature = (model, grid, coords, codes, *, n=1, seed=0, mask=None, max_data=12, closeness_limit=0.01, max_per_octant=0, svd_cutoff=1e-8, quench=true, quench_iterations=3, quench_limit=0.4, quench_tol=1e-3, proportion_weight=1.0, memory=None, data=None))]
+#[pyo3(signature = (model, grid, coords, codes=None, *, n=1, seed=0, mask=None, max_data=12, closeness_limit=0.01, max_per_octant=0, svd_cutoff=1e-8, quench=true, quench_iterations=3, quench_limit=0.4, quench_tol=1e-3, proportion_weight=1.0, memory=None, data=None))]
 #[allow(clippy::too_many_arguments)]
 fn tprogs_simulate<'py>(
     py: Python<'py>,
     model: &PyTransitionModel,
-    grid: &PyGrid,
+    grid: &Bound<'py, PyAny>,
     coords: &Bound<'py, PyAny>,
-    codes: &Bound<'py, PyAny>,
+    codes: Option<&Bound<'py, PyAny>>,
     n: usize,
     seed: i128,
     mask: Option<&Bound<'py, PyAny>>,
@@ -493,7 +594,7 @@ fn tprogs_simulate<'py>(
     data: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<PyRealizations> {
     let seed = crate::args::seed(seed)?;
-    let (h, m) = hard(&model.0, &grid.0, coords, codes, mask, data)?;
+    let h = hard(&model.0, grid, coords, codes, mask, data)?;
     let opts = Options {
         n_realizations: n,
         seed,
@@ -510,9 +611,18 @@ fn tprogs_simulate<'py>(
         memory,
     };
     let r = py
-        .detach(|| transiograms_tpsim::simulate(&model.0, &grid.0, m.as_deref(), &h, &opts))
+        .detach(|| {
+            transiograms_tpsim::simulate(&model.0, &h.grid, h.mask.as_deref(), &h.snapped, &opts)
+        })
         .map_err(to_rust)?;
-    Ok(PyRealizations { r, memory })
+    Ok(PyRealizations {
+        r,
+        memory,
+        grid: h.grid,
+        categories: h.categories,
+        crs: h.crs,
+        length_unit: h.length_unit,
+    })
 }
 
 pub fn register(m: &Bound<PyModule>) -> PyResult<()> {

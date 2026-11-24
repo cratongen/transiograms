@@ -4,7 +4,6 @@ use pyo3::prelude::*;
 use transiograms_mcrf::{Neighbourhood, Options};
 
 use crate::args::to_rust;
-use crate::core::PyGrid;
 use crate::invalid;
 use crate::tpsim::{PyPrediction, PyRealizations, hard};
 use crate::transiogram::PyTransitionModel;
@@ -88,25 +87,27 @@ fn options(
 /// >>> pred.most_likely[cells], hard
 /// (array([0, 2, 1]), array([0, 2, 1]))
 #[pyfunction]
-#[pyo3(signature = (model, grid, coords, codes, *, mask=None, neighbours=None, closeness_limit=0.01, memory=None, data=None))]
+#[pyo3(signature = (model, grid, coords, codes=None, *, mask=None, neighbours=None, closeness_limit=0.01, memory=None, data=None))]
 #[allow(clippy::too_many_arguments)]
 fn mcp_predict<'py>(
     py: Python<'py>,
     model: &PyTransitionModel,
-    grid: &PyGrid,
+    grid: &Bound<'py, PyAny>,
     coords: &Bound<'py, PyAny>,
-    codes: &Bound<'py, PyAny>,
+    codes: Option<&Bound<'py, PyAny>>,
     mask: Option<&Bound<'py, PyAny>>,
     neighbours: Option<&Bound<'py, PyAny>>,
     closeness_limit: f64,
     memory: Option<u64>,
     data: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<PyPrediction> {
-    let (h, m) = hard(&model.0, &grid.0, coords, codes, mask, data)?;
+    let h = hard(&model.0, grid, coords, codes, mask, data)?;
     let opts = options(neighbours, closeness_limit, 1, 0, memory)?;
-    py.detach(|| transiograms_mcrf::predict(&model.0, &grid.0, m.as_deref(), &h, &opts))
-        .map(PyPrediction)
-        .map_err(to_rust)
+    py.detach(|| {
+        transiograms_mcrf::predict(&model.0, &h.grid, h.mask.as_deref(), &h.snapped, &opts)
+    })
+    .map(PyPrediction)
+    .map_err(to_rust)
 }
 
 /// Sequential Markov chain random field simulation: cells visited along a seeded random path,
@@ -145,14 +146,14 @@ fn mcp_predict<'py>(
 /// >>> bool(np.array_equal(real.realizations, tg.mcrf_simulate(model, grid, xyz, codes, n=2, seed=1, neighbours=8).realizations))
 /// True
 #[pyfunction]
-#[pyo3(signature = (model, grid, coords, codes, *, n=1, seed=0, mask=None, neighbours=None, closeness_limit=0.01, memory=None, data=None))]
+#[pyo3(signature = (model, grid, coords, codes=None, *, n=1, seed=0, mask=None, neighbours=None, closeness_limit=0.01, memory=None, data=None))]
 #[allow(clippy::too_many_arguments)]
 fn mcrf_simulate<'py>(
     py: Python<'py>,
     model: &PyTransitionModel,
-    grid: &PyGrid,
+    grid: &Bound<'py, PyAny>,
     coords: &Bound<'py, PyAny>,
-    codes: &Bound<'py, PyAny>,
+    codes: Option<&Bound<'py, PyAny>>,
     n: usize,
     seed: i128,
     mask: Option<&Bound<'py, PyAny>>,
@@ -162,12 +163,21 @@ fn mcrf_simulate<'py>(
     data: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<PyRealizations> {
     let seed = crate::args::seed(seed)?;
-    let (h, m) = hard(&model.0, &grid.0, coords, codes, mask, data)?;
+    let h = hard(&model.0, grid, coords, codes, mask, data)?;
     let opts = options(neighbours, closeness_limit, n, seed, memory)?;
     let r = py
-        .detach(|| transiograms_mcrf::simulate(&model.0, &grid.0, m.as_deref(), &h, &opts))
+        .detach(|| {
+            transiograms_mcrf::simulate(&model.0, &h.grid, h.mask.as_deref(), &h.snapped, &opts)
+        })
         .map_err(to_rust)?;
-    Ok(PyRealizations { r, memory })
+    Ok(PyRealizations {
+        r,
+        memory,
+        grid: h.grid,
+        categories: h.categories,
+        crs: h.crs,
+        length_unit: h.length_unit,
+    })
 }
 
 pub fn register(m: &Bound<PyModule>) -> PyResult<()> {

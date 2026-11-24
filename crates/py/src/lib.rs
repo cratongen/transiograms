@@ -3,6 +3,7 @@ use pyo3::types::PyType;
 
 mod args;
 mod core;
+mod protocol;
 // >>> chain
 mod chain;
 // <<< chain

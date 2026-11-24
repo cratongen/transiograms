@@ -3,7 +3,7 @@
 use numpy::ndarray::Array2;
 use numpy::{IntoPyArray, PyArray1, PyArray2};
 use pyo3::prelude::*;
-use pyo3::types::{PyList, PyString};
+use pyo3::types::{PyDict, PyList, PyString};
 use transiograms_core::{Categories, Grid, MISSING};
 
 use crate::args::{codes, coords, to_rust};
@@ -93,7 +93,11 @@ pub struct PyCategories(pub Categories);
 impl PyCategories {
     #[new]
     #[pyo3(signature = (names, *, colors=None))]
-    fn new(names: Vec<String>, colors: Option<Vec<String>>) -> PyResult<Self> {
+    fn new(names: &Bound<PyAny>, colors: Option<Vec<String>>) -> PyResult<Self> {
+        if colors.is_none() && crate::protocol::is_protocol(names)? {
+            return crate::protocol::categories_from_protocol(names).map(Self);
+        }
+        let names: Vec<String> = names.extract()?;
         Categories::new(names, colors).map(Self).map_err(to_rust)
     }
 
@@ -114,7 +118,7 @@ impl PyCategories {
     /// InvalidInput
     ///     When there is no non-missing label.
     #[staticmethod]
-    fn from_labels(labels: &Bound<PyAny>) -> PyResult<Self> {
+    pub fn from_labels(labels: &Bound<PyAny>) -> PyResult<Self> {
         let l = self::labels(labels)?;
         Categories::from_labels(l.iter().map(Option::as_deref))
             .map(Self)
@@ -233,6 +237,23 @@ impl PyCategories {
     fn __repr__(&self) -> String {
         format!("Categories({:?})", self.0.names)
     }
+
+    /// Protocol v1 dictionary of this category table (``kind="categories"``).
+    ///
+    /// Returns
+    /// -------
+    /// dict
+    fn __minetypes__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let d = crate::protocol::category_entry_dict(py, &self.0.names, self.0.colors.as_deref())?;
+        d.set_item("protocol", 1)?;
+        d.set_item("kind", "categories")?;
+        d.set_item("columns", PyDict::new(py))?;
+        d.set_item("units", PyDict::new(py))?;
+        d.set_item("categories", PyDict::new(py))?;
+        d.set_item("crs", py.None())?;
+        d.set_item("length_unit", py.None())?;
+        Ok(d)
+    }
 }
 
 /// Axis-aligned grid, cells x fastest, then y, then z.
@@ -271,7 +292,32 @@ pub struct PyGrid(pub Grid);
 #[pymethods]
 impl PyGrid {
     #[new]
-    fn new(origin: [f64; 3], size: [f64; 3], count: [usize; 3]) -> PyResult<Self> {
+    #[pyo3(signature = (origin, size=None, count=None))]
+    fn new(
+        origin: &Bound<PyAny>,
+        size: Option<[f64; 3]>,
+        count: Option<[usize; 3]>,
+    ) -> PyResult<Self> {
+        if size.is_none() && count.is_none() && crate::protocol::is_protocol(origin)? {
+            let (grid, mask, _, _, _, _) = crate::protocol::resolve_grid_target(origin)?;
+            if mask.is_some() {
+                return Err(invalid(
+                    "masked block_model cannot be converted to a plain Grid",
+                ));
+            }
+            return Ok(Self(grid));
+        }
+        let origin: [f64; 3] = origin.extract()?;
+        let Some(size) = size else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "Grid() missing required positional arguments: 'size' and 'count'",
+            ));
+        };
+        let Some(count) = count else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "Grid() missing required positional argument: 'count'",
+            ));
+        };
         Grid::new(origin, size, count).map(Self).map_err(to_rust)
     }
 
@@ -347,16 +393,28 @@ impl PyGrid {
     /// ------
     /// InvalidInput
     ///     When ``coords`` is not ``(n, 3)``, the lengths differ or ``mask`` has another length.
-    #[pyo3(signature = (coords, codes, *, mask=None))]
+    #[pyo3(signature = (coords, codes=None, *, mask=None))]
     fn snap<'py>(
         &self,
         py: Python<'py>,
         coords: &Bound<'py, PyAny>,
-        codes: &Bound<'py, PyAny>,
+        codes: Option<&Bound<'py, PyAny>>,
         mask: Option<Vec<bool>>,
     ) -> PyResult<(Bound<'py, PyArray1<u64>>, Bound<'py, PyArray1<i64>>)> {
-        let xyz = self::coords(coords, "coords")?;
-        let codes = self::codes(codes, "codes")?;
+        let (xyz, codes) = if crate::protocol::is_protocol(coords)? {
+            let pts = crate::protocol::points_from_protocol(coords, codes, None, None, None)?;
+            (pts.coords, pts.codes)
+        } else {
+            let Some(codes) = codes else {
+                return Err(pyo3::exceptions::PyTypeError::new_err(
+                    "snap() missing 1 required positional argument: 'codes'",
+                ));
+            };
+            (
+                self::coords(coords, "coords")?,
+                self::codes(codes, "codes")?,
+            )
+        };
         let s = self
             .0
             .snap(&xyz, &codes, mask.as_deref())
@@ -403,6 +461,27 @@ impl PyGrid {
             "Grid(origin={:?}, size={:?}, count={:?})",
             self.0.origin, self.0.size, self.0.count
         )
+    }
+
+    /// Protocol v1 dictionary of this grid (``kind="grid"``).
+    ///
+    /// Returns
+    /// -------
+    /// dict
+    fn __minetypes__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let d = PyDict::new(py);
+        d.set_item("protocol", 1)?;
+        d.set_item("kind", "grid")?;
+        d.set_item("origin", self.origin())?;
+        d.set_item("size", self.size())?;
+        d.set_item("count", self.count())?;
+        d.set_item("rotation", (0.0, 0.0, 0.0))?;
+        d.set_item("columns", PyDict::new(py))?;
+        d.set_item("units", PyDict::new(py))?;
+        d.set_item("categories", PyDict::new(py))?;
+        d.set_item("crs", py.None())?;
+        d.set_item("length_unit", py.None())?;
+        Ok(d)
     }
 }
 
